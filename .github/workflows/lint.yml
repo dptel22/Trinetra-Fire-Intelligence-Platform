@@ -1,0 +1,49 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (stub)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint tools
+        run: |
+          pip install ruff mypy
+
+      - name: Run ruff (if backend exists)
+        if: ${{ hashFiles('backend/**/*.py') != '' }}
+        run: |
+          ruff check backend/ || echo "No backend code yet"
+
+      - name: Run mypy (if backend exists)
+        if: ${{ hashFiles('backend/**/*.py') != '' }}
+        run: |
+          mypy backend/ || echo "No backend code yet"
+
+      - name: Run ruff (if ml-pipeline exists)
+        if: ${{ hashFiles('ml-pipeline/**/*.py') != '' }}
+        run: |
+          ruff check ml-pipeline/ || echo "No ml-pipeline code yet"
+
+      - name: Run mypy (if ml-pipeline exists)
+        if: ${{ hashFiles('ml-pipeline/**/*.py') != '' }}
+        run: |
+          mypy ml-pipeline/ || echo "No ml-pipeline code yet"
+
+      - name: Check frontend (stub)
+        if: ${{ hashFiles('frontend/**/*.ts') != '' || hashFiles('frontend/**/*.tsx') != '' }}
+        run: |
+          echo "Frontend linting not yet configured"

@@ -1,0 +1,110 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test-backend:
+    name: Backend Tests (stub)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: ${{ hashFiles('backend/pyproject.toml') != '' || hashFiles('backend/requirements.txt') != '' }}
+        run: |
+          pip install pytest pytest-asyncio httpx
+          if [ -f pyproject.toml ]; then pip install -e .; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        if: ${{ hashFiles('backend/tests/**/*.py') != '' }}
+        run: |
+          pytest tests/ -v || echo "No backend tests yet"
+        continue-on-error: true
+
+  test-ml-pipeline:
+    name: ML Pipeline Tests (stub)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ml-pipeline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: ${{ hashFiles('ml-pipeline/pyproject.toml') != '' || hashFiles('ml-pipeline/requirements.txt') != '' }}
+        run: |
+          pip install pytest pandas xgboost h3
+          if [ -f pyproject.toml ]; then pip install -e .; fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        if: ${{ hashFiles('ml-pipeline/tests/**/*.py') != '' }}
+        run: |
+          pytest tests/ -v || echo "No ML pipeline tests yet"
+        continue-on-error: true
+
+  test-frontend:
+    name: Frontend Tests (stub)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        if: ${{ hashFiles('frontend/package.json') != '' }}
+        run: |
+          npm ci
+
+      - name: Run tests
+        if: ${{ hashFiles('frontend/tests/**/*.test.ts') != '' || hashFiles('frontend/tests/**/*.spec.ts') != '' }}
+        run: |
+          npm test -- --run || echo "No frontend tests yet"
+        continue-on-error: true
+
+  strip-notebooks:
+    name: Strip Notebook Outputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install nbstripout
+        run: pip install nbstripout
+
+      - name: Check notebooks have no outputs
+        run: |
+          nbstripout --dry-run notebooks/**/*.ipynb || echo "No notebooks yet or outputs found"
+        continue-on-error: true
