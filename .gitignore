@@ -2,6 +2,9 @@
 data/raw/**
 data/processed/**
 !data/sample/**
+data/DL_FIRE_*
+data/*.zip
+
 
 # Model artifacts - use releases/artifact store instead
 *.pkl
