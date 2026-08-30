@@ -17,6 +17,7 @@ class CatBoostModelService:
         self.model_path = model_path
         self.model: CatBoostClassifier = None
         self.is_loaded = False
+        self.model_version: str = settings.VERSION  # Exposed for audit trail provenance
         self._load_model()
 
     def _load_model(self):
@@ -97,10 +98,10 @@ class CatBoostModelService:
         if not self.is_loaded:
             return ExplanationResponse(
                 hotspot_id=str(record_dict.get("hotspot_id", f"H3-{h3_idx}")),
-                predicted_class="Wildfire",
+                predicted_class=settings.TARGET_CLASSES[0],
                 base_value=0.0,
                 feature_attributions=[],
-                summary_statement="Model not yet trained."
+                summary_statement="Model not yet trained — run pipeline/train_catboost.py first."
             )
 
         pool = Pool(X, cat_features=settings.CAT_FEATURES)

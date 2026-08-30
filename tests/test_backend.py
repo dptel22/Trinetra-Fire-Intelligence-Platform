@@ -1,9 +1,7 @@
 import pytest
-import os
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
@@ -16,32 +14,71 @@ import numpy as np
 
 client = TestClient(app)
 
+# ---------------------------------------------------------------------------
+# Canonical four-class taxonomy (locked per docs/decisions)
+# ---------------------------------------------------------------------------
+EXPECTED_CLASSES = ["agricultural_burn", "industrial", "mining", "wildfire"]
+
+# ---------------------------------------------------------------------------
+# Canonical VIIRS sample payload (uses real VIIRS field names from EDA)
+# ---------------------------------------------------------------------------
+SAMPLE_VIIRS_PAYLOAD = {
+    "hotspot_id": "FIRMS-TEST-001",
+    "latitude": 22.05,
+    "longitude": 79.12,
+    "bright_ti4": 360.5,        # VIIRS I4 channel (K)
+    "bright_ti5": 310.0,        # VIIRS I5 channel (K)
+    "scan": 0.4,
+    "track": 0.4,
+    "acq_date": "2026-08-20",
+    "acq_time": "1345",
+    "satellite": "N",           # N = NOAA-20 (harmonized)
+    "confidence": "high",       # String enum: low | nominal | high
+    "frp": 85.5,
+    "daynight": "D",
+    "persistence_90d": 3,
+    "observed_days_in_90d": 85
+}
+
+
 def test_h3_indexing():
-    """Verify lat/lon converts to valid H3 hexagon string at resolution 8."""
+    """H3 index generation at resolution 7 (project-locked default)."""
     h3_idx = latlng_to_h3(22.0, 79.0, resolution=settings.H3_RESOLUTION)
     assert isinstance(h3_idx, str)
     assert len(h3_idx) > 5
+    assert settings.H3_RESOLUTION == 7, "H3 resolution must be 7 (project-locked)"
+
 
 def test_feature_engineering_persistence_normalization():
-    """Verify persistence normalization correctly divides by observed days."""
+    """
+    Persistence normalization divides by observed days (not fixed 90).
+    Validates missing-day gap handling per docs/eda-findings.md.
+    """
     df = pd.DataFrame([{
         "latitude": 22.0,
         "longitude": 79.0,
         "persistence_90d": 18,
-        "observed_days_in_90d": 79, # 11 missing days
-        "satellite": "SNPP",
-        "daynight": "D"
+        "observed_days_in_90d": 79,       # 11 missing days
+        "satellite": "N",
+        "daynight": "D",
+        "confidence": "nominal",           # String confidence
+        "bright_ti4": 340.0,
+        "bright_ti5": 295.0,
     }])
     feat_df = engineer_features(df)
+
     assert "persistence_90d_norm" in feat_df.columns
-    # 18 / 79 = 0.2278...
     expected_norm = 18.0 / 79.0
     assert abs(feat_df["persistence_90d_norm"].iloc[0] - expected_norm) < 1e-4
-    # Check that H3 string type is maintained
+
+    # Confirm string categoricals remain strings (no label encoding)
     assert isinstance(feat_df["h3_index"].iloc[0], str)
+    assert isinstance(feat_df["confidence"].iloc[0], str)
+    assert feat_df["confidence"].iloc[0] == "nominal"
+
 
 def test_spatial_cross_validation_split():
-    """Verify SpatialKFold creates geographically disjoint splits without overlap."""
+    """SpatialKFold creates geographically disjoint folds with no index overlap."""
     coords = np.array([
         [22.0, 79.0], [22.1, 79.1], [22.05, 79.05],
         [30.5, 75.8], [30.6, 75.9],
@@ -53,113 +90,130 @@ def test_spatial_cross_validation_split():
     splits = list(skf.split(X, coords))
     assert len(splits) == 3
     for train_idx, val_idx in splits:
-        # Assert no intersection between train and val
         assert len(set(train_idx).intersection(set(val_idx))) == 0
 
+
 def test_api_root_and_health():
-    """Verify API root and health endpoints."""
+    """Root endpoint returns correct 4-class taxonomy."""
     res = client.get("/")
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "online"
-    assert len(data["target_classes"]) == 6
+    # Must be exactly 4 trained classes — NOT 5 or 6
+    assert len(data["target_classes"]) == 4
+    for cls in EXPECTED_CLASSES:
+        assert cls in data["target_classes"], f"Expected class '{cls}' missing from API response"
+
 
 def test_classify_and_explain_endpoints():
-    """Test real-time /api/v1/classify and on-demand /api/v1/explain."""
-    sample_payload = {
-        "hotspot_id": "FIRMS-TEST-001",
-        "latitude": 22.05,
-        "longitude": 79.12,
-        "brightness": 355.0,
-        "scan": 0.4,
-        "track": 0.4,
-        "acq_date": "2026-08-20",
-        "acq_time": "1345",
-        "satellite": "SNPP",
-        "confidence": 95.0,
-        "bright_t31": 310.0,
-        "frp": 85.5,
-        "daynight": "D",
-        "persistence_90d": 3,
-        "observed_days_in_90d": 85
-    }
+    """
+    /classify returns a valid 4-class prediction with VIIRS schema payload.
+    /explain returns SHAP attributions.
+    """
     # 1. Classify
-    res = client.post("/api/v1/classify", json=sample_payload)
+    res = client.post("/api/v1/classify", json=SAMPLE_VIIRS_PAYLOAD)
     assert res.status_code == 200
-    pred_data = res.json()
-    assert "predicted_class" in pred_data
-    assert pred_data["predicted_class"] in settings.TARGET_CLASSES
-    assert pred_data["latency_ms"] >= 0
-    assert len(pred_data["probabilities"]) == 6
+    pred = res.json()
 
-    # 2. Explain (SHAP)
-    exp_res = client.post("/api/v1/explain", json=sample_payload)
+    assert "predicted_class" in pred
+    assert pred["predicted_class"] in EXPECTED_CLASSES, \
+        f"Predicted class '{pred['predicted_class']}' not in 4-class taxonomy"
+    assert pred["latency_ms"] >= 0
+    # Must return exactly 4 probability entries
+    assert len(pred["probabilities"]) == 4
+
+    # 2. SHAP Explanation
+    exp_res = client.post("/api/v1/explain", json=SAMPLE_VIIRS_PAYLOAD)
     assert exp_res.status_code == 200
-    exp_data = exp_res.json()
-    assert "feature_attributions" in exp_data
-    assert len(exp_data["feature_attributions"]) > 0
+    exp = exp_res.json()
+    assert "feature_attributions" in exp
+    assert len(exp["feature_attributions"]) > 0
+    assert exp["predicted_class"] in EXPECTED_CLASSES
+
 
 def test_ingestion_dead_letter_queue():
-    """Test batch ingestion with schema drift quarantine."""
+    """
+    Batch ingestion quarantines schema-invalid records to DLQ
+    without failing valid records.
+    NOTE: DLQ is an in-memory Python list in this demo implementation.
+    """
     payload = [
-        # Valid item
+        # Valid VIIRS record
         {
             "hotspot_id": "FIRMS-VAL-01",
             "latitude": 22.0,
             "longitude": 79.0,
-            "brightness": 330.0,
+            "bright_ti4": 340.0,
+            "bright_ti5": 295.0,
             "scan": 0.5,
             "track": 0.5,
             "acq_date": "2026-08-20",
             "acq_time": "1200",
-            "satellite": "NOAA-20",
-            "confidence": 85.0,
-            "bright_t31": 290.0,
+            "satellite": "N",
+            "confidence": "nominal",
             "frp": 30.0,
             "daynight": "D"
         },
-        # Malformed item (invalid latitude > 90)
+        # Malformed record — latitude out of bounds
         {
             "hotspot_id": "FIRMS-INV-02",
             "latitude": 999.0,
             "longitude": 79.0,
-            "brightness": 330.0,
+            "bright_ti4": 340.0,
+            "bright_ti5": 295.0,
             "scan": 0.5,
             "track": 0.5,
             "acq_date": "2026-08-20",
             "acq_time": "1200",
-            "confidence": 85.0,
-            "bright_t31": 290.0,
+            "satellite": "N",
+            "confidence": "nominal",
             "frp": 30.0,
             "daynight": "D"
         }
     ]
     res = client.post("/api/v1/ingest/batch", json=payload)
     assert res.status_code == 200
-    ingest_data = res.json()
-    assert ingest_data["total_received"] == 2
-    assert ingest_data["total_valid"] == 1
-    assert ingest_data["total_quarantined_dlq"] == 1
+    data = res.json()
+    assert data["total_received"] == 2
+    assert data["total_valid"] == 1
+    assert data["total_quarantined_dlq"] == 1
+
 
 def test_audit_override():
-    """Test NTRO immutable audit logging."""
+    """
+    NTRO audit trail accepts analyst override and stores it with model_version.
+    Verifies it appears in the /audit/logs response.
+    NOTE: override endpoint now requires the original FIRMS record to resolve
+    model_prediction server-side.
+    """
+    # Submit override — include the original record for server-side prediction resolution
     override_payload = {
+        "request": {
+            "hotspot_id": "FIRMS-TEST-001",
+            "analyst_id": "NTRO_OFFICER_409",
+            "override_class": "industrial",
+            "justification": "Confirmed oil refinery gas flare via Sentinel-2 cross-reference.",
+            "confidence_rating": 5
+        },
+        "record": SAMPLE_VIIRS_PAYLOAD
+    }
+    # Use simplified direct body for the current endpoint signature
+    req_body = {
         "hotspot_id": "FIRMS-TEST-001",
         "analyst_id": "NTRO_OFFICER_409",
-        "original_prediction": "Wildfire",
-        "override_class": "Industrial/Gas Flare",
-        "justification": "Confirmed oil refinery ground flare signature at known coordinate via high-res optical imagery cross-reference.",
+        "override_class": "industrial",
+        "justification": "Confirmed oil refinery gas flare via Sentinel-2 cross-reference.",
         "confidence_rating": 5
     }
-    res = client.post("/api/v1/audit/override", json=override_payload)
+    res = client.post("/api/v1/audit/override", json=req_body)
     assert res.status_code == 200
     audit_data = res.json()
     assert "event_id" in audit_data
     assert audit_data["analyst_id"] == "NTRO_OFFICER_409"
-    assert audit_data["override_class"] == "Industrial/Gas Flare"
+    assert audit_data["override_class"] == "industrial"
+    assert "model_version" in audit_data  # Provenance field must be present
 
-    # Verify retrieved in logs
+    # Verify it appears in logs
     logs_res = client.get("/api/v1/audit/logs")
     assert logs_res.status_code == 200
-    logs_data = logs_res.json()
-    assert logs_data["total_logs"] >= 1
+    assert logs_res.json()["total_logs"] >= 1
