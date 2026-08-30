@@ -1,105 +1,64 @@
-# SIH 2026 PS26162 — Wildfire Detection & Alert System
+# SIH 2026 PS26162 — NASA FIRMS Thermal-Source Classification Backend
 
-> **Smart India Hackathon 2026** — Problem Statement 26162  
-> End-to-end wildfire detection using NASA FIRMS satellite data
+**Smart India Hackathon 2026 · Problem Statement 26162** — backend/data foundation for classifying persistent thermal sources (hotspots) from NASA FIRMS satellite data for geospatial decision support.
 
-## Quick Start
+## 🚧 Current project status
 
-```bash
-# 1. Clone & configure
-git clone <repo-url>
-cd SIH_2026
-cp .env.example .env
-# Edit .env with your FIRMS_API_KEY, MAP_TILE_API_KEY
+This is a **backend prototype/foundation**. It is **not** a production, NTRO-certified, or "defense-grade" system: it is not validated against the real project data pipeline, and it has not been benchmarked. Do not treat it as complete.
 
-# 2. Start all services
-docker-compose up -d
+## Current trained taxonomy
 
-# 3. Verify
-curl http://localhost:8000/health        # Backend API
-open http://localhost:5173               # Frontend Dashboard
-```
+The **locked project decision** (see `docs/decisions/SIH_2026_26162_Technical_Findings_and_Backend_Summary_updated.docx`) is **four trained classes**: `industrial`, `mining`, `agricultural_burn`, `wildfire`.
 
-## Architecture
+**`unclassified` is NOT a trained class.** It is a **post-training confidence-threshold fallback** for human-review routing. **The confidence cutoff has not yet been validated** — no arbitrary threshold is final.
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   FIRMS     │───▶│  ML Pipeline │───▶│  Backend    │───▶│  Frontend   │
-│   API/CSV   │    │  (XGBoost)   │    │  (FastAPI)  │    │  (React)    │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-       │                   │                   │                   │
-       ▼                   ▼                   ▼                   ▼
-  data/raw/          ml-pipeline/          PostgreSQL          MapLibre
-  data/processed/    ingest/features/      + PostGIS           Dashboard
-  data/sample/       rules/train/          Redis               WebSocket
-```
+Other locked decisions:
+- **Gas flare is not a separate class** — it was rejected as standalone and is **folded into `industrial`**.
+- The **real 4-class label column does not yet exist**. The executed Phase 9 target remains `is_static_land` with `is_labeled`.
 
-## Repository Structure
+## What the code actually does today
 
-```
-SIH_2026/
-├── .github/workflows/     # CI/CD (lint, test, strip-notebooks)
-├── .agents/               # AI agent memory & prompts
-├── backend/               # FastAPI REST API (TBD - see backend/README.md)
-├── frontend/              # React + TypeScript Dashboard (TBD - see frontend/README.md)
-├── ml-pipeline/           # Production ML code (ingest → features → rules → train)
-├── notebooks/             # Exploration ONLY (never imported by production)
-├── data/                  # raw/ (gitignored), processed/ (gitignored), sample/
-├── docs/                  # Architecture, decisions, EDA findings, demo script
-├── infra/                 # Docker, env templates
-├── .gitignore
-├── .env.example
-├── docker-compose.yml
-├── CONTRIBUTING.md
-└── README.md
-```
+- **FastAPI** backend: classification, batch classification, SHAP explanation, batch ingestion + in-memory dead-letter queue (DLQ), spatial viewport query, append-only audit trail.
+- **CatBoost** multiclass classifier. **Note:** the prototype model uses **six labels** (Wildfire, Agricultural Burn, Industrial/Gas Flare, Mining Activity, Urban/Infrastructure, False Positive/Noise) — this **diverges from the locked four-class decision** and is a documented prototype divergence to be aligned, not the real taxonomy.
+- **DuckDB** in-process feature store (H3 spatial context: landuse, canopy cover, distances) and audit log.
+- **H3** resolution 8 as the spatial key.
+- The bundled model is trained on **synthetic/demo sample data** (`data/sample_firms.csv`), not the real dataset; real 4-class labeling not executed.
 
-## ML Pipeline (Production Code)
+## Executed data evidence (real pipeline, Technical Findings doc)
+
+- ~2.598M FIRMS detections (executed two-year run)
+- 1,718,002 H3-day rows
+- 921,202 unique H3 cells
+- H3 resolution 8
+
+The **real H3-day pipeline is separate from the synthetic backend sample model** — not yet integrated.
+
+## Architecture: intended vs implemented
+
+**Intended blueprint** (future work, NOT all implemented): FastAPI; PostgreSQL/PostGIS for raw/vector storage; DuckDB as analytical H3 feature store; Redis caching/messaging; Celery async ingestion; Pydantic; precomputed feature vectors; H3 as common key; spatial-leakage prevention; on-demand SHAP; viewport culling; ingestion/DLQ; auditability; containerized.
+
+**Currently implemented:** FastAPI + CatBoost + DuckDB + H3, Pydantic, in-memory DLQ (Redis/Celery **not implemented**), on-demand SHAP, append-only DuckDB audit log (**not** DB-enforced immutability), viewport endpoint (geo-filter correctness **to be verified**). "Sub-50 ms" etc. are **architecture targets, not measured benchmarks.**
+
+## Running the backend
 
 ```bash
-# Install
-cd ml-pipeline && pip install -e .
-
-# Run full pipeline
-python -m ml_pipeline.train
-
-# Or individual stages
-python -m ml_pipeline.ingest.harmonize    # CSVs → Parquet
-python -m ml_pipeline.features            # Add H3, persistence, history
-python -m ml_pipeline.rules.labeler       # Rule-based labels
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --port 8000
+# Health: http://localhost:8000/health   Docs: http://localhost:8000/docs
 ```
+If no model artifact exists, the app auto-trains a CatBoost model at startup (against synthetic sample data).
 
-**Key thresholds** (configurable in `ml-pipeline/train/config.yaml`):
-- FRP > 40 MW
-- Brightness > 320 K
-- Confidence ≥ nominal
-- Persistence (90-day) ≥ 3 fires/H3 cell
+## What is NOT production-ready
 
-## Data
+- Real-data 4-class training
+- Geographic/state split validation (locked decision; rigorous notebook not yet executed)
+- Redis/Celery async ingestion
+- DB-enforced audit immutability
+- Verified viewport-culling spatial filtering
+- Validated confidence threshold / calibrated probabilities
+- Measured latency/performance benchmarks
 
-~1.19M fire detections from 4 FIRMS sources:
-- South Asia 7-day (3K rows)
-- India 2024 VIIRS-SNPP (552K rows)
-- SV-C2 Archive (534K rows)
-- SV-C2 NRT (100K rows)
+## Authoritative references
 
-See `data/README.md` for schema details and `docs/eda-findings.md` for analysis.
-
-## Team Workflow
-
-- **Trunk-based**: Branch off `main`, PR → squash merge, delete branch
-- **Folder ownership**: Each person owns one top-level folder (see `CONTRIBUTING.md`)
-- **Git worktree**: Parallel branches in separate directories
-- **Notebook hygiene**: Strip outputs before commit; promote to `ml-pipeline/` when ready
-
-## Documentation
-
-- `docs/problem-statement.md` — Requirements & interpretation
-- `docs/architecture.md` — System diagram & data flow
-- `docs/eda-findings.md` — Schema quirks, coverage gaps, feature insights
-- `docs/decisions/0001-model-choice.md` — Why XGBoost
-- `docs/demo-script.md` — 3-minute judge walkthrough
-
-## License
-
-MIT — Built for SIH 2026
+`docs/decisions/SIH_2026_26162_Technical_Findings_and_Backend_Summary_updated.docx`. Backend details: `BACKEND_DOCUMENTATION.md`. Frontend: `FRONTEND_INTEGRATION_GUIDE.md`.

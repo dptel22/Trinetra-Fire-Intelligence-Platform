@@ -1,3 +1,10 @@
+> ## ⚠️ HISTORICAL / SUPERSEDED DECISION RECORD
+>
+> **This document is retained as history only.** It records an early decision to use **XGBoost** with a `high / medium / low / no_fire` risk-tier taxonomy. The **current locked project decision** (see `SIH_2026_26162_Technical_Findings_and_Backend_Summary_updated.docx`) supersedes it: the model is **CatBoost**, and the trained taxonomy is **`industrial`, `mining`, `agricultural_burn`, `wildfire`** (with `unclassified` as a post-training confidence fallback). Do **not** treat this file as the current model/taxonomy decision.
+>
+> ---
+
+
 # Decision 0001: Model Choice — XGBoost vs Alternatives
 
 **Date**: 2026-08-28
