@@ -1,23 +1,79 @@
-# Byte-compiled / optimized / DLL files
+# Data directories - large files never committed
+data/raw/**
+data/processed/**
+!data/sample/**
+data/DL_FIRE_*
+data/*.zip
+
+
+# Model artifacts - use releases/artifact store instead
+*.pkl
+*.joblib
+*.xgb
+*.model
+ml-pipeline/train/checkpoints/
+ml-pipeline/train/*.json
+ml-pipeline/train/*.csv
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Pytest / Cache
+.venv/
+venv/
+.env
+.env.local
+.env.*.local
+*.egg-info/
+dist/
+build/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb.json
 
-# CatBoost training logs
-catboost_info/
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+.next/
+out/
 
-# OS generated files
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# Logs
+logs/
+*.log
+.agents/logs/
+
+# Docker
+.docker/
+
+# OS
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Testing
+.nyc_output/
+coverage/
+
+# Misc
+*.tmp
+*.temp
+.cache/
