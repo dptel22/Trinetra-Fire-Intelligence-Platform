@@ -13,19 +13,20 @@ class Settings:
     DUCKDB_PATH: str = str(DATA_DIR / "feature_store.duckdb")
     MODEL_PATH: str = str(DATA_DIR / "catboost_hotspot_model.cbm")
     AUDIT_DB_PATH: str = str(DATA_DIR / "audit_log.duckdb")
+    INGESTION_DB_PATH: str = str(DATA_DIR / "ingestion.duckdb")
     
     # Spatial Config
     H3_RESOLUTION: int = 8  # Standard H3 hex resolution (~0.7 km2 area)
     
-    # Class Definitions (6 distinct NTRO classes)
-    TARGET_CLASSES: list = [
-        "Wildfire",
-        "Agricultural Burn",
-        "Industrial/Gas Flare",
-        "Mining Activity",
-        "Urban/Infrastructure",
-        "False Positive/Noise"
+    # Class Definitions are intentionally configurable while labeling policy evolves.
+    DEFAULT_TRAINED_CLASSES: list = [
+        "industrial",
+        "mining",
+        "agricultural_burn",
+        "wildfire",
     ]
+    UNCLASSIFIED_THRESHOLD: float | None = None
+    FEATURE_SCHEMA_VERSION: str = "v1-point-prototype"
     
     # CatBoost Categorical Feature Definitions
     CAT_FEATURES: list = ["h3_index", "satellite", "daynight", "landuse_tag"]
@@ -44,6 +45,8 @@ class Settings:
         "canopy_cover_pct",
         "is_static_source"
     ]
+    INGEST_MAX_BATCH_SIZE: int = 5000
+    CORS_ALLOW_ORIGINS: list = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
 settings = Settings()
 
