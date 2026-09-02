@@ -1,13 +1,19 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from typing import List
 from app.schemas.firms import FIRMSRecord
-from app.schemas.prediction import HotspotPredictionResponse, BatchPredictionResponse, ExplanationResponse
+from app.schemas.prediction import (
+    BatchPredictionResponse,
+    PredictionResponse,
+    ExplanationResponse,
+    CellPredictionDetailResponse,
+    ViewportPredictionsResponse,
+)
 from app.services.model_service import model_service
 import numpy as np
 
 router = APIRouter()
 
-@router.post("/classify", response_model=HotspotPredictionResponse)
+@router.post("/classify", response_model=PredictionResponse)
 def classify_hotspot(record: FIRMSRecord):
     """
     Sub-50ms real-time classification of NASA FIRMS thermal anomaly
@@ -47,3 +53,43 @@ def explain_hotspot(record: FIRMSRecord):
         return model_service.explain_single(payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Explainability computation failed: {str(e)}")
+
+@router.get("/predictions", response_model=ViewportPredictionsResponse)
+def get_viewport_predictions(
+    min_lat: float = Query(..., ge=-90.0, le=90.0),
+    max_lat: float = Query(..., ge=-90.0, le=90.0),
+    min_lon: float = Query(..., ge=-180.0, le=180.0),
+    max_lon: float = Query(..., ge=-180.0, le=180.0),
+    acq_date: str = Query(...),
+    zoom: float = Query(8.0, ge=1.0, le=20.0),
+):
+    """
+    Viewport-Culling spatial predictions query for frontend live-map rendering.
+    """
+    try:
+        return model_service.get_viewport_predictions(min_lat, max_lat, min_lon, max_lon, acq_date, zoom)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Viewport prediction failed: {str(e)}")
+
+
+@router.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse)
+def get_prediction_cell_explanation(cell_id: str, acq_date: str = Query(...)):
+    """
+    Single-cell on-demand SHAP explanation.
+    """
+    try:
+        cell = model_service.get_cell_detail(cell_id, acq_date)
+        return model_service.explain(cell.context)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cell explanation failed: {str(e)}")
+
+
+@router.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse)
+def get_prediction_cell_detail(cell_id: str, acq_date: str = Query(...)):
+    """
+    Single-cell prediction detail query for frontend side panel inspection.
+    """
+    try:
+        return model_service.get_cell_detail(cell_id, acq_date)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cell detail query failed: {str(e)}")

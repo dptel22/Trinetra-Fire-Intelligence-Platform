@@ -1,14 +1,16 @@
-fastapi>=0.110.0
-uvicorn>=0.28.0
-pydantic>=2.6.0
-catboost>=1.2.0
-shap>=0.45.0
-duckdb>=0.10.0
-h3>=3.7.6
-numpy>=1.24.0
-pandas>=2.0.0
-scikit-learn>=1.4.0
-geopy>=2.4.0
+# PS26162 Backend — pinned dependencies.
+# Versions locked to Dhruv's training environment (CATBOOST/H3 MUST match the
+# model that produced the served .cbm, or predict surfaces drift silently).
+catboost==1.2.10
+h3==4.5.0
+shap>=0.44
+duckdb>=1.0
+pydantic>=2.6
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pandas>=2.0
+numpy>=1.26
 python-multipart>=0.0.9
-requests>=2.31.0
-pytest>=8.0.0
+pytest>=8.0
+# NOTE: pydantic-settings is intentionally NOT included — config is the
+# dependency-free os.environ-driven Settings class in app/core/config.py.

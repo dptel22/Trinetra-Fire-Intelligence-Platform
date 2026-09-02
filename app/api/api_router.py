@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.api.endpoints import classify, ingest, spatial, audit
+from app.api.endpoints import classify, audit
 
 api_router = APIRouter()
 
-api_router.include_router(classify.router, tags=["Classification & SHAP"])
-api_router.include_router(ingest.router, tags=["Ingestion Gateway & DLQ"])
-api_router.include_router(spatial.router, tags=["Spatial & Viewport"])
+# Canonical H3-day prediction routes (+ legacy classify aliases kept for compatibility)
+api_router.include_router(classify.router, tags=["Classification & Predictions"])
+# Audit trail remains available under /api/v1/audit/*
 api_router.include_router(audit.router, tags=["NTRO Audit Trail"])
+# Legacy ingest/spatial point-level routes removed from default router (pre-H3-day contract).

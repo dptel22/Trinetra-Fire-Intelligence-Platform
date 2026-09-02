@@ -4,6 +4,12 @@ data/processed/**
 !data/sample/**
 data/DL_FIRE_*
 data/*.zip
+*.duckdb
+/*.parquet
+
+# Agent/IDE temp
+.qwen/
+.zcode/
 
 
 # Model artifacts - use releases/artifact store instead
@@ -11,6 +17,7 @@ data/*.zip
 *.joblib
 *.xgb
 *.model
+*.cbm
 ml-pipeline/train/checkpoints/
 ml-pipeline/train/*.json
 ml-pipeline/train/*.csv

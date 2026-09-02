@@ -1,113 +1,29 @@
 version: '3.8'
 
+# The working backend is the root `app/` FastAPI service (CatBoost/H3-day/DuckDB),
+# built from the root Dockerfile. Legacy Postgres/Redis/backend_legacy/ml-worker/
+# frontend scaffold services were removed in the 2026-09-02 cleanup — they pointed
+# at Dockerfiles and infra that no longer exist. Use `docker build -t sih2026-backend .`
+# or `docker compose up backend`.
+
 services:
-  # PostgreSQL with PostGIS for spatial queries
-  postgres:
-    image: postgis/postgis:16-3.4
-    container_name: sih2026-postgres
-    environment:
-      POSTGRES_DB: sih2026
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infra/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sih2026"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - sih2026-network
-
-  # Redis for caching, sessions, WebSocket pub/sub
-  redis:
-    image: redis:7-alpine
-    container_name: sih2026-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - sih2026-network
-
-  # Backend API (FastAPI)
+  # Backend API (FastAPI) — build from repo root
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: sih2026-backend
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/sih2026
-      - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
-      - ./ml-pipeline:/ml-pipeline:ro
-      - ./data:/data:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./app:/app/app
+      - ./data/processed:/data:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - sih2026-network
-
-  # Frontend (Vite + React)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: sih2026-frontend
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000/api/v1
-      - VITE_WS_URL=ws://localhost:8000/api/v1/ws
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-    command: npm run dev -- --host 0.0.0.0 --port 5173
-    networks:
-      - sih2026-network
-
-  # ML Pipeline Worker (for scheduled retraining)
-  ml-worker:
-    build:
-      context: ./ml-pipeline
-      dockerfile: Dockerfile
-    container_name: sih2026-ml-worker
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/sih2026
-      - ML_MODEL_PATH=/ml-pipeline/train/model.xgb
-      - ML_FEATURE_CONFIG=/ml-pipeline/train/config.yaml
-    volumes:
-      - ./ml-pipeline:/ml-pipeline
-      - ./data:/data:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-    profiles:
-      - ml
-    networks:
-      - sih2026-network
-
-volumes:
-  postgres_data:
-  redis_data:
 
 networks:
   sih2026-network:

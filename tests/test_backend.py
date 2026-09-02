@@ -1,219 +1,115 @@
-import pytest
 import sys
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+from catboost import CatBoostClassifier, Pool
+from fastapi.testclient import TestClient
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from fastapi.testclient import TestClient
-from app.main import app
 from app.core.config import settings
-from pipeline.feature_engineering import engineer_features, latlng_to_h3
-from pipeline.spatial_cv import SpatialKFold
-import pandas as pd
-import numpy as np
-
-client = TestClient(app)
-
-# ---------------------------------------------------------------------------
-# Canonical four-class taxonomy (locked per docs/decisions)
-# ---------------------------------------------------------------------------
-EXPECTED_CLASSES = ["agricultural_burn", "industrial", "mining", "wildfire"]
-
-# ---------------------------------------------------------------------------
-# Canonical VIIRS sample payload (uses real VIIRS field names from EDA)
-# ---------------------------------------------------------------------------
-SAMPLE_VIIRS_PAYLOAD = {
-    "hotspot_id": "FIRMS-TEST-001",
-    "latitude": 22.05,
-    "longitude": 79.12,
-    "bright_ti4": 360.5,        # VIIRS I4 channel (K)
-    "bright_ti5": 310.0,        # VIIRS I5 channel (K)
-    "scan": 0.4,
-    "track": 0.4,
-    "acq_date": "2026-08-20",
-    "acq_time": "1345",
-    "satellite": "N",           # N = NOAA-20 (harmonized)
-    "confidence": "high",       # String enum: low | nominal | high
-    "frp": 85.5,
-    "daynight": "D",
-    "persistence_90d": 3,
-    "observed_days_in_90d": 85
-}
+from app.main import app
+from app.services.feature_store import feature_store
 
 
-def test_h3_indexing():
-    """H3 index generation at resolution 7 (project-locked default)."""
-    h3_idx = latlng_to_h3(22.0, 79.0, resolution=settings.H3_RESOLUTION)
-    assert isinstance(h3_idx, str)
-    assert len(h3_idx) > 5
-    assert settings.H3_RESOLUTION == 7, "H3 resolution must be 7 (project-locked)"
+EXPECTED_CLASSES = {"industrial", "mining", "agricultural_burn", "wildfire"}
 
 
-def test_feature_engineering_persistence_normalization():
-    """
-    Persistence normalization divides by observed days (not fixed 90).
-    Validates missing-day gap handling per docs/eda-findings.md.
-    """
-    df = pd.DataFrame([{
-        "latitude": 22.0,
-        "longitude": 79.0,
-        "persistence_90d": 18,
-        "observed_days_in_90d": 79,       # 11 missing days
-        "satellite": "N",
-        "daynight": "D",
-        "confidence": "nominal",           # String confidence
-        "bright_ti4": 340.0,
-        "bright_ti5": 295.0,
-    }])
-    feat_df = engineer_features(df)
-
-    assert "persistence_90d_norm" in feat_df.columns
-    expected_norm = 18.0 / 79.0
-    assert abs(feat_df["persistence_90d_norm"].iloc[0] - expected_norm) < 1e-4
-
-    # Confirm string categoricals remain strings (no label encoding)
-    assert isinstance(feat_df["h3_index"].iloc[0], str)
-    assert isinstance(feat_df["confidence"].iloc[0], str)
-    assert feat_df["confidence"].iloc[0] == "nominal"
+def _sample_h3_day_row() -> dict:
+    df = pd.read_parquet(settings.OSMWRI_PARQUET)
+    row = df.dropna(subset=["h3_08", "acq_date", "h3_lat", "h3_lon"]).iloc[0]
+    payload = row.to_dict()
+    payload["acq_date"] = str(pd.to_datetime(payload["acq_date"]).date())
+    return payload
 
 
-def test_spatial_cross_validation_split():
-    """SpatialKFold creates geographically disjoint folds with no index overlap."""
-    coords = np.array([
-        [22.0, 79.0], [22.1, 79.1], [22.05, 79.05],
-        [30.5, 75.8], [30.6, 75.9],
-        [22.3, 73.2], [22.4, 73.3],
-        [21.8, 85.3], [21.9, 85.4]
-    ])
-    X = np.zeros((len(coords), 5))
-    skf = SpatialKFold(n_splits=3, min_distance_km=10.0, random_state=42)
-    splits = list(skf.split(X, coords))
-    assert len(splits) == 3
-    for train_idx, val_idx in splits:
-        assert len(set(train_idx).intersection(set(val_idx))) == 0
+def _pool_from_row(row: dict) -> Pool:
+    frame = pd.DataFrame([{col: row[col] for col in settings.MODEL_FEATURES}], columns=settings.MODEL_FEATURES)
+    for col in settings.CAT_FEATURES:
+        frame[col] = frame[col].astype("string").fillna("missing").astype(str)
+    for col in frame.columns:
+        if col not in settings.CAT_FEATURES:
+            frame[col] = pd.to_numeric(frame[col], errors="coerce")
+    return Pool(frame, cat_features=settings.CAT_FEATURES)
 
 
-def test_api_root_and_health():
-    """Root endpoint returns correct 4-class taxonomy."""
-    res = client.get("/")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "online"
-    # Must be exactly 4 trained classes — NOT 5 or 6
-    assert len(data["target_classes"]) == 4
-    for cls in EXPECTED_CLASSES:
-        assert cls in data["target_classes"], f"Expected class '{cls}' missing from API response"
+def test_real_model_contract():
+    model = CatBoostClassifier()
+    model.load_model(settings.MODEL_PATH)
+
+    assert settings.H3_RESOLUTION == 8
+    assert list(model.feature_names_) == settings.MODEL_FEATURES
+    assert [model.feature_names_[idx] for idx in model.get_cat_feature_indices()] == settings.CAT_FEATURES
+    assert set(str(cls) for cls in model.classes_) == EXPECTED_CLASSES
 
 
-def test_classify_and_explain_endpoints():
-    """
-    /classify returns a valid 4-class prediction with VIIRS schema payload.
-    /explain returns SHAP attributions.
-    """
-    # 1. Classify
-    res = client.post("/api/v1/classify", json=SAMPLE_VIIRS_PAYLOAD)
-    assert res.status_code == 200
-    pred = res.json()
+def test_real_model_predict_proba_and_shap_shape():
+    model = CatBoostClassifier()
+    model.load_model(settings.MODEL_PATH)
+    row = _sample_h3_day_row()
+    pool = _pool_from_row(row)
 
-    assert "predicted_class" in pred
-    assert pred["predicted_class"] in EXPECTED_CLASSES, \
-        f"Predicted class '{pred['predicted_class']}' not in 4-class taxonomy"
-    assert pred["latency_ms"] >= 0
-    # Must return exactly 4 probability entries
-    assert len(pred["probabilities"]) == 4
+    probs = model.predict_proba(pool)[0]
+    assert len(probs) == 4
+    assert np.isclose(float(np.sum(probs)), 1.0)
 
-    # 2. SHAP Explanation
-    exp_res = client.post("/api/v1/explain", json=SAMPLE_VIIRS_PAYLOAD)
-    assert exp_res.status_code == 200
-    exp = exp_res.json()
-    assert "feature_attributions" in exp
-    assert len(exp["feature_attributions"]) > 0
-    assert exp["predicted_class"] in EXPECTED_CLASSES
+    shap_values = model.get_feature_importance(type="ShapValues", data=pool)
+    assert shap_values.shape == (1, 4, len(settings.MODEL_FEATURES) + 1)
 
 
-def test_ingestion_dead_letter_queue():
-    """
-    Batch ingestion quarantines schema-invalid records to DLQ
-    without failing valid records.
-    NOTE: DLQ is an in-memory Python list in this demo implementation.
-    """
-    payload = [
-        # Valid VIIRS record
-        {
-            "hotspot_id": "FIRMS-VAL-01",
-            "latitude": 22.0,
-            "longitude": 79.0,
-            "bright_ti4": 340.0,
-            "bright_ti5": 295.0,
-            "scan": 0.5,
-            "track": 0.5,
-            "acq_date": "2026-08-20",
-            "acq_time": "1200",
-            "satellite": "N",
-            "confidence": "nominal",
-            "frp": 30.0,
-            "daynight": "D"
-        },
-        # Malformed record — latitude out of bounds
-        {
-            "hotspot_id": "FIRMS-INV-02",
-            "latitude": 999.0,
-            "longitude": 79.0,
-            "bright_ti4": 340.0,
-            "bright_ti5": 295.0,
-            "scan": 0.5,
-            "track": 0.5,
-            "acq_date": "2026-08-20",
-            "acq_time": "1200",
-            "satellite": "N",
-            "confidence": "nominal",
-            "frp": 30.0,
-            "daynight": "D"
-        }
-    ]
-    res = client.post("/api/v1/ingest/batch", json=payload)
-    assert res.status_code == 200
-    data = res.json()
-    assert data["total_received"] == 2
-    assert data["total_valid"] == 1
-    assert data["total_quarantined_dlq"] == 1
+def test_feature_store_cell_and_bbox_contract():
+    row = _sample_h3_day_row()
+    feature_store.load()
+
+    cell = feature_store.get_cell(row["h3_08"], row["acq_date"])
+    assert cell is not None
+    assert cell["h3_08"] == row["h3_08"]
+    for feature in settings.MODEL_FEATURES:
+        assert feature in cell
+
+    bbox_rows = feature_store.query_bbox(
+        row["h3_lat"] - 0.01,
+        row["h3_lat"] + 0.01,
+        row["h3_lon"] - 0.01,
+        row["h3_lon"] + 0.01,
+        row["acq_date"],
+    )
+    assert any(item["h3_08"] == row["h3_08"] for item in bbox_rows)
 
 
-def test_audit_override():
-    """
-    NTRO audit trail accepts analyst override and stores it with model_version.
-    Verifies it appears in the /audit/logs response.
-    NOTE: override endpoint now requires the original FIRMS record to resolve
-    model_prediction server-side.
-    """
-    # Submit override — include the original record for server-side prediction resolution
-    override_payload = {
-        "request": {
-            "hotspot_id": "FIRMS-TEST-001",
-            "analyst_id": "NTRO_OFFICER_409",
-            "override_class": "industrial",
-            "justification": "Confirmed oil refinery gas flare via Sentinel-2 cross-reference.",
-            "confidence_rating": 5
-        },
-        "record": SAMPLE_VIIRS_PAYLOAD
-    }
-    # Use simplified direct body for the current endpoint signature
-    req_body = {
-        "hotspot_id": "FIRMS-TEST-001",
-        "analyst_id": "NTRO_OFFICER_409",
-        "override_class": "industrial",
-        "justification": "Confirmed oil refinery gas flare via Sentinel-2 cross-reference.",
-        "confidence_rating": 5
-    }
-    res = client.post("/api/v1/audit/override", json=req_body)
-    assert res.status_code == 200
-    audit_data = res.json()
-    assert "event_id" in audit_data
-    assert audit_data["analyst_id"] == "NTRO_OFFICER_409"
-    assert audit_data["override_class"] == "industrial"
-    assert "model_version" in audit_data  # Provenance field must be present
+def test_health_predictions_and_explain_endpoints():
+    row = _sample_h3_day_row()
+    with TestClient(app) as client:
+        health = client.get("/health")
+        assert health.status_code == 200
+        health_json = health.json()
+        assert health_json["model_loaded"] is True
+        assert health_json["schema_version"] == settings.FEATURE_SCHEMA_VERSION
 
-    # Verify it appears in logs
-    logs_res = client.get("/api/v1/audit/logs")
-    assert logs_res.status_code == 200
-    assert logs_res.json()["total_logs"] >= 1
+        list_res = client.get(
+            "/predictions",
+            params={
+                "min_lat": row["h3_lat"] - 0.01,
+                "max_lat": row["h3_lat"] + 0.01,
+                "min_lon": row["h3_lon"] - 0.01,
+                "max_lon": row["h3_lon"] + 0.01,
+                "acq_date": row["acq_date"],
+            },
+        )
+        assert list_res.status_code == 200
+        list_json = list_res.json()
+        assert list_json["total_predictions"] >= 1
+        prediction = list_json["predictions"][0]
+        assert prediction["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}
+        assert len(prediction["probabilities"]) == 4
+
+        detail = client.get(f"/predictions/{row['h3_08']}", params={"acq_date": row["acq_date"]})
+        assert detail.status_code == 200
+        assert detail.json()["cell_id"] == row["h3_08"]
+
+        explain = client.get(f"/predictions/{row['h3_08']}/explain", params={"acq_date": row["acq_date"]})
+        assert explain.status_code == 200
+        explain_json = explain.json()
+        assert len(explain_json["feature_attributions"]) == 3
+        assert explain_json["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}

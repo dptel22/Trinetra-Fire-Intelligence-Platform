@@ -1,23 +1,17 @@
-import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.api_router import api_router
 from app.services.model_service import model_service
+from app.services.feature_store import feature_store
+from app.schemas.prediction import CellPredictionDetailResponse, ExplanationResponse, HealthResponse, ViewportPredictionsResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Ensure DuckDB feature store and CatBoost model are loaded
     print(f"[STARTUP] Initializing {settings.PROJECT_NAME} (v{settings.VERSION})...")
-    if not model_service.is_loaded:
-        print("[WARNING] CatBoost model not found at startup. Running automatic pipeline training...")
-        try:
-            from pipeline.train_catboost import train_model
-            train_model()
-            model_service._load_model()
-        except Exception as e:
-            print(f"Model auto-train error: {e}")
+    feature_store.load()
+    model_service.load_model()
     yield
     print("[SHUTDOWN] Shutting down NASA FIRMS Geospatial AI Backend.")
 
@@ -50,13 +44,29 @@ def root():
         "target_classes": settings.TARGET_CLASSES
     }
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health_check():
-    return {
-        "status": "healthy",
-        "model_ready": model_service.is_loaded,
-        "database": "connected"
-    }
+    return {"status": "healthy", "database": "connected", **model_service.health()}
+
+@app.get("/predictions", response_model=ViewportPredictionsResponse)
+def get_predictions_root(
+    min_lat: float = Query(..., ge=-90.0, le=90.0),
+    max_lat: float = Query(..., ge=-90.0, le=90.0),
+    min_lon: float = Query(..., ge=-180.0, le=180.0),
+    max_lon: float = Query(..., ge=-180.0, le=180.0),
+    acq_date: str = Query(...),
+    zoom: float = Query(8.0, ge=1.0, le=20.0),
+):
+    return model_service.get_viewport_predictions(min_lat, max_lat, min_lon, max_lon, acq_date, zoom)
+
+@app.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse)
+def get_prediction_cell_explanation_root(cell_id: str, acq_date: str = Query(...)):
+    detail = model_service.get_cell_detail(cell_id, acq_date)
+    return model_service.explain(detail.context)
+
+@app.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse)
+def get_prediction_cell_detail_root(cell_id: str, acq_date: str = Query(...)):
+    return model_service.get_cell_detail(cell_id, acq_date)
 
 if __name__ == "__main__":
     import uvicorn
