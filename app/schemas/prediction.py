@@ -20,7 +20,7 @@ class HotspotPredictionResponse(BaseModel):
     confidence: float
     probabilities: List[ClassProbability]
     latency_ms: float
-    context: Dict[str, Optional[float | str]] = {}
+    context: Dict[str, Optional[float | str]] = Field(default_factory=dict)
 
 class BatchPredictionResponse(BaseModel):
     total_predictions: int
