@@ -11,7 +11,7 @@ router = APIRouter()
 def classify_hotspot(record: FIRMSRecord):
     """
     Sub-50ms real-time classification of NASA FIRMS thermal anomaly
-    into 6 distinct NTRO classes using CatBoost + DuckDB H3 context.
+    into the configured NTRO target classes using CatBoost + DuckDB H3 context.
     """
     try:
         payload = record.model_dump()
