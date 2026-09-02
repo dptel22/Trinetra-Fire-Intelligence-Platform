@@ -53,4 +53,4 @@ class IngestionBatchResponse(BaseModel):
     total_valid: int
     total_quarantined_dlq: int
     message: str
-    quarantined_errors: List[dict] = []
+    quarantined_errors: List[dict] = Field(default_factory=list)
