@@ -32,7 +32,7 @@ app = FastAPI(
 # Enable CORS for Deck.gl / WebGL Frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
