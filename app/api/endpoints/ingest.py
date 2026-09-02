@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from pydantic import ValidationError
-from app.schemas.firms import FIRMSRecord, IngestionBatchRequest, IngestionBatchResponse
-from app.services.model_service import model_service
+from app.core.config import settings
+from app.schemas.firms import FIRMSRecord, IngestionBatchResponse
 
 router = APIRouter()
 
