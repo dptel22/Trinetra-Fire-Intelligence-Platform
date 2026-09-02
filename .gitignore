@@ -10,6 +10,7 @@ data/*.zip
 # Agent/IDE temp
 .qwen/
 .zcode/
+.claude/
 
 
 # Model artifacts - use releases/artifact store instead
@@ -18,9 +19,6 @@ data/*.zip
 *.xgb
 *.model
 *.cbm
-ml-pipeline/train/checkpoints/
-ml-pipeline/train/*.json
-ml-pipeline/train/*.csv
 
 # Python
 __pycache__/

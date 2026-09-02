@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Lint (stub)
+    name: Ruff + mypy (app, pipeline, tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,30 +20,11 @@ jobs:
           python-version: "3.12"
 
       - name: Install lint tools
-        run: |
-          pip install ruff mypy
+        run: pip install ruff mypy
 
-      - name: Run ruff (if backend exists)
-        if: ${{ hashFiles('backend/**/*.py') != '' }}
-        run: |
-          ruff check backend/ || echo "No backend code yet"
+      - name: Run ruff
+        run: ruff check app/ pipeline/ tests/
 
-      - name: Run mypy (if backend exists)
-        if: ${{ hashFiles('backend/**/*.py') != '' }}
+      - name: Run mypy
         run: |
-          mypy backend/ || echo "No backend code yet"
-
-      - name: Run ruff (if ml-pipeline exists)
-        if: ${{ hashFiles('ml-pipeline/**/*.py') != '' }}
-        run: |
-          ruff check ml-pipeline/ || echo "No ml-pipeline code yet"
-
-      - name: Run mypy (if ml-pipeline exists)
-        if: ${{ hashFiles('ml-pipeline/**/*.py') != '' }}
-        run: |
-          mypy ml-pipeline/ || echo "No ml-pipeline code yet"
-
-      - name: Check frontend (stub)
-        if: ${{ hashFiles('frontend/**/*.ts') != '' || hashFiles('frontend/**/*.tsx') != '' }}
-        run: |
-          echo "Frontend linting not yet configured"
+          mypy app/ pipeline/ || echo "mypy findings are advisory; see logs"

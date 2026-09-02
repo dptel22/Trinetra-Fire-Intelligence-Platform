@@ -1,3 +1,5 @@
+> **DEPRECATED (2026-09-02):** This script describes the old XGBoost/Postgres point-level demo (`ml-pipeline/`, 6 classes, `ml_pipeline.train`), which has been removed. The live demo path is the CatBoost H3-day backend in `app/` — see the root README.md and BACKEND_DOCUMENTATION.md for the current walkthrough.
+
 # Demo Script — SIH 2026 PS26162
 
 ## 3-Minute Judge Walkthrough
