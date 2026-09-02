@@ -15,6 +15,12 @@ def ingest_batch_records(raw_payload: List[Dict[str, Any]]):
     Asynchronous Ingestion Gateway with Pydantic Schema Validation & Dead-Letter Queue (DLQ).
     Protects against NASA schema drift and malformed rows.
     """
+    if len(raw_payload) > settings.INGEST_MAX_BATCH_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Batch payload exceeds maximum allowed size of {settings.INGEST_MAX_BATCH_SIZE} records."
+        )
+
     valid_records = []
     quarantined = []
 

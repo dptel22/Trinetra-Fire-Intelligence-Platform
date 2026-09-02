@@ -35,11 +35,17 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2. Categorical feature type enforcement (raw strings for CatBoost)
     processed["h3_index"] = processed["h3_index"].astype(str)
-    processed["satellite"] = processed.get("satellite", pd.Series(["N"] * len(processed))).astype(str)
-    processed["daynight"] = processed.get("daynight", pd.Series(["D"] * len(processed))).astype(str)
-    # confidence is a string enum: low | nominal | high
-    processed["confidence"] = processed.get("confidence", pd.Series(["nominal"] * len(processed))).astype(str)
-    processed["landuse_tag"] = processed.get("landuse_tag", pd.Series(["unknown"] * len(processed))).astype(str)
+    for col, default_str in [
+        ("satellite", "N"),
+        ("daynight", "D"),
+        ("confidence", "nominal"),
+        ("landuse_tag", "unknown"),
+    ]:
+        if col not in processed.columns:
+            processed[col] = default_str
+        else:
+            processed[col] = processed[col].fillna(default_str)
+        processed[col] = processed[col].astype(str)
 
     # 3. VIIRS channel brightness (Kelvin) — use ti4/ti5, NOT MODIS brightness/bright_t31
     for col, default in [("bright_ti4", 320.0), ("bright_ti5", 295.0)]:
