@@ -39,6 +39,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     processed["daynight"] = processed.get("daynight", pd.Series(["D"] * len(processed))).astype(str)
     # confidence is a string enum: low | nominal | high
     processed["confidence"] = processed.get("confidence", pd.Series(["nominal"] * len(processed))).astype(str)
+    processed["landuse_tag"] = processed.get("landuse_tag", pd.Series(["unknown"] * len(processed))).astype(str)
 
     # 3. VIIRS channel brightness (Kelvin) — use ti4/ti5, NOT MODIS brightness/bright_t31
     for col, default in [("bright_ti4", 320.0), ("bright_ti5", 295.0)]:
