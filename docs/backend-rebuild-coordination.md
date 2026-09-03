@@ -232,3 +232,81 @@ Closes the "Await Agent B test rerun" item above and the worktree cleanup plan.
 - **docker-compose.yml**: pruned to the working `backend` service. Removed `postgres` (mounted nonexistent `infra/init-db.sql`), `backend_legacy`/`ml-worker`/`frontend` (Dockerfiles don't exist), and legacy volumes.
 - **Docs**: root `README.md` rewritten to the 4-class H3-day CatBoost contract with current layout; `data/README.md` rewritten to actual layout; `BACKEND_DOCUMENTATION.md` model-artifact note corrected (models/ path; duplicate copy deleted).
 - **Correction to Agent A log above**: `MODEL_PATH` now defaults to `models/catboost_hotspot_classifier_v1.cbm` (not `notebooks/experiments/`, which was cleaned up).
+
+---
+
+## Agent Integration & Verification Log (2026-09-03)
+
+### Bug Fixes & Architectural Updates
+
+1. **`pipeline/aggregation.py` — Bug 1 (Temporal History Crash) Fix**:
+   - **Root Cause**: `_add_temporal_history` invoked `rolling("7D", ...)` on a `RangeIndex`, which fails in pandas because offset-based rolling windows require a `DatetimeIndex`.
+   - **Fix**: Set index to `_date = pd.to_datetime(acq_date)` before grouping, used `grouped.transform(lambda s: s.shift(1).rolling("...D", ...))` per temporal feature to maintain exact DatetimeIndex alignment without cross-cell leakage, and reset index cleanly at the end.
+   - **Contract Preservation**: Maintained exact semantics: `frp_max_lag7`/`frp_max_lag30` = max of prior window (`min_periods=1`, NaN -> 0.0), `active_days_7d/30d/90d` = prior-window count (`min_periods=0`, NaN -> 0), and `is_first_observation` = `shift(1).isna()`.
+
+2. **`pipeline/aggregation.py` — Bug 2 (Confidence Parsing Mask) Fix**:
+   - **Root Cause**: Confidence values (e.g. `"h"`, `"high"`) were coerced to numeric `NaN`, causing `point_conf.notna()` to evaluate `False` and zeroing out confidence metrics.
+   - **Fix**: Replaced numeric coercion with direct string matching: `conf.astype(str).str.strip().str.lower().isin(["h", "high"])`. Handles VIIRS short/long forms, mixed-case, whitespace, and non-high strings/NaNs safely.
+   - **Defensive Extraction**: Hardened column extraction in `_daily_cell_aggregate` against missing or scalar inputs for `scan`, `track`, `is_saturated`, `bright_ti4`.
+
+3. **`docker-compose.yml` & `Dockerfile` — DuckDB Write-Path & Hygiene Fix**:
+   - **Docker Compose**: Added named volume `sih2026-data:/data_writable` with `DUCKDB_PATH=/data_writable/feature_store.duckdb` while keeping `./data/processed:/data:ro` read-only. DuckDB seed now persists across container restarts without risking read-only volume conflicts.
+   - **Dockerfile**: Pruned unused `ARG MODEL_SRC=models/catboost_hotspot_classifier_v1.cbm`.
+
+4. **Honesty Caveats Wiring**:
+   - In `app/services/model_service.py`, updated `explain()` and `get_cell_detail()` to call `active_caveats(final_class)` and format `caveat_flag` as `" | ".join(...)` (prepending the policy caveat message when present).
+   - Fast paths (`predict()`, bbox queries) stay lean without full caveat strings.
+   - Verified via test assertion in `tests/test_backend.py`.
+
+5. **`tests/test_aggregation.py` — Multi-Day Aggregation Fixture**:
+   - Implemented deterministic 2-cell multi-day fixture asserting:
+     1. End-to-end completion of `aggregate_daily`.
+     2. Shift-before-rolling: current day's FRP excluded from its own lag window (e.g., Jan 05 lag7 = 8.0 excluding its own 20.0).
+     3. Exact 7D/30D/90D boundary window calculations.
+     4. Cross-cell isolation without inter-cell state leakage.
+     5. `is_first_observation` = 1 only on the first observation per cell.
+     6. Mixed confidence input normalization ("high", "h", "n", "l", NaN, mixed case).
+     7. Output columns match `settings.H3_DAILY_FEATURES` (25 columns) exactly.
+
+### Test & Build Verification Outputs
+
+- **Aggregation Suite (`python -m pytest tests/test_aggregation.py -v`)**:
+  ```
+  tests/test_aggregation.py::test_aggregate_daily_end_to_end_and_columns PASSED [ 16%]
+  tests/test_aggregation.py::test_shift_before_rolling_no_leakage_of_current_day PASSED [ 33%]
+  tests/test_aggregation.py::test_boundary_day_math_and_active_days PASSED [ 50%]
+  tests/test_aggregation.py::test_cross_cell_isolation PASSED              [ 66%]
+  tests/test_aggregation.py::test_is_first_observation PASSED              [ 83%]
+  tests/test_aggregation.py::test_confidence_parsing_forms PASSED          [100%]
+  ======================== 6 passed, 1 warning in 1.70s =========================
+  ```
+
+- **Backend Integration Suite (`python -m pytest tests/test_backend.py -v`)**:
+  ```
+  tests/test_backend.py::test_real_model_contract PASSED                   [ 25%]
+  tests/test_backend.py::test_real_model_predict_proba_and_shap_shape PASSED [ 50%]
+  tests/test_backend.py::test_feature_store_cell_and_bbox_contract PASSED  [ 75%]
+  tests/test_backend.py::test_health_predictions_and_explain_endpoints PASSED [100%]
+  ======================== 4 passed, 2 warnings in 7.97s ========================
+  ```
+
+- **Live Aggregation Frame Output**:
+  ```
+               h3_08    acq_date  frp_max  frp_max_lag7  active_days_7d  frp_max_lag30  active_days_30d  active_days_90d  is_first_observation  confidence_high_any  pct_high_confidence
+  0  883da11463fffff  2026-01-01      8.0           0.0               0            0.0                0                0                     1                    1                  0.5
+  1  883da11463fffff  2026-01-05     20.0           8.0               1            8.0                1                1                     0                    1                  1.0
+  2  883da11463fffff  2026-01-08     15.0          20.0               2           20.0                2                2                     0                    1                  1.0
+  3  883da11463fffff  2026-02-01     12.0          15.0               1           20.0                3                3                     0                    0                  0.0
+  4  883da11463fffff  2026-04-15     25.0          12.0               1           12.0                1                2                     0                    0                  0.0
+  5  88608b0b61fffff  2026-01-02     50.0           0.0               0            0.0                0                0                     1                    0                  0.0
+  6  88608b0b61fffff  2026-01-05    100.0          50.0               1           50.0                1                1                     0                    1                  1.0
+  ```
+
+- **Docker Build (`docker build -t sih2026-backend .`)**:
+  - Image built and exported successfully (`sih2026-backend:latest`).
+
+### Open Items & Known Ingestion Nuances
+
+1. **NULL vs. 0.0 Lag Skew**: Offline Parquet dataset contains `NULL` for initial observation lags whereas live aggregation pipeline fills unobserved prior windows with `0.0`. CatBoost handles numeric `NaN`/`0.0` gracefully, but alignment should be standardized if full training pipeline rerun is executed.
+2. **Raw FIRMS Confidence Representation**: No raw FIRMS sample file exists in repo; current mapping handles both string categorical formats (`"h"`, `"high"`, `"l"`, `"n"`) and numerical percentages if converted upstream.
+3. **Static Land / Offshore Flags**: `is_static_land` and `is_offshore` are not generated by the FIRMS aggregation pipeline directly, as spatial feature enrichment is joined via OSM/WRI static tables in the serving layer.
