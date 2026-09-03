@@ -1,6 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from fastapi import APIRouter, HTTPException
 from app.schemas.audit import AnalystOverrideRequest, AuditLogEntry, AuditLogResponse
 from app.services.audit_service import audit_service
 from app.services.model_service import model_service

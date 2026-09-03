@@ -1,7 +1,6 @@
 import duckdb
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 from app.core.config import settings
 from app.schemas.audit import AnalystOverrideRequest, AuditLogEntry, AuditLogResponse
 
