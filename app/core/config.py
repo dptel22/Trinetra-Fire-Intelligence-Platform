@@ -16,13 +16,19 @@ class Settings:
     INGESTION_DB_PATH: str = str(DATA_DIR / "ingestion.duckdb")
     
     # Spatial Config
-    H3_RESOLUTION: int = 8  # Standard H3 hex resolution (~0.7 km2 area)
+    H3_RESOLUTION: int = 7  # Standard H3 hex resolution (project-locked default)
     
     # Class Definitions are intentionally configurable while labeling policy evolves.
     DEFAULT_TRAINED_CLASSES: list = [
+        "agricultural_burn",
         "industrial",
         "mining",
+        "wildfire",
+    ]
+    TARGET_CLASSES: list = [
         "agricultural_burn",
+        "industrial",
+        "mining",
         "wildfire",
     ]
     UNCLASSIFIED_THRESHOLD: float | None = None
@@ -33,12 +39,11 @@ class Settings:
     
     # Numerical Feature Definitions
     NUM_FEATURES: list = [
-        "brightness",
+        "bright_ti4",
+        "bright_ti5",
         "scan",
         "track",
         "frp",
-        "bright_t31",
-        "confidence",
         "persistence_90d_norm",
         "distance_to_water_km",
         "distance_to_road_km",
