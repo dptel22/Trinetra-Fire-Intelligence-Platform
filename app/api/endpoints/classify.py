@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Query
+import logging
 from typing import List
+from fastapi import APIRouter, HTTPException, Query
 from app.schemas.firms import FIRMSRecord
 from app.schemas.prediction import (
     BatchPredictionResponse,
@@ -10,6 +11,8 @@ from app.schemas.prediction import (
 )
 from app.services.model_service import model_service
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -22,25 +25,34 @@ def classify_hotspot(record: FIRMSRecord):
     try:
         payload = record.model_dump()
         return model_service.predict_single(payload)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Inference failed")
+        raise HTTPException(status_code=500, detail="Inference failed due to an internal server error.")
 
 @router.post("/classify/batch", response_model=BatchPredictionResponse)
 def classify_batch(records: List[FIRMSRecord]):
     """Batch classification for multi-hotspot ingestion."""
-    results = []
-    latencies = []
-    for rec in records:
-        pred = model_service.predict_single(rec.model_dump())
-        results.append(pred)
-        latencies.append(pred.latency_ms)
+    try:
+        results = []
+        latencies = []
+        for rec in records:
+            pred = model_service.predict_single(rec.model_dump())
+            results.append(pred)
+            latencies.append(pred.latency_ms)
 
-    avg_lat = round(float(np.mean(latencies)), 2) if latencies else 0.0
-    return BatchPredictionResponse(
-        total_predictions=len(results),
-        predictions=results,
-        average_latency_ms=avg_lat
-    )
+        avg_lat = round(float(np.mean(latencies)), 2) if latencies else 0.0
+        return BatchPredictionResponse(
+            total_predictions=len(results),
+            predictions=results,
+            average_latency_ms=avg_lat
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Batch classification failed")
+        raise HTTPException(status_code=500, detail="Batch classification failed due to an internal server error.")
 
 @router.post("/explain", response_model=ExplanationResponse)
 def explain_hotspot(record: FIRMSRecord):
@@ -51,8 +63,11 @@ def explain_hotspot(record: FIRMSRecord):
     try:
         payload = record.model_dump()
         return model_service.explain_single(payload)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Explainability computation failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Explainability computation failed")
+        raise HTTPException(status_code=500, detail="Explainability computation failed due to an internal server error.")
 
 @router.get("/predictions", response_model=ViewportPredictionsResponse)
 def get_viewport_predictions(
@@ -68,8 +83,11 @@ def get_viewport_predictions(
     """
     try:
         return model_service.get_viewport_predictions(min_lat, max_lat, min_lon, max_lon, acq_date, zoom)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Viewport prediction failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Viewport prediction failed")
+        raise HTTPException(status_code=500, detail="Viewport prediction failed due to an internal server error.")
 
 
 @router.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse)
@@ -80,8 +98,11 @@ def get_prediction_cell_explanation(cell_id: str, acq_date: str = Query(...)):
     try:
         cell = model_service.get_cell_detail(cell_id, acq_date)
         return model_service.explain(cell.context)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cell explanation failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Cell explanation failed")
+        raise HTTPException(status_code=500, detail="Cell explanation failed due to an internal server error.")
 
 
 @router.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse)
@@ -91,5 +112,8 @@ def get_prediction_cell_detail(cell_id: str, acq_date: str = Query(...)):
     """
     try:
         return model_service.get_cell_detail(cell_id, acq_date)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cell detail query failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Cell detail query failed")
+        raise HTTPException(status_code=500, detail="Cell detail query failed due to an internal server error.")
