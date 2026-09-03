@@ -20,7 +20,7 @@ from app.schemas.prediction import (
     PredictionResponse,
     ViewportPredictionsResponse,
 )
-from app.services.explanation import humanize_feature, top_human_features
+from app.services.explanation import active_caveats, humanize_feature, top_human_features
 from app.services.feature_store import feature_store
 from pipeline.feature_engineering import latlng_to_h3
 
@@ -150,7 +150,13 @@ class CatBoostModelService:
             predicted_idx = self.model_classes.index(predicted_class)
             raw_class = predicted_class
         confidence = float(prob_row[predicted_idx])
-        final_class, caveat = self._apply_confidence_policy(raw_class, confidence)
+        final_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
+        active_list = active_caveats(final_class)
+        if policy_caveat:
+            caveat_list = [policy_caveat] + [c for c in active_list if c != policy_caveat]
+        else:
+            caveat_list = active_list
+        caveat_str = " | ".join(caveat_list) if caveat_list else None
         shap_values = self.model.get_feature_importance(type="ShapValues", data=pool)
 
         if shap_values.ndim == 3 and shap_values.shape[1] == len(self.model_classes):
@@ -186,7 +192,7 @@ class CatBoostModelService:
             base_value=round(base_value, 6),
             feature_attributions=attributions[:3],
             top_features=top_features,
-            caveat_flag=caveat,
+            caveat_flag=caveat_str,
             summary_statement=f"Top drivers for {final_class}: {', '.join(top_features)}.",
             latency_ms=round((time.time() - started) * 1000, 2),
         )
@@ -227,8 +233,10 @@ class CatBoostModelService:
             raise ValueError(f"No H3-day features found for h3_08={cell_id}, acq_date={acq_date}")
         prediction = self.predict(cell)
         explanation = self.explain(cell, predicted_class=prediction.predicted_class)
+        pred_dict = prediction.model_dump()
+        pred_dict["caveat_flag"] = explanation.caveat_flag
         return CellPredictionDetailResponse(
-            **prediction.model_dump(),
+            **pred_dict,
             feature_attributions=explanation.feature_attributions,
             top_features=explanation.top_features,
             context=cell,

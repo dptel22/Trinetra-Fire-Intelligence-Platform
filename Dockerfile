@@ -7,8 +7,6 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-ARG MODEL_SRC=models/catboost_hotspot_classifier_v1.cbm
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

@@ -106,10 +106,15 @@ def test_health_predictions_and_explain_endpoints():
 
         detail = client.get(f"/predictions/{row['h3_08']}", params={"acq_date": row["acq_date"]})
         assert detail.status_code == 200
-        assert detail.json()["cell_id"] == row["h3_08"]
+        detail_json = detail.json()
+        assert detail_json["cell_id"] == row["h3_08"]
+        assert detail_json["caveat_flag"] is not None
+        assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in detail_json["caveat_flag"]
 
         explain = client.get(f"/predictions/{row['h3_08']}/explain", params={"acq_date": row["acq_date"]})
         assert explain.status_code == 200
         explain_json = explain.json()
         assert len(explain_json["feature_attributions"]) == 3
         assert explain_json["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}
+        assert explain_json["caveat_flag"] is not None
+        assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in explain_json["caveat_flag"]

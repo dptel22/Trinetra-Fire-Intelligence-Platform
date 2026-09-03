@@ -16,14 +16,19 @@ services:
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
+      - DUCKDB_PATH=/data_writable/feature_store.duckdb
     ports:
       - "8000:8000"
     volumes:
       - ./app:/app/app
       - ./data/processed:/data:ro
+      - sih2026-data:/data_writable
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - sih2026-network
+
+volumes:
+  sih2026-data:
 
 networks:
   sih2026-network:

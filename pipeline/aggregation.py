@@ -54,13 +54,29 @@ def _daily_cell_aggregate(points: pd.DataFrame) -> pd.DataFrame:
         except (TypeError, ValueError):
             return 0.0
 
-    point_conf = pd.to_numeric(points.get("confidence"), errors="coerce")
-    high_mask = point_conf.notna() & (point_conf.astype(str).str.lower() == "high")
-    night_mask = points.get("daynight", pd.Series(["D"] * len(points))).astype(str).str.upper().isin(["N", "NIGHT"])
+    conf = points["confidence"] if "confidence" in points.columns else pd.Series([""] * len(points), index=points.index)
+    high_mask = conf.astype(str).str.strip().str.lower().isin(["h", "high"])
+    daynight_series = points["daynight"] if "daynight" in points.columns else pd.Series(["D"] * len(points), index=points.index)
+    night_mask = daynight_series.astype(str).str.upper().isin(["N", "NIGHT"])
 
-    frp = pd.to_numeric(points.get("frp"), errors="coerce").fillna(0.0)
-    ti4 = pd.to_numeric(points.get("bright_ti4", points.get("ti4")), errors="coerce").fillna(0.0)
-    sat = points.get("satellite", pd.Series(["N"] * len(points)))
+    frp_col = points["frp"] if "frp" in points.columns else pd.Series([0.0] * len(points), index=points.index)
+    frp = pd.to_numeric(frp_col, errors="coerce").fillna(0.0)
+
+    if "bright_ti4" in points.columns:
+        ti4_col = points["bright_ti4"]
+    elif "ti4" in points.columns:
+        ti4_col = points["ti4"]
+    else:
+        ti4_col = pd.Series([0.0] * len(points), index=points.index)
+    ti4 = pd.to_numeric(ti4_col, errors="coerce").fillna(0.0)
+
+    sat = points["satellite"] if "satellite" in points.columns else pd.Series(["N"] * len(points), index=points.index)
+    scan_col = points["scan"] if "scan" in points.columns else pd.Series([0.0] * len(points), index=points.index)
+    scan = pd.to_numeric(scan_col, errors="coerce").fillna(0.0)
+    track_col = points["track"] if "track" in points.columns else pd.Series([0.0] * len(points), index=points.index)
+    track = pd.to_numeric(track_col, errors="coerce").fillna(0.0)
+    sat_col = points["is_saturated"] if "is_saturated" in points.columns else pd.Series([0] * len(points), index=points.index)
+    is_sat = pd.to_numeric(sat_col, errors="coerce").fillna(0)
 
     row: dict = {
         "h3_08": str(points["h3_08"].iloc[0]),
@@ -69,17 +85,17 @@ def _daily_cell_aggregate(points: pd.DataFrame) -> pd.DataFrame:
         "frp_mean": float(frp.mean()),
         "n_detections": int(len(points)),
         "ti4_max": float(ti4.max()),
-        "is_saturated_max": int(pd.to_numeric(points.get("is_saturated", 0), errors="coerce").fillna(0).max()),
-        "scan_mean": float(pd.to_numeric(points.get("scan", 0), errors="coerce").fillna(0.0).mean()),
-        "track_mean": float(pd.to_numeric(points.get("track", 0), errors="coerce").fillna(0.0).mean()),
+        "is_saturated_max": int(is_sat.max()),
+        "scan_mean": float(scan.mean()),
+        "track_mean": float(track.mean()),
         "confidence_high_any": int(bool(high_mask.any())),
         "pct_high_confidence": _pct(high_mask.astype(int)),
         "frp_max_night": _max_if(frp, night_mask),
         "frp_max_day": _max_if(frp, ~night_mask),
         "n_detections_night": int(night_mask.sum()),
         "n_detections_day": int((~night_mask).sum()),
-        "scan_max": float(pd.to_numeric(points.get("scan", 0), errors="coerce").fillna(0.0).max()),
-        "track_max": float(pd.to_numeric(points.get("track", 0), errors="coerce").fillna(0.0).max()),
+        "scan_max": float(scan.max()),
+        "track_max": float(track.max()),
         "daynight": "Day" if night_mask.sum() < (~night_mask).sum() else "Night",
         "satellite_nunique": int(sat.nunique()),
     }
@@ -102,6 +118,8 @@ def aggregate_daily(points: pd.DataFrame) -> pd.DataFrame:
     groups = []
     for (_h3, _key), g in df.groupby(["h3_08", "acq_date"]):
         groups.append(_daily_cell_aggregate(g))
+    if not groups:
+        return pd.DataFrame(columns=H3_DAILY_FEATURES)
     daily = pd.concat(groups, ignore_index=True)
 
     daily = _add_temporal_history(daily)
@@ -111,55 +129,40 @@ def aggregate_daily(points: pd.DataFrame) -> pd.DataFrame:
 
 def _add_temporal_history(daily: pd.DataFrame) -> pd.DataFrame:
     """Shift-before-rolling temporal features (leakage-safe, per h3_08)."""
+    if daily.empty:
+        return daily.copy()
     out = daily.sort_values(["h3_08", "acq_date"]).copy()
     out["_date"] = pd.to_datetime(out["acq_date"])
+    out = out.set_index("_date")
+
+    grouped = out.groupby("h3_08")["frp_max"]
 
     out["frp_max_lag7"] = (
-        out.groupby("h3_08")["frp_max"]
-        .shift(1)
-        .rolling("7D", min_periods=1)
-        .max()
-        .reset_index(level=0, drop=True)
+        grouped.transform(lambda s: s.shift(1).rolling("7D", min_periods=1).max())
         .fillna(0.0)
     )
     out["frp_max_lag30"] = (
-        out.groupby("h3_08")["frp_max"]
-        .shift(1)
-        .rolling("30D", min_periods=1)
-        .max()
-        .reset_index(level=0, drop=True)
+        grouped.transform(lambda s: s.shift(1).rolling("30D", min_periods=1).max())
         .fillna(0.0)
     )
 
     out["active_days_7d"] = (
-        out.groupby("h3_08")["frp_max"]
-        .shift(1)
-        .rolling("7D", min_periods=0)
-        .count()
-        .reset_index(level=0, drop=True)
+        grouped.transform(lambda s: s.shift(1).rolling("7D", min_periods=0).count())
         .fillna(0)
         .astype(int)
     )
     out["active_days_30d"] = (
-        out.groupby("h3_08")["frp_max"]
-        .shift(1)
-        .rolling("30D", min_periods=0)
-        .count()
-        .reset_index(level=0, drop=True)
+        grouped.transform(lambda s: s.shift(1).rolling("30D", min_periods=0).count())
         .fillna(0)
         .astype(int)
     )
     out["active_days_90d"] = (
-        out.groupby("h3_08")["frp_max"]
-        .shift(1)
-        .rolling("90D", min_periods=0)
-        .count()
-        .reset_index(level=0, drop=True)
+        grouped.transform(lambda s: s.shift(1).rolling("90D", min_periods=0).count())
         .fillna(0)
         .astype(int)
     )
 
     out["is_first_observation"] = (
-        out.groupby("h3_08")["frp_max"].shift(1).isna().astype(int)
+        grouped.transform(lambda s: s.shift(1).isna()).astype(int)
     )
-    return out.drop(columns=["_date"])
+    return out.reset_index(drop=True)
