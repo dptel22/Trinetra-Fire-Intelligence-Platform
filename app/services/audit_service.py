@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import duckdb
 
@@ -52,7 +52,7 @@ class AuditTrailService:
     ) -> AuditLogEntry:
         """Append an immutable audit entry with microsecond precision."""
         event_id = f"AUDIT-EVT-{uuid.uuid4().hex[:12].upper()}"
-        ts = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+        ts = datetime.now(UTC).isoformat(timespec="microseconds")
 
         conn = self._get_connection()
         conn.execute("""

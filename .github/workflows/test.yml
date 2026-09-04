@@ -14,20 +14,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest httpx
+        run: uv sync
 
       # Contract tests verify real model loading when artifacts exist;
       # they skip gracefully with an informative notice if run without them.
       - name: Run tests
-        run: pytest tests/ -v -rs
+        run: uv run pytest tests/ -v -rs
 
   strip-notebooks:
     name: Strip Notebook Outputs
@@ -36,15 +37,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install nbstripout
-        run: pip install nbstripout
+          python-version: "3.14"
 
       - name: Check notebooks have no outputs
         run: |
-          nbstripout --dry-run notebooks/**/*.ipynb || echo "No notebooks yet or outputs found"
+          uv run nbstripout --dry-run notebooks/**/*.ipynb || echo "No notebooks yet or outputs found"
         continue-on-error: true
