@@ -1,6 +1,6 @@
 import h3 as h3lib
 import pandas as pd
-import numpy as np
+
 from app.core.config import settings
 
 

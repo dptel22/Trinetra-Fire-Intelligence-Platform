@@ -1,11 +1,19 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
+
 from app.api.api_router import api_router
-from app.services.model_service import model_service
+from app.core.config import settings
+from app.schemas.prediction import (
+    CellPredictionDetailResponse,
+    ExplanationResponse,
+    HealthResponse,
+    ViewportPredictionsResponse,
+)
 from app.services.feature_store import feature_store
-from app.schemas.prediction import CellPredictionDetailResponse, ExplanationResponse, HealthResponse, ViewportPredictionsResponse
+from app.services.model_service import model_service
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

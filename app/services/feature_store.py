@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import duckdb
 
 from app.core.config import settings
-
 
 STATIC_COLUMNS = [col for col in settings.MODEL_FEATURES if col not in settings.H3_DAILY_FEATURES]
 
@@ -58,7 +57,7 @@ class FeatureStoreService:
             conn.close()
             self.loaded = True
 
-    def get_cell(self, h3_index: str, acq_date: str) -> Optional[Dict[str, Any]]:
+    def get_cell(self, h3_index: str, acq_date: str) -> dict[str, Any] | None:
         self.load()
         conn = self._connect(read_only=True)
         row = conn.execute(
@@ -82,7 +81,7 @@ class FeatureStoreService:
         min_lon: float,
         max_lon: float,
         acq_date: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         self.load()
         conn = self._connect(read_only=True)
         rows = conn.execute(

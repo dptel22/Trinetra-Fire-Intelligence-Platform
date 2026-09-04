@@ -4,7 +4,7 @@ import hashlib
 import time
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import h3 as h3lib
 import numpy as np
@@ -20,7 +20,11 @@ from app.schemas.prediction import (
     PredictionResponse,
     ViewportPredictionsResponse,
 )
-from app.services.explanation import active_caveats, humanize_feature, top_human_features
+from app.services.explanation import (
+    active_caveats,
+    humanize_feature,
+    top_human_features,
+)
 from app.services.feature_store import feature_store
 from pipeline.feature_engineering import latlng_to_h3
 
@@ -30,11 +34,11 @@ class CatBoostModelService:
 
     def __init__(self, model_path: str = settings.MODEL_PATH):
         self.model_path = model_path
-        self.model: Optional[CatBoostClassifier] = None
+        self.model: CatBoostClassifier | None = None
         self.is_loaded = False
         self.model_version = settings.FEATURE_SCHEMA_VERSION
-        self.startup_latency_ms: Optional[float] = None
-        self.model_classes: List[str] = []
+        self.startup_latency_ms: float | None = None
+        self.model_classes: list[str] = []
         self._lock = Lock()
 
     def load_model(self) -> None:
@@ -74,7 +78,7 @@ class CatBoostModelService:
         joined = "\n".join(settings.MODEL_FEATURES + settings.CAT_FEATURES + settings.TARGET_CLASSES)
         return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
 
-    def _prepare_pool(self, features: Dict[str, Any]) -> Pool:
+    def _prepare_pool(self, features: dict[str, Any]) -> Pool:
         missing = [col for col in settings.MODEL_FEATURES if col not in features]
         if missing:
             raise ValueError(f"Missing model features: {missing[:8]}")
@@ -98,25 +102,25 @@ class CatBoostModelService:
 
         return Pool(frame, cat_features=settings.CAT_FEATURES)
 
-    def _coordinates(self, features: Dict[str, Any]) -> tuple[float, float]:
+    def _coordinates(self, features: dict[str, Any]) -> tuple[float, float]:
         if features.get("h3_lat") is not None and features.get("h3_lon") is not None:
             return float(features["h3_lat"]), float(features["h3_lon"])
         return tuple(float(v) for v in h3lib.cell_to_latlng(str(features["h3_08"])))
 
-    def _apply_confidence_policy(self, predicted_class: str, confidence: float) -> tuple[str, Optional[str]]:
+    def _apply_confidence_policy(self, predicted_class: str, confidence: float) -> tuple[str, str | None]:
         if settings.UNCLASSIFIED_THRESHOLD is not None and confidence < settings.UNCLASSIFIED_THRESHOLD:
             return "unclassified", f"Low confidence below configured UNCLASSIFIED_THRESHOLD={settings.UNCLASSIFIED_THRESHOLD:.3f}"
         if predicted_class == "mining":
             return predicted_class, settings.CAVEAT_MANIFEST["mining_low_support"]
         return predicted_class, None
 
-    def _probabilities(self, prob_row: np.ndarray) -> List[ClassProbability]:
+    def _probabilities(self, prob_row: np.ndarray) -> list[ClassProbability]:
         return [
             ClassProbability(class_name=class_name, probability=round(float(prob), 6))
             for class_name, prob in zip(self.model_classes, prob_row)
         ]
 
-    def predict(self, cell_features: Dict[str, Any]) -> PredictionResponse:
+    def predict(self, cell_features: dict[str, Any]) -> PredictionResponse:
         self.load_model()
         started = time.time()
         pool = self._prepare_pool(cell_features)
@@ -139,7 +143,7 @@ class CatBoostModelService:
             latency_ms=round((time.time() - started) * 1000, 2),
         )
 
-    def explain(self, cell_features: Dict[str, Any], predicted_class: str | None = None) -> ExplanationResponse:
+    def explain(self, cell_features: dict[str, Any], predicted_class: str | None = None) -> ExplanationResponse:
         self.load_model()
         started = time.time()
         pool = self._prepare_pool(cell_features)
@@ -197,7 +201,7 @@ class CatBoostModelService:
             latency_ms=round((time.time() - started) * 1000, 2),
         )
 
-    def health(self) -> Dict[str, Any]:
+    def health(self) -> dict[str, Any]:
         return {
             "model_loaded": self.is_loaded,
             "schema_version": settings.FEATURE_SCHEMA_VERSION,
@@ -207,7 +211,7 @@ class CatBoostModelService:
             "target_classes": settings.TARGET_CLASSES,
         }
 
-    def predict_single(self, record_dict: Dict[str, Any]) -> PredictionResponse:
+    def predict_single(self, record_dict: dict[str, Any]) -> PredictionResponse:
         h3_index = record_dict.get("h3_08") or record_dict.get("h3_index")
         if not h3_index and "latitude" in record_dict and "longitude" in record_dict:
             h3_index = latlng_to_h3(float(record_dict["latitude"]), float(record_dict["longitude"]), settings.H3_RESOLUTION)
@@ -217,7 +221,7 @@ class CatBoostModelService:
             raise ValueError(f"No H3-day features found for h3_08={h3_index}, acq_date={acq_date}")
         return self.predict(cell)
 
-    def explain_single(self, record_dict: Dict[str, Any]) -> ExplanationResponse:
+    def explain_single(self, record_dict: dict[str, Any]) -> ExplanationResponse:
         h3_index = record_dict.get("h3_08") or record_dict.get("h3_index")
         if not h3_index and "latitude" in record_dict and "longitude" in record_dict:
             h3_index = latlng_to_h3(float(record_dict["latitude"]), float(record_dict["longitude"]), settings.H3_RESOLUTION)

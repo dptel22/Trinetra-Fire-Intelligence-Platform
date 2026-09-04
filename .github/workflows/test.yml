@@ -24,11 +24,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest httpx
 
-      # The contract tests need the model artifact + processed parquets, which
-      # are gitignored. They currently fail without them, so this job runs
-      # with a notice until artifacts are published to a release.
+      # Contract tests verify real model loading when artifacts exist;
+      # they skip gracefully with an informative notice if run without them.
       - name: Run tests
-        run: pytest tests/ -v
+        run: pytest tests/ -v -rs
 
   strip-notebooks:
     name: Strip Notebook Outputs

@@ -9,7 +9,7 @@ model service can reuse them without duplicating formatting logic.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from app.core.config import settings
 
@@ -63,7 +63,7 @@ def top_human_features(
     ]
 
 
-def active_caveats(predicted_class: Optional[str] = None) -> list[str]:
+def active_caveats(predicted_class: str | None = None) -> list[str]:
     """Judge-facing honesty caveats relevant to a prediction.
 
     Always surfaces the label-scheme circularity (it affects every prediction's

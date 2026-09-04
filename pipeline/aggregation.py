@@ -83,7 +83,7 @@ def _daily_cell_aggregate(points: pd.DataFrame) -> pd.DataFrame:
         "acq_date": str(pd.to_datetime(points["acq_date"]).iloc[0].date()),
         "frp_max": float(frp.max()),
         "frp_mean": float(frp.mean()),
-        "n_detections": int(len(points)),
+        "n_detections": len(points),
         "ti4_max": float(ti4.max()),
         "is_saturated_max": int(is_sat.max()),
         "scan_mean": float(scan.mean()),

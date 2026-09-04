@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent
 _DATA_DIR = _BASE_DIR / "data"
@@ -117,24 +117,24 @@ class Settings:
         "OSMWRI_PARQUET",
         str(_DATA_DIR / "processed" / "sih2026_h3_daily_features_with_osm_wri.parquet"),
     )
-    CAVEAT_MANIFEST = {
+    CAVEAT_MANIFEST: ClassVar[dict[str, str]] = {
         "pseudo_label_circularity": "Labels derive partly from FIRMS/OSM/WRI features, so metrics are not independent ground truth.",
         "satellite_nunique_only": "Only satellite count is modeled, not satellite identity.",
         "mining_low_support": "Mining has lower labeled support and should be read cautiously.",
     }
     H3_RESOLUTION = int(os.environ.get("H3_RESOLUTION", "8"))
-    UNCLASSIFIED_THRESHOLD: Optional[float] = (
+    UNCLASSIFIED_THRESHOLD: float | None = (
         float(os.environ["UNCLASSIFIED_THRESHOLD"])
         if os.environ.get("UNCLASSIFIED_THRESHOLD") not in (None, "")
         else None
     )
     FEATURE_SCHEMA_VERSION = "v2-h3-day-catboost"
     INGEST_MAX_BATCH_SIZE = 5000
-    CORS_ALLOW_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    TARGET_CLASSES = TARGET_CLASSES
-    CAT_FEATURES = CAT_FEATURES
-    MODEL_FEATURES = MODEL_FEATURES
-    H3_DAILY_FEATURES = H3_DAILY_FEATURES
+    CORS_ALLOW_ORIGINS: ClassVar[list[str]] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    TARGET_CLASSES: ClassVar[list[str]] = TARGET_CLASSES
+    CAT_FEATURES: ClassVar[list[str]] = CAT_FEATURES
+    MODEL_FEATURES: ClassVar[list[str]] = MODEL_FEATURES
+    H3_DAILY_FEATURES: ClassVar[list[str]] = H3_DAILY_FEATURES
 
 
 settings = Settings()

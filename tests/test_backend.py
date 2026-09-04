@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from catboost import CatBoostClassifier, Pool
 from fastapi.testclient import TestClient
 
@@ -12,8 +13,9 @@ from app.core.config import settings
 from app.main import app
 from app.services.feature_store import feature_store
 
-
 EXPECTED_CLASSES = {"industrial", "mining", "agricultural_burn", "wildfire"}
+MODEL_EXISTS = Path(settings.MODEL_PATH).exists()
+PARQUET_EXISTS = Path(settings.OSMWRI_PARQUET).exists()
 
 
 def _sample_h3_day_row() -> dict:
@@ -34,6 +36,7 @@ def _pool_from_row(row: dict) -> Pool:
     return Pool(frame, cat_features=settings.CAT_FEATURES)
 
 
+@pytest.mark.skipif(not MODEL_EXISTS, reason=f"Model artifact not found at {settings.MODEL_PATH}")
 def test_real_model_contract():
     model = CatBoostClassifier()
     model.load_model(settings.MODEL_PATH)
@@ -41,9 +44,10 @@ def test_real_model_contract():
     assert settings.H3_RESOLUTION == 8
     assert list(model.feature_names_) == settings.MODEL_FEATURES
     assert [model.feature_names_[idx] for idx in model.get_cat_feature_indices()] == settings.CAT_FEATURES
-    assert set(str(cls) for cls in model.classes_) == EXPECTED_CLASSES
+    assert {str(cls) for cls in model.classes_} == EXPECTED_CLASSES
 
 
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires model artifact and OSM/WRI parquet")
 def test_real_model_predict_proba_and_shap_shape():
     model = CatBoostClassifier()
     model.load_model(settings.MODEL_PATH)
@@ -58,6 +62,7 @@ def test_real_model_predict_proba_and_shap_shape():
     assert shap_values.shape == (1, 4, len(settings.MODEL_FEATURES) + 1)
 
 
+@pytest.mark.skipif(not PARQUET_EXISTS, reason=f"OSM/WRI parquet not found at {settings.OSMWRI_PARQUET}")
 def test_feature_store_cell_and_bbox_contract():
     row = _sample_h3_day_row()
     feature_store.load()
@@ -78,6 +83,7 @@ def test_feature_store_cell_and_bbox_contract():
     assert any(item["h3_08"] == row["h3_08"] for item in bbox_rows)
 
 
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires model artifact and OSM/WRI parquet")
 def test_health_predictions_and_explain_endpoints():
     row = _sample_h3_day_row()
     with TestClient(app) as client:

@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Literal
-from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
 
 class FIRMSRecord(BaseModel):
     """
@@ -10,7 +11,7 @@ class FIRMSRecord(BaseModel):
     docs/eda-findings.md (main branch). Do NOT use old MODIS names like
     'brightness' or 'bright_t31' — this backend targets VIIRS data only.
     """
-    hotspot_id: Optional[str] = Field(None, description="Unique identifier for the observation (generated if absent)")
+    hotspot_id: str | None = Field(None, description="Unique identifier for the observation (generated if absent)")
 
     # Core spatial fields
     latitude: float = Field(..., ge=-90.0, le=90.0, description="Latitude in decimal degrees")
@@ -37,15 +38,15 @@ class FIRMSRecord(BaseModel):
     confidence: Literal["low", "nominal", "high"] = Field("nominal", description="Detection confidence: low | nominal | high")
 
     # Optional temporal persistence fields
-    persistence_90d: Optional[int] = Field(0, ge=0, description="Raw detection count in 90-day window for this H3 cell")
-    observed_days_in_90d: Optional[int] = Field(90, ge=1, le=90, description="Valid observation days in 90-day window (accounts for cloud/sensor gaps)")
+    persistence_90d: int | None = Field(0, ge=0, description="Raw detection count in 90-day window for this H3 cell")
+    observed_days_in_90d: int | None = Field(90, ge=1, le=90, description="Valid observation days in 90-day window (accounts for cloud/sensor gaps)")
 
     # Optional FIRMS type field (only in viirs-snpp_2024 source)
-    type: Optional[int] = Field(None, description="FIRMS type: 0=vegetation, 1=volcano, 2=static land source, 3=offshore")
+    type: int | None = Field(None, description="FIRMS type: 0=vegetation, 1=volcano, 2=static land source, 3=offshore")
 
 
 class IngestionBatchRequest(BaseModel):
-    records: List[FIRMSRecord]
+    records: list[FIRMSRecord]
 
 
 class IngestionBatchResponse(BaseModel):
@@ -53,4 +54,4 @@ class IngestionBatchResponse(BaseModel):
     total_valid: int
     total_quarantined_dlq: int
     message: str
-    quarantined_errors: List[dict] = Field(default_factory=list)
+    quarantined_errors: list[dict] = Field(default_factory=list)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +17,7 @@ class FeatureAttribution(BaseModel):
     feature_value: str
     shap_value: float
     contribution: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class PredictionResponse(BaseModel):
@@ -26,9 +26,9 @@ class PredictionResponse(BaseModel):
     longitude: float
     h3_index: str
     predicted_class: str
-    probabilities: List[ClassProbability]
+    probabilities: list[ClassProbability]
     confidence: float = Field(..., ge=0.0, le=1.0)
-    caveat_flag: Optional[str] = None
+    caveat_flag: str | None = None
     latency_ms: float
 
 
@@ -38,7 +38,7 @@ class HotspotPredictionResponse(PredictionResponse):
 
 class BatchPredictionResponse(BaseModel):
     total_predictions: int
-    predictions: List[PredictionResponse]
+    predictions: list[PredictionResponse]
     average_latency_ms: float
 
 
@@ -47,26 +47,26 @@ class ExplanationResponse(BaseModel):
     h3_index: str
     predicted_class: str
     confidence: float = Field(..., ge=0.0, le=1.0)
-    probabilities: List[ClassProbability]
+    probabilities: list[ClassProbability]
     base_value: float
-    feature_attributions: List[FeatureAttribution]
-    top_features: List[str] = Field(default_factory=list)
-    caveat_flag: Optional[str] = None
+    feature_attributions: list[FeatureAttribution]
+    top_features: list[str] = Field(default_factory=list)
+    caveat_flag: str | None = None
     summary_statement: str
     latency_ms: float
 
 
 class CellPredictionDetailResponse(PredictionResponse):
-    feature_attributions: List[FeatureAttribution] = Field(default_factory=list)
-    top_features: List[str] = Field(default_factory=list)
-    context: Dict[str, Any] = Field(default_factory=dict)
+    feature_attributions: list[FeatureAttribution] = Field(default_factory=list)
+    top_features: list[str] = Field(default_factory=list)
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class ViewportPredictionsResponse(BaseModel):
     mode: str
     zoom: float = 8.0
     total_predictions: int
-    predictions: List[PredictionResponse]
+    predictions: list[PredictionResponse]
 
 
 class HealthResponse(BaseModel):
@@ -76,6 +76,6 @@ class HealthResponse(BaseModel):
     schema_version: str
     schema_hash: str
     model_path: str
-    startup_latency_ms: Optional[float] = None
-    target_classes: List[str]
+    startup_latency_ms: float | None = None
+    target_classes: list[str]
 

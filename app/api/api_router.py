@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from app.api.endpoints import classify, audit
+
+from app.api.endpoints import audit, classify
 
 api_router = APIRouter()
 
