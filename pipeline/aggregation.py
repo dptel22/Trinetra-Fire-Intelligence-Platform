@@ -1,8 +1,10 @@
 """FIRMS VIIRS point stream -> exact H3-day cell aggregation.
 
 Produces the daily per-cell feature frame whose column contract is locked by
-``app/core/config.H3_DAILY_FEATURES`` / the shipped product
-``sih2026_h3_daily_features_firms.parquet`` (28 columns).
+``app/core/config.H3_DAILY_FEATURES``: the shipped product
+``sih2026_h3_daily_features_firms.parquet`` (28 columns) plus the 3
+``acq_date``-derived calendar features (``acq_month``, ``doy_sin``,
+``doy_cos``) required by the v3 model contract.
 
 IMPORTANT (read before trusting live ingestion): the raw-FIRMS *field mapping*
 below (e.g. ``ti4_max`` from ``bright_ti4``, ``daynight`` values, confidence
@@ -21,6 +23,7 @@ Designed contracts enforced here:
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from app.core.config import H3_DAILY_FEATURES, settings
@@ -134,6 +137,14 @@ def _add_temporal_history(daily: pd.DataFrame) -> pd.DataFrame:
     out = daily.sort_values(["h3_08", "acq_date"]).copy()
     out["_date"] = pd.to_datetime(out["acq_date"])
     out = out.set_index("_date")
+
+    # Calendar features (v3 model contract). Must stay numerically identical
+    # to the DuckDB derivation in app/services/feature_store.py::load():
+    # 1-indexed day-of-year, 365.25-day period. A pytest gate pins the two.
+    doy = out.index.dayofyear
+    out["acq_month"] = out.index.month.astype(int)
+    out["doy_sin"] = np.sin(2 * np.pi * doy / 365.25)
+    out["doy_cos"] = np.cos(2 * np.pi * doy / 365.25)
 
     grouped = out.groupby("h3_08")["frp_max"]
 

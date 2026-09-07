@@ -35,7 +35,27 @@ class FeatureStoreService:
 
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
             conn = self._connect()
-            conn.execute("CREATE OR REPLACE TABLE h3_daily AS SELECT * FROM read_parquet(?)", [str(daily_path)])
+            # Calendar features required by the v3 model contract are derived
+            # from acq_date at seed time: month plus 1-indexed day-of-year
+            # sin/cos with a 365.25-day period.
+            conn.execute(
+                """
+                CREATE OR REPLACE TABLE h3_daily AS
+                SELECT
+                    *,
+                    month(CAST(acq_date AS DATE)) AS acq_month,
+                    sin(2 * pi() * dayofyear(CAST(acq_date AS DATE)) / 365.25) AS doy_sin,
+                    cos(2 * pi() * dayofyear(CAST(acq_date AS DATE)) / 365.25) AS doy_cos
+                FROM read_parquet(?)
+                """,
+                [str(daily_path)],
+            )
+            for col in ("acq_month", "doy_sin", "doy_cos"):
+                null_count = conn.execute(
+                    f"SELECT count(*) FROM h3_daily WHERE {col} IS NULL"
+                ).fetchone()[0]
+                if null_count == conn.execute("SELECT count(*) FROM h3_daily").fetchone()[0]:
+                    raise ValueError(f"Derived column {col} is entirely NULL; check acq_date parsing")
             # DuckDB does NOT support SELECT DISTINCT ON. Use ROW_NUMBER() to
             # take the first row per h3_08 for the static OSM/WRI columns.
             static_col_list = ", ".join(STATIC_COLUMNS)

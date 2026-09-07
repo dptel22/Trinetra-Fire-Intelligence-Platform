@@ -28,6 +28,8 @@ class PredictionResponse(BaseModel):
     predicted_class: str
     probabilities: list[ClassProbability]
     confidence: float = Field(..., ge=0.0, le=1.0)
+    calibrated: bool = True
+    needs_review: bool = False
     caveat_flag: str | None = None
     latency_ms: float
 
@@ -76,6 +78,9 @@ class HealthResponse(BaseModel):
     schema_version: str
     schema_hash: str
     model_path: str
+    bundle_dir: str = ""
+    calibrators_loaded: bool = False
+    review_thresholds: dict[str, float] | None = None
     startup_latency_ms: float | None = None
     target_classes: list[str]
 

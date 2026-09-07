@@ -36,6 +36,9 @@ MODEL_FEATURES = [
     "frp_max_lag30",
     "active_days_30d",
     "active_days_90d",
+    "acq_month",
+    "doy_sin",
+    "doy_cos",
     "is_first_observation",
     "dist_wri_solar_km",
     "n_wri_solar_10km",
@@ -92,6 +95,9 @@ H3_DAILY_FEATURES = [
     "frp_max_lag30",
     "active_days_30d",
     "active_days_90d",
+    "acq_month",
+    "doy_sin",
+    "doy_cos",
     "is_first_observation",
 ]
 
@@ -105,9 +111,13 @@ class Settings:
     DUCKDB_PATH = os.environ.get("DUCKDB_PATH", str(_DATA_DIR / "feature_store.duckdb"))
     AUDIT_DB_PATH = os.environ.get("AUDIT_DB_PATH", str(_DATA_DIR / "audit_log.duckdb"))
     INGESTION_DB_PATH = os.environ.get("INGESTION_DB_PATH", str(_DATA_DIR / "ingestion.duckdb"))
+    INFERENCE_BUNDLE_DIR = os.environ.get(
+        "INFERENCE_BUNDLE_DIR",
+        str(_BASE_DIR / "models" / "PS26162_catboost_final" / "inference_bundle"),
+    )
     MODEL_PATH = os.environ.get(
         "MODEL_PATH",
-        str(_BASE_DIR / "models" / "catboost_hotspot_classifier_v1.cbm"),
+        str(Path(INFERENCE_BUNDLE_DIR) / "catboost_hotspot_classifier.cbm"),
     )
     H3_DAILY_PARQUET = os.environ.get(
         "H3_DAILY_PARQUET",
@@ -121,6 +131,7 @@ class Settings:
         "pseudo_label_circularity": "Labels derive partly from FIRMS/OSM/WRI features, so metrics are not independent ground truth.",
         "satellite_nunique_only": "Only satellite count is modeled, not satellite identity.",
         "mining_low_support": "Mining has lower labeled support and should be read cautiously.",
+        "low_confidence_review": "Calibrated confidence is below the per-class review threshold; treat as provisional.",
     }
     H3_RESOLUTION = int(os.environ.get("H3_RESOLUTION", "8"))
     UNCLASSIFIED_THRESHOLD: float | None = (
@@ -128,7 +139,7 @@ class Settings:
         if os.environ.get("UNCLASSIFIED_THRESHOLD") not in (None, "")
         else None
     )
-    FEATURE_SCHEMA_VERSION = "v2-h3-day-catboost"
+    FEATURE_SCHEMA_VERSION = "v3-h3-day-catboost"
     INGEST_MAX_BATCH_SIZE = 5000
     CORS_ALLOW_ORIGINS: ClassVar[list[str]] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     TARGET_CLASSES: ClassVar[list[str]] = TARGET_CLASSES

@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import logging
 import time
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
 import h3 as h3lib
+import joblib
 import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier, Pool
+from sklearn.isotonic import IsotonicRegression
 
 from app.core.config import settings
 from app.schemas.prediction import (
@@ -28,17 +32,24 @@ from app.services.explanation import (
 from app.services.feature_store import feature_store
 from pipeline.feature_engineering import latlng_to_h3
 
+logger = logging.getLogger(__name__)
+
+_BUNDLE_FILES = ("feature_schema.json", "calibrators.joblib", "review_thresholds.json")
+
 
 class CatBoostModelService:
     """Inference service for Dhruv's real PS26162 H3-day CatBoost model."""
 
     def __init__(self, model_path: str = settings.MODEL_PATH):
         self.model_path = model_path
+        self.bundle_dir = settings.INFERENCE_BUNDLE_DIR
         self.model: CatBoostClassifier | None = None
         self.is_loaded = False
         self.model_version = settings.FEATURE_SCHEMA_VERSION
         self.startup_latency_ms: float | None = None
         self.model_classes: list[str] = []
+        self.calibrators: dict[str, IsotonicRegression] | None = None
+        self.review_thresholds: dict[str, float] = {}
         self._lock = Lock()
 
     def load_model(self) -> None:
@@ -46,17 +57,77 @@ class CatBoostModelService:
             if self.is_loaded:
                 return
             started = time.time()
-            path = Path(self.model_path)
-            if not path.exists():
-                raise FileNotFoundError(f"Missing CatBoost model artifact: {path}")
+            bundle = Path(self.bundle_dir)
+            cbm_files = sorted(bundle.glob("*.cbm"))
+            if not cbm_files:
+                raise FileNotFoundError(f"No .cbm artifact found in inference bundle: {bundle}")
+            missing = [name for name in _BUNDLE_FILES if not (bundle / name).exists()]
+            if missing:
+                raise FileNotFoundError(f"Missing inference bundle artifacts {missing} in {bundle}")
 
             model = CatBoostClassifier()
-            model.load_model(str(path))
+            model.load_model(str(cbm_files[0]))
+            self.model_path = str(cbm_files[0])
             self._assert_contract(model)
+
+            schema = json.loads((bundle / "feature_schema.json").read_text(encoding="utf-8"))
+            schema_features = list(schema["feature_cols"])
+            if not (schema_features == list(model.feature_names_) == settings.MODEL_FEATURES):
+                raise ValueError(
+                    "Three-way feature contract mismatch: model, feature_schema.json and "
+                    "settings.MODEL_FEATURES must agree exactly"
+                )
+            if set(schema.get("cat_features", [])) != set(settings.CAT_FEATURES):
+                raise ValueError(f"Bundle cat_features mismatch: {schema.get('cat_features')}")
+            if set(schema.get("target_classes", [])) != set(settings.TARGET_CLASSES):
+                raise ValueError(f"Bundle target_classes mismatch: {schema.get('target_classes')}")
+
+            calibrators = joblib.load(bundle / "calibrators.joblib")
+            # Trust boundary: calibrators.joblib is a first-party artifact from our
+            # own Kaggle training run, loaded from the versioned bundle directory.
+            # joblib.load must never be pointed at user-supplied files.
+            if not isinstance(calibrators, dict) or set(calibrators) != set(settings.TARGET_CLASSES):
+                raise ValueError(f"Calibrators must map every target class to an IsotonicRegression, got: {sorted(calibrators) if isinstance(calibrators, dict) else type(calibrators)}")
+            probe = np.array([0.0, 0.5, 1.0])
+            for cls, cal in calibrators.items():
+                if not isinstance(cal, IsotonicRegression):
+                    raise ValueError(f"Calibrator for {cls} is {type(cal).__name__}, expected IsotonicRegression")
+                if not np.all(np.isfinite(cal.predict(probe))):
+                    raise ValueError(f"Calibrator for {cls} returns non-finite output on [0,1] probe; check out_of_bounds setting")
+
+            thresholds = json.loads((bundle / "review_thresholds.json").read_text(encoding="utf-8"))
+            if not isinstance(thresholds, dict) or not thresholds:
+                raise ValueError("review_thresholds.json must be a non-empty mapping")
+            unknown = set(thresholds) - set(settings.TARGET_CLASSES)
+            if unknown:
+                raise ValueError(f"review_thresholds.json has unknown classes: {sorted(unknown)}")
+            if not all(isinstance(v, (int, float)) for v in thresholds.values()):
+                raise ValueError("review_thresholds.json values must be numeric")
+
+            self._check_runtime_versions(bundle)
+
             self.model = model
             self.model_classes = [str(cls) for cls in model.classes_]
+            self.calibrators = calibrators
+            self.review_thresholds = {k: float(v) for k, v in thresholds.items()}
             self.is_loaded = True
             self.startup_latency_ms = round((time.time() - started) * 1000, 2)
+
+    def _check_runtime_versions(self, bundle: Path) -> None:
+        """Warn (never fail) when serving versions drift from the training runtime."""
+        versions_file = bundle / "runtime_versions.json"
+        if not versions_file.exists():
+            return
+        recorded = json.loads(versions_file.read_text(encoding="utf-8"))
+        import catboost
+        import sklearn
+        import sys
+
+        installed = {"python": ".".join(str(v) for v in sys.version_info[:2]), "catboost": catboost.__version__, "scikit-learn": sklearn.__version__}
+        for key, expected in recorded.items():
+            actual = installed.get(key)
+            if actual is not None and actual != str(expected):
+                logger.warning("Runtime version drift for %s: bundle=%s serving=%s", key, expected, actual)
 
     def _assert_contract(self, model: CatBoostClassifier) -> None:
         feature_names = list(model.feature_names_)
@@ -114,6 +185,40 @@ class CatBoostModelService:
             return predicted_class, settings.CAVEAT_MANIFEST["mining_low_support"]
         return predicted_class, None
 
+    def _calibrate(self, raw_row: np.ndarray) -> tuple[np.ndarray, bool]:
+        """Map raw per-class probabilities through the bundle's isotonic calibrators.
+
+        Per-class one-vs-rest isotonic outputs do not sum to 1, so they are
+        renormalized. Falls back to the raw probabilities whenever the
+        calibrated vector is non-finite or degenerate (isotonic with
+        out_of_bounds='nan' can emit NaN for raw probs outside its fit range).
+        """
+        assert self.calibrators is not None
+        calibrated = np.array(
+            [float(self.calibrators[cls].predict([float(p)])[0]) for cls, p in zip(self.model_classes, raw_row)]
+        )
+        total = calibrated.sum()
+        if not np.all(np.isfinite(calibrated)) or total <= 0.0:
+            return raw_row.astype(float), False
+        return calibrated / total, True
+
+    def _needs_review(self, raw_class: str, confidence: float, final_class: str) -> bool:
+        """Review gate is evaluated against the pre-policy class so that
+        'unclassified' rows (which have no threshold entry) can never escape
+        review via a .get() default."""
+        if final_class == "unclassified":
+            return True
+        threshold = self.review_thresholds.get(raw_class)
+        return threshold is not None and confidence < threshold
+
+    def _compose_caveats(self, policy_caveat: str | None, needs_review: bool) -> str | None:
+        parts = []
+        if policy_caveat:
+            parts.append(policy_caveat)
+        if needs_review:
+            parts.append(settings.CAVEAT_MANIFEST["low_confidence_review"])
+        return " | ".join(parts) if parts else None
+
     def _probabilities(self, prob_row: np.ndarray) -> list[ClassProbability]:
         return [
             ClassProbability(class_name=class_name, probability=round(float(prob), 6))
@@ -124,11 +229,14 @@ class CatBoostModelService:
         self.load_model()
         started = time.time()
         pool = self._prepare_pool(cell_features)
-        prob_row = self.model.predict_proba(pool)[0]
+        raw_row = self.model.predict_proba(pool)[0]
+        prob_row, calibrated = self._calibrate(raw_row)
         predicted_idx = int(np.argmax(prob_row))
         raw_class = self.model_classes[predicted_idx]
         confidence = float(prob_row[predicted_idx])
-        predicted_class, caveat = self._apply_confidence_policy(raw_class, confidence)
+        predicted_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
+        needs_review = self._needs_review(raw_class, confidence, predicted_class)
+        caveat = self._compose_caveats(policy_caveat, needs_review)
         lat, lon = self._coordinates(cell_features)
 
         return PredictionResponse(
@@ -139,6 +247,8 @@ class CatBoostModelService:
             predicted_class=predicted_class,
             probabilities=self._probabilities(prob_row),
             confidence=round(confidence, 6),
+            calibrated=calibrated,
+            needs_review=needs_review,
             caveat_flag=caveat,
             latency_ms=round((time.time() - started) * 1000, 2),
         )
@@ -147,7 +257,8 @@ class CatBoostModelService:
         self.load_model()
         started = time.time()
         pool = self._prepare_pool(cell_features)
-        prob_row = self.model.predict_proba(pool)[0]
+        raw_row = self.model.predict_proba(pool)[0]
+        prob_row, _ = self._calibrate(raw_row)
         predicted_idx = int(np.argmax(prob_row))
         raw_class = self.model_classes[predicted_idx]
         if predicted_class in self.model_classes:
@@ -155,11 +266,12 @@ class CatBoostModelService:
             raw_class = predicted_class
         confidence = float(prob_row[predicted_idx])
         final_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
+        needs_review = self._needs_review(raw_class, confidence, final_class)
         active_list = active_caveats(final_class)
-        if policy_caveat:
-            caveat_list = [policy_caveat] + [c for c in active_list if c != policy_caveat]
-        else:
-            caveat_list = active_list
+        caveat_list = []
+        for caveat in (policy_caveat, settings.CAVEAT_MANIFEST["low_confidence_review"] if needs_review else None, *active_list):
+            if caveat and caveat not in caveat_list:
+                caveat_list.append(caveat)
         caveat_str = " | ".join(caveat_list) if caveat_list else None
         shap_values = self.model.get_feature_importance(type="ShapValues", data=pool)
 
@@ -207,6 +319,9 @@ class CatBoostModelService:
             "schema_version": settings.FEATURE_SCHEMA_VERSION,
             "schema_hash": self._schema_hash(),
             "model_path": self.model_path,
+            "bundle_dir": self.bundle_dir,
+            "calibrators_loaded": self.calibrators is not None,
+            "review_thresholds": dict(self.review_thresholds) if self.review_thresholds else None,
             "startup_latency_ms": self.startup_latency_ms,
             "target_classes": settings.TARGET_CLASSES,
         }
@@ -238,7 +353,15 @@ class CatBoostModelService:
         prediction = self.predict(cell)
         explanation = self.explain(cell, predicted_class=prediction.predicted_class)
         pred_dict = prediction.model_dump()
-        pred_dict["caveat_flag"] = explanation.caveat_flag
+        # Merge rather than overwrite: the prediction may carry the review
+        # caveat which must survive onto the detail endpoint.
+        merged = []
+        for caveat in (pred_dict["caveat_flag"], explanation.caveat_flag):
+            if caveat:
+                for part in caveat.split(" | "):
+                    if part and part not in merged:
+                        merged.append(part)
+        pred_dict["caveat_flag"] = " | ".join(merged) if merged else None
         return CellPredictionDetailResponse(
             **pred_dict,
             feature_attributions=explanation.feature_attributions,

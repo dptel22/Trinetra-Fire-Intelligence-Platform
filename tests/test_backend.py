@@ -1,6 +1,9 @@
+import json
+import math
 import sys
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,11 +14,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings
 from app.main import app
-from app.services.feature_store import feature_store
+from app.services.feature_store import STATIC_COLUMNS, feature_store
+from app.services.model_service import model_service
 
 EXPECTED_CLASSES = {"industrial", "mining", "agricultural_burn", "wildfire"}
 MODEL_EXISTS = Path(settings.MODEL_PATH).exists()
 PARQUET_EXISTS = Path(settings.OSMWRI_PARQUET).exists()
+
+
+def _calendar_features(acq_date: str) -> dict[str, float]:
+    dt = pd.to_datetime(acq_date)
+    doy = dt.dayofyear
+    return {
+        "acq_month": int(dt.month),
+        "doy_sin": math.sin(2 * math.pi * doy / 365.25),
+        "doy_cos": math.cos(2 * math.pi * doy / 365.25),
+    }
 
 
 def _sample_h3_day_row() -> dict:
@@ -23,6 +37,9 @@ def _sample_h3_day_row() -> dict:
     row = df.dropna(subset=["h3_08", "acq_date", "h3_lat", "h3_lon"]).iloc[0]
     payload = row.to_dict()
     payload["acq_date"] = str(pd.to_datetime(payload["acq_date"]).date())
+    # The shipped parquets predate the v3 contract; the calendar features are
+    # derived at seed time in the store, so mirror that here.
+    payload.update(_calendar_features(payload["acq_date"]))
     return payload
 
 
@@ -92,6 +109,9 @@ def test_health_predictions_and_explain_endpoints():
         health_json = health.json()
         assert health_json["model_loaded"] is True
         assert health_json["schema_version"] == settings.FEATURE_SCHEMA_VERSION
+        assert health_json["calibrators_loaded"] is True
+        assert health_json["bundle_dir"]
+        assert set(health_json["review_thresholds"]) == EXPECTED_CLASSES
 
         list_res = client.get(
             "/predictions",
@@ -109,6 +129,9 @@ def test_health_predictions_and_explain_endpoints():
         prediction = list_json["predictions"][0]
         assert prediction["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}
         assert len(prediction["probabilities"]) == 4
+        assert "calibrated" in prediction and isinstance(prediction["calibrated"], bool)
+        assert "needs_review" in prediction
+        assert math.isclose(sum(p["probability"] for p in prediction["probabilities"]), 1.0, rel_tol=1e-3)
 
         detail = client.get(f"/predictions/{row['h3_08']}", params={"acq_date": row["acq_date"]})
         assert detail.status_code == 200
@@ -124,3 +147,85 @@ def test_health_predictions_and_explain_endpoints():
         assert explain_json["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}
         assert explain_json["caveat_flag"] is not None
         assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in explain_json["caveat_flag"]
+
+
+@pytest.mark.skipif(not MODEL_EXISTS, reason="Requires model bundle")
+def test_inference_bundle_contract():
+    model_service.load_model()
+    schema = json.loads((Path(settings.INFERENCE_BUNDLE_DIR) / "feature_schema.json").read_text(encoding="utf-8"))
+    assert schema["feature_cols"] == settings.MODEL_FEATURES == list(model_service.model.feature_names_)
+    assert len(settings.MODEL_FEATURES) == 55
+    assert set(schema["cat_features"]) == set(settings.CAT_FEATURES)
+    assert set(schema["target_classes"]) == EXPECTED_CLASSES
+    assert set(model_service.calibrators) == EXPECTED_CLASSES
+    assert set(model_service.review_thresholds) <= EXPECTED_CLASSES
+
+
+@pytest.mark.skipif(not PARQUET_EXISTS, reason="Requires OSM/WRI parquet")
+def test_static_columns_available_in_parquet():
+    df = pd.read_parquet(settings.OSMWRI_PARQUET)
+    missing = [col for col in STATIC_COLUMNS if col not in df.columns]
+    assert not missing, f"STATIC_COLUMNS not present in OSM/WRI parquet: {missing}"
+    derived = {"acq_month", "doy_sin", "doy_cos"}
+    assert derived.isdisjoint(STATIC_COLUMNS), "calendar features must not be treated as static OSM/WRI columns"
+
+
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires model bundle and OSM/WRI parquet")
+def test_review_gate_flags_low_confidence(monkeypatch):
+    model_service.load_model()
+    row = _sample_h3_day_row()
+
+    monkeypatch.setattr(model_service, "review_thresholds", {cls: 1.01 for cls in settings.TARGET_CLASSES})
+    flagged = model_service.predict(row)
+    assert flagged.needs_review is True
+    assert settings.CAVEAT_MANIFEST["low_confidence_review"] in (flagged.caveat_flag or "")
+
+    monkeypatch.setattr(model_service, "review_thresholds", {cls: 0.0 for cls in settings.TARGET_CLASSES})
+    unflagged = model_service.predict(row)
+    assert unflagged.needs_review is False
+    assert settings.CAVEAT_MANIFEST["low_confidence_review"] not in (unflagged.caveat_flag or "")
+
+
+class _BrokenCalibrator:
+    def predict(self, values):
+        return [float("nan")] * len(list(values))
+
+
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires model bundle and OSM/WRI parquet")
+def test_calibrator_failure_falls_back_to_raw(monkeypatch):
+    model_service.load_model()
+    row = _sample_h3_day_row()
+    monkeypatch.setattr(
+        model_service,
+        "calibrators",
+        {cls: _BrokenCalibrator() for cls in model_service.model_classes},
+    )
+    response = model_service.predict(row)
+    assert response.calibrated is False
+    assert math.isclose(sum(p.probability for p in response.probabilities), 1.0, rel_tol=1e-6)
+    assert response.predicted_class in EXPECTED_CLASSES | {"unclassified"}
+
+
+def test_calendar_feature_parity_sql_vs_pandas():
+    """The DuckDB seed derivation and the pandas aggregation formula must be
+    numerically identical (1-indexed doy, 365.25-day period)."""
+    dates = ["2024-01-01", "2024-03-28", "2024-12-31", "2025-03-01", "2025-07-15"]
+    conn = duckdb.connect()
+    try:
+        sql_rows = conn.execute(
+            """
+            SELECT CAST(acq_date AS DATE) AS d,
+                   month(CAST(acq_date AS DATE)) AS m,
+                   sin(2 * pi() * dayofyear(CAST(acq_date AS DATE)) / 365.25) AS s,
+                   cos(2 * pi() * dayofyear(CAST(acq_date AS DATE)) / 365.25) AS c
+            FROM (SELECT unnest(?::DATE[]) AS acq_date)
+            """,
+            [dates],
+        ).fetchall()
+    finally:
+        conn.close()
+    for (d, m, s, c), date_str in zip(sql_rows, dates):
+        expected = _calendar_features(date_str)
+        assert int(m) == expected["acq_month"]
+        assert np.isclose(float(s), expected["doy_sin"])
+        assert np.isclose(float(c), expected["doy_cos"])

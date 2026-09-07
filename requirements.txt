@@ -3,6 +3,7 @@
 # model that produced the served .cbm, or predict surfaces drift silently).
 catboost==1.2.10
 h3==4.5.0
+scikit-learn==1.6.1
 shap>=0.44
 duckdb>=1.0
 pydantic>=2.6

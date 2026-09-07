@@ -21,6 +21,11 @@ data/*.zip
 *.model
 *.cbm
 
+# Exception: the PS26162 v3 inference bundle is the served contract
+# (model + calibrators + schemas) and is tracked despite the binary policy.
+!models/PS26162_catboost_final/inference_bundle/*.cbm
+!models/PS26162_catboost_final/inference_bundle/*.joblib
+
 # Large model output CSVs (>1 MB) - go in GitHub Release assets
 models/**/deployment_tiered_predictions.csv
 

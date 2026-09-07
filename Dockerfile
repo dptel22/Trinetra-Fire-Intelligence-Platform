@@ -1,5 +1,5 @@
 # PS26162 Backend image. Runtime paths are configurable via env vars.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -12,9 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY pipeline ./pipeline
-COPY models ./models
+COPY models/PS26162_catboost_final/inference_bundle ./models/PS26162_catboost_final/inference_bundle
 
-ENV MODEL_PATH=/app/models/catboost_hotspot_classifier_v1.cbm
+ENV MODEL_PATH=/app/models/PS26162_catboost_final/inference_bundle/catboost_hotspot_classifier.cbm
 ENV H3_DAILY_PARQUET=/data/sih2026_h3_daily_features_firms.parquet
 ENV OSMWRI_PARQUET=/data/sih2026_h3_daily_features_with_osm_wri.parquet
 ENV DUCKDB_PATH=/data/feature_store.duckdb
