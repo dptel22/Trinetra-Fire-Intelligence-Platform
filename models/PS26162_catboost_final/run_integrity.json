@@ -1,0 +1,15 @@
+{
+  "partition_gate_passed": true,
+  "train_mining_support_matches_locked": true,
+  "test_a_mining_support_matches_locked": true,
+  "test_b_mining_support_matches_locked": true,
+  "test_support_floor_all_classes": true,
+  "internal_h3_parent_overlap_zero": true,
+  "internal_exact_h3_overlap_zero": true,
+  "train_test_a_exact_h3_overlap_zero": true,
+  "train_test_b_exact_h3_overlap_zero": true,
+  "test_a_test_b_exact_h3_overlap_zero": true,
+  "dataset_shape_matches_expected": true,
+  "no_duplicate_h3_day_rows": true,
+  "label_flag_consistency": true
+}

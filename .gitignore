@@ -13,12 +13,26 @@ data/*.zip
 .claude/
 
 
-# Model artifacts - use releases/artifact store instead
+# Model artifacts - use GitHub Releases instead of committing binaries
 *.pkl
 *.joblib
 *.xgb
 *.model
 *.cbm
+
+# Large model output CSVs (>1 MB) - go in GitHub Release assets
+models/**/deployment_tiered_predictions.csv
+
+# CatBoost training info directories (tfevents, tsv logs) - not useful in git
+models/**/ablation_catboost_info/
+models/**/diagnostic_catboost_info/
+models/**/final_catboost_info/
+*.tfevents
+
+# Model backup directories created by download script
+models/PS26162_catboost_final_backup_*/
+models/kaggle_download_staging/
+models/catboost_hotspot_classifier_v3.cbm
 
 # Python
 __pycache__/

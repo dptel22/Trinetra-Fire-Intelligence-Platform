@@ -1,0 +1,7 @@
+{
+  "catboost": "1.2.10",
+  "python": "3.12.13",
+  "numpy": "2.0.2",
+  "pandas": "2.3.3",
+  "scikit-learn": "1.6.1"
+}
