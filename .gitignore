@@ -11,6 +11,7 @@ data/*.zip
 .qwen/
 .zcode/
 .claude/
+.mimosa/
 
 
 # Model artifacts - use GitHub Releases instead of committing binaries
@@ -33,6 +34,9 @@ models/**/final_catboost_info/
 models/PS26162_catboost_final_backup_*/
 models/kaggle_download_staging/
 models/catboost_hotspot_classifier_v3.cbm
+
+# Model release zips - attached to GitHub Releases, not committed
+models/*.zip
 
 # Python
 __pycache__/
