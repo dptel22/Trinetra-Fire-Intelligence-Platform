@@ -1,0 +1,630 @@
+@import 'leaflet/dist/leaflet.css';
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap');
+
+:root {
+  /* Global Design System Theme Tokens - Default Light Theme */
+  --bg-dark: #FFFFFF;
+  --panel-surface: #FFFFFF;
+  --hairline-border: rgba(0, 0, 0, 0.08);
+  --text-primary: #1B1E21;
+  --text-muted: #55595E;
+
+  /* UI Chrome Accents */
+  --accent-ember: #FF6B35;
+  --accent-blue: #3D9DE8;
+
+  /* LOCKED Fire Classification Colors */
+  --color-industrial: #E67E22;
+  --color-mining: #95A5A6;
+  --color-agri-burn: #F1C40F;
+  --color-wildfire: #E74C3C;
+  --color-unclassified: #787878;
+
+  /* Typography */
+  --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Light Theme Overrides */
+[data-theme='light'] {
+  --bg-dark: #FFFFFF;
+  --panel-surface: #FFFFFF;
+  --hairline-border: rgba(0, 0, 0, 0.08);
+  --text-primary: #1B1E21;
+  --text-muted: #55595E;
+}
+
+/* Dark Theme Overrides */
+[data-theme='dark'] {
+  --bg-dark: #0A0E12;
+  --panel-surface: #12181F;
+  --hairline-border: rgba(234, 237, 240, 0.08);
+  --text-primary: #EAEDF0;
+  --text-muted: #8B95A1;
+}
+
+header {
+  background-color: var(--panel-surface) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] header {
+  background-color: #0A0E12 !important;
+  box-shadow: none;
+}
+
+[data-theme='light'] .hero-3d-canvas {
+  background: radial-gradient(circle at 60% 40%, rgba(215, 78, 38, 0.12) 0%, rgba(251, 249, 247, 0) 70%);
+}
+
+[data-theme='light'] .hero-3d-frame {
+  background-color: #FFFFFF;
+  border-color: rgba(215, 78, 38, 0.25);
+  box-shadow: 0 30px 80px -20px rgba(215, 78, 38, 0.2), 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .hero-banner-overlay {
+  background: linear-gradient(90deg, rgba(251, 249, 247, 0.96) 0%, rgba(251, 249, 247, 0.82) 45%, rgba(251, 249, 247, 0.3) 100%);
+}
+
+[data-theme='light'] .hero-main-title {
+  color: #1B1E21;
+}
+
+[data-theme='light'] .floating-3d-card {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(215, 78, 38, 0.25);
+  box-shadow: 0 12px 32px rgba(215, 78, 38, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .floating-3d-card .card-title {
+  color: #1B1E21;
+}
+
+[data-theme='light'] .tri-btn-ember {
+  background-color: #D74E26;
+  color: #FFFFFF;
+  box-shadow: 0 4px 18px rgba(215, 78, 38, 0.35);
+}
+
+[data-theme='light'] .tri-btn-ember:hover {
+  background-color: #c4431e;
+  box-shadow: 0 8px 24px rgba(215, 78, 38, 0.5);
+}
+
+[data-theme='light'] .tri-btn-blue {
+  background-color: #2B6CB0;
+  color: #FFFFFF;
+  box-shadow: 0 4px 18px rgba(43, 108, 176, 0.35);
+}
+
+[data-theme='light'] .tri-btn-blue:hover {
+  background-color: #235891;
+  box-shadow: 0 8px 24px rgba(43, 108, 176, 0.5);
+}
+
+[data-theme='light'] .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.98) !important;
+  color: #1B1E21 !important;
+  border: 1px solid rgba(215, 78, 38, 0.2) !important;
+}
+
+[data-theme='light'] .leaflet-popup-tip {
+  background: rgba(255, 255, 255, 0.98) !important;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  width: 100vw;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Defaults */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+p, span, label, div {
+  text-align: left;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0E12;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(234, 237, 240, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(234, 237, 240, 0.3);
+}
+
+/* Surface Panel Utility */
+.tri-panel {
+  background-color: var(--panel-surface);
+  border: 1px solid var(--hairline-border);
+  border-radius: 8px;
+}
+
+/* Buttons Base */
+.tri-btn-ember {
+  background-color: var(--accent-ember);
+  color: #0A0E12;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.8rem 1.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 20px rgba(255, 107, 53, 0.35);
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tri-btn-ember:hover {
+  transform: translateY(-2px);
+  background-color: #ff7a4a;
+  box-shadow: 0 8px 28px rgba(255, 107, 53, 0.55);
+}
+
+.tri-btn-ember:active {
+  transform: translateY(1px);
+}
+
+.tri-btn-blue {
+  background-color: var(--accent-blue);
+  color: #0A0E12;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.8rem 1.6rem;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 20px rgba(61, 157, 232, 0.35);
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tri-btn-blue:hover {
+  transform: translateY(-2px);
+  background-color: #52abf0;
+  box-shadow: 0 8px 28px rgba(61, 157, 232, 0.55);
+}
+
+.tri-btn-blue:active {
+  transform: translateY(1px);
+}
+
+/* 3D Perspective Floating UI Styles */
+.hero-3d-canvas {
+  position: relative;
+  width: 100%;
+  padding: 2rem 1.5rem 4rem 1.5rem;
+  background: radial-gradient(circle at 60% 40%, rgba(255, 107, 53, 0.18) 0%, rgba(10, 14, 18, 0) 70%);
+}
+
+.hero-3d-frame {
+  max-width: 1280px;
+  margin: 0 auto;
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: #0A0E12;
+  border: 1px solid rgba(255, 107, 53, 0.25);
+  box-shadow: 0 35px 90px -20px rgba(255, 107, 53, 0.35), 0 0 50px rgba(0, 0, 0, 0.95);
+  position: relative;
+}
+
+.hero-3d-banner {
+  position: relative;
+  min-height: 540px;
+  width: 100%;
+  background-image: url('/images/hero-wildfire.jpg');
+  background-size: cover;
+  background-position: center 70%;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: stretch;
+}
+
+.hero-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(10, 14, 18, 0.96) 0%, rgba(10, 14, 18, 0.75) 45%, rgba(10, 14, 18, 0.25) 100%);
+}
+
+.hero-content-grid {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4rem 3.5rem;
+  align-items: center;
+  gap: 2rem;
+}
+
+.hero-left-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 580px;
+}
+
+.eyebrow-tag {
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-ember);
+  margin-bottom: 1rem;
+}
+
+.hero-main-title {
+  font-family: var(--font-heading);
+  font-size: 2.85rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #FFFFFF;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.hero-main-subtext {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+/* Floating 3D News/Intelligence Cards Grid (Overlapping Lower Right) */
+.hero-floating-cards {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.floating-3d-card {
+  background: rgba(18, 24, 31, 0.92);
+  border: 1px solid rgba(255, 107, 53, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  width: 175px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.floating-3d-card:hover {
+  transform: translateY(-8px) scale(1.03);
+  box-shadow: 0 24px 50px rgba(255, 107, 53, 0.45);
+  border-color: var(--accent-ember);
+}
+
+.card-thumbnail-container {
+  height: 95px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-thumbnail-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: var(--accent-ember);
+  color: #0A0E12;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.card-body-text {
+  padding: 10px;
+  text-align: left;
+}
+
+.card-title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.card-meta {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Visual Motion, Ambient Radial Glow & Category Edge Glow Styles
+   ========================================================================== */
+
+/* 1. Page Load Entrance Keyframe Animations */
+@keyframes heroFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroCardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.eyebrow-tag {
+  animation: heroFadeSlideUp 400ms ease-out forwards;
+}
+
+.hero-main-title {
+  animation: heroFadeSlideUp 450ms ease-out 100ms forwards;
+  opacity: 0;
+}
+
+.hero-main-subtext {
+  animation: heroFadeSlideUp 500ms ease-out 220ms forwards;
+  opacity: 0;
+}
+
+/* 2. Staggered Hero Thermal Cards Entrance */
+.hero-floating-cards .floating-3d-card:nth-child(1) {
+  animation: heroCardSlideIn 450ms ease-out 280ms forwards;
+  opacity: 0;
+}
+
+.hero-floating-cards .floating-3d-card:nth-child(2) {
+  animation: heroCardSlideIn 450ms ease-out 380ms forwards;
+  opacity: 0;
+}
+
+.hero-floating-cards .floating-3d-card:nth-child(3) {
+  animation: heroCardSlideIn 450ms ease-out 480ms forwards;
+  opacity: 0;
+}
+
+/* 3. Hero Floating Cards Hover Lift (-4px) & Transition */
+.floating-3d-card {
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.floating-3d-card:hover {
+  transform: translateY(-4px) !important;
+}
+
+/* 4. Ambient Warm Radial Gradient Glow Spilling Behind Hero Canvas */
+.hero-3d-canvas {
+  position: relative;
+}
+
+.hero-3d-canvas::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 95%;
+  height: 92%;
+  background: radial-gradient(ellipse at center, rgba(255, 107, 53, 0.14) 0%, rgba(255, 107, 53, 0.05) 50%, transparent 75%);
+  filter: blur(45px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-3d-frame {
+  position: relative;
+  z-index: 1;
+}
+
+/* 5. Category Card Edge Glows Matching Tag Colors */
+.floating-3d-card.glow-industrial {
+  border: 1px solid rgba(230, 126, 34, 0.45);
+  box-shadow: 0 8px 24px rgba(230, 126, 34, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.floating-3d-card.glow-industrial:hover {
+  border-color: rgba(230, 126, 34, 0.85);
+  box-shadow: 0 16px 36px rgba(230, 126, 34, 0.38);
+}
+
+.floating-3d-card.glow-wildfire {
+  border: 1px solid rgba(231, 76, 60, 0.45);
+  box-shadow: 0 8px 24px rgba(231, 76, 60, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.floating-3d-card.glow-wildfire:hover {
+  border-color: rgba(231, 76, 60, 0.85);
+  box-shadow: 0 16px 36px rgba(231, 76, 60, 0.38);
+}
+
+.floating-3d-card.glow-logistics {
+  border: 1px solid rgba(61, 157, 232, 0.45);
+  box-shadow: 0 8px 24px rgba(61, 157, 232, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.floating-3d-card.glow-logistics:hover {
+  border-color: rgba(61, 157, 232, 0.85);
+  box-shadow: 0 16px 36px rgba(61, 157, 232, 0.38);
+}
+
+/* 6. Fire Map and Fire Alerts Panels Hover Effects */
+.panel-card-hover {
+  transition: background-color 150ms ease;
+}
+
+.panel-card-hover:hover {
+  background-color: rgba(255, 107, 53, 0.025);
+}
+
+.panel-card-hover-blue:hover {
+  background-color: rgba(61, 157, 232, 0.025);
+}
+
+.panel-icon-circle {
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.panel-card-hover:hover .panel-icon-circle {
+  background-color: rgba(255, 107, 53, 0.22) !important;
+  border-color: rgba(255, 107, 53, 0.5) !important;
+}
+
+.panel-card-hover-blue:hover .panel-icon-circle-blue {
+  background-color: rgba(61, 157, 232, 0.22) !important;
+  border-color: rgba(61, 157, 232, 0.5) !important;
+}
+
+/* 7. Button Hover & Click Active States */
+.tri-btn-ember, .tri-btn-blue {
+  transition: transform 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.tri-btn-ember:hover, .tri-btn-blue:hover {
+  transform: translateY(-2px);
+}
+
+.tri-btn-ember:active, .tri-btn-blue:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 8. Scroll Reveal Viewport Trigger */
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 500ms ease-out, transform 500ms ease-out;
+}
+
+.scroll-reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Side Navigation Drawer Theme Styles */
+.side-drawer-container {
+  background-color: var(--panel-surface);
+  color: var(--text-primary);
+}
+
+.drawer-header-orange {
+  background: linear-gradient(135deg, #D74E26 0%, #FF6B35 100%);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.drawer-active-row-orange {
+  background: linear-gradient(90deg, #D74E26 0%, #E65C00 100%);
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: #FFFFFF;
+}
+
+.drawer-item-row {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--hairline-border);
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  background-color: var(--panel-surface);
+  transition: background-color 0.15s ease, padding-left 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.drawer-item-row svg {
+  stroke: var(--text-primary);
+}
+
+.drawer-item-row:hover {
+  background-color: rgba(215, 78, 38, 0.08);
+  padding-left: 1.5rem;
+  color: #D74E26;
+}
+
+.drawer-item-row:hover svg {
+  stroke: #D74E26;
+}
+
+[data-theme='dark'] .drawer-item-row:hover {
+  background-color: #1A222C;
+  color: #FF6B35;
+}
+
+[data-theme='dark'] .drawer-item-row:hover svg {
+  stroke: #FF6B35;
+}
+
+/* Responsive Media Rules */
+@media (max-width: 990px) {
+  .hero-content-grid {
+    grid-template-columns: 1fr;
+    padding: 3rem 2rem;
+  }
+  .hero-floating-cards {
+    justify-content: flex-start;
+    margin-top: 1.5rem;
+  }
+  .hero-main-title {
+    font-size: 2.15rem;
+  }
+}
