@@ -175,7 +175,8 @@ export default function FireMapPage() {
   }, [predictions]);
 
   const [dateRange, setDateRange] = useState('24hrs');
-  const [acqDate] = useState('2025-01-26');
+  // Live FIRMS ingestion targets the current day; default to today's date.
+  const [acqDate] = useState(() => new Date().toLocaleDateString('en-CA'));
 
   // activeClasses is a Set — seeded with all 5, matching original all-on default
   const [activeClasses, setActiveClasses] = useState(

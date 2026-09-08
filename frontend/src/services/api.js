@@ -159,16 +159,20 @@ function normalizeBbox(bbox) {
   return INDIA_BOUNDS;
 }
 
+// Live FIRMS ingestion targets the current day, so default queries to today
+// (local calendar date, YYYY-MM-DD) instead of a stale hardcoded date.
+const DEFAULT_ACQ_DATE = () => new Date().toLocaleDateString('en-CA');
+
 /**
  * Fetches viewport predictions with automatic 2x2 tiling on 2500-limit ceiling.
- * @param {object|Array} bbox 
- * @param {string} [acqDate='2025-01-26'] 
- * @param {number} [zoom=8] 
+ * @param {object|Array} bbox
+ * @param {string} [acqDate=today YYYY-MM-DD]
+ * @param {number} [zoom=8]
  * @returns {Promise<Array>} List of PredictionResponse objects
  */
-export async function fetchPredictions(bbox, acqDate = '2025-01-26', zoom = 8) {
+export async function fetchPredictions(bbox, acqDate = DEFAULT_ACQ_DATE(), zoom = 8) {
   const normBbox = normalizeBbox(bbox);
-  const effectiveDate = acqDate || '2025-01-26';
+  const effectiveDate = acqDate || DEFAULT_ACQ_DATE();
   const effectiveZoom = typeof zoom === 'number' ? Math.max(1, Math.min(20, zoom)) : 8.0;
 
   if (currentMode === 'mock') {
@@ -313,7 +317,7 @@ export async function fetchCellDetail(cellId, acqDate) {
     throw new Error('Detail endpoints have no mock mode equivalent');
   }
 
-  const effectiveDate = acqDate || '2025-01-26';
+  const effectiveDate = acqDate || DEFAULT_ACQ_DATE();
   const res = await fetch(`${BASE_URL}/api/v1/predictions/${encodeURIComponent(cellId)}?acq_date=${effectiveDate}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch cell details for ${cellId}: HTTP ${res.status}`);
@@ -328,7 +332,7 @@ export async function fetchCellDetail(cellId, acqDate) {
  * @returns {Promise<object>} ExplanationResponse
  */
 export async function fetchExplanation(cellId, acqDate) {
-  const effectiveDate = acqDate || '2025-01-26';
+  const effectiveDate = acqDate || DEFAULT_ACQ_DATE();
 
   if (currentMode === 'mock') {
     // Generate realistic mock SHAP explanation

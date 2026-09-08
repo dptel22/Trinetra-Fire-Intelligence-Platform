@@ -26,11 +26,13 @@ from app.services.model_service import model_service
 # Deterministic (h3_08, acq_date) pairs chosen per requirements. Each exists in
 # the labeled training artifact AND in both serving parquets
 # (sih2026_h3_daily_features_firms.parquet + sih2026_h3_daily_features_with_osm_wri.parquet).
+# Re-picked 2026-09-08: the serving parquets are now 10-state filtered
+# (ingestion/run_ingestion.py), so cells in non-serving states are gone.
 CELL_CASES = {
-    # is_first_observation == 0, non-trivial history: frp_max_lag7=3.74, active_days_7d=1
-    "non_trivial": ("88209a2297fffff", "2025-11-29"),
+    # is_first_observation == 0, non-trivial history: frp_max_lag7=6.08, active_days_7d=1
+    "non_trivial": ("883c124ce1fffff", "2026-02-08"),
     # is_first_observation == 1; FRP lag columns are NULL in the training artifact.
-    "first_observation_null_lag": ("88209a2011fffff", "2025-01-26"),
+    "first_observation_null_lag": ("883c12480bfffff", "2026-04-24"),
 }
 
 # Columns that hold lag/rolling history. These are the only columns where the
@@ -115,8 +117,8 @@ def test_feature_column_set_and_order_parity():
 @pytest.mark.parametrize(
     ("h3", "acq_date", "case"),
     [
-        pytest.param("88209a2297fffff", "2025-11-29", "non_trivial"),
-        pytest.param("88209a2011fffff", "2025-01-26", "first_observation_null_lag"),
+        pytest.param("883c124ce1fffff", "2026-02-08", "non_trivial"),
+        pytest.param("883c12480bfffff", "2026-04-24", "first_observation_null_lag"),
     ],
     ids=["non_trivial_lag", "first_observation_null_lag"],
 )

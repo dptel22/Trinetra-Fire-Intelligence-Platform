@@ -18,10 +18,22 @@ dependencies = [
     "scikit-learn==1.6.1",
     "shap>=0.44",
     "uvicorn[standard]>=0.29",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "osmium>=4.0",
+    "pyshp>=2.3",
 ]
 
 [dependency-groups]
 dev = [
     "mypy>=2.3.1",
     "nbstripout>=0.9.1",
+]
+
+[tool.pytest.ini_options]
+addopts = "-m 'not live'"
+markers = [
+    "live: hits the real NASA FIRMS API (burns transactions); run with `pytest -m live`",
 ]

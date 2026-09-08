@@ -1,3 +1,6 @@
+import logging
+import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
@@ -14,12 +17,36 @@ from app.schemas.prediction import (
 from app.services.feature_store import feature_store
 from app.services.model_service import model_service
 
+logger = logging.getLogger("uvicorn.startup")
+
+
+def _background_ingestion() -> None:
+    """Boot-time freshness check + ingestion, deliberately OFF the hot path.
+
+    The freshness check itself is a millisecond JSON read and happens inline;
+    the (potentially slow) FIRMS pull runs in this daemon thread so a demo
+    restart never waits on NASA. On success the feature store is reloaded
+    atomically; on failure the backend keeps serving the last good parquets.
+    Disable with INGESTION_ON_STARTUP=0.
+    """
+    if os.environ.get("INGESTION_ON_STARTUP", "1") != "1":
+        return
+    try:
+        from ingestion.run_ingestion import ensure_fresh_for_backend
+
+        stats = ensure_fresh_for_backend()
+        if stats is not None:
+            logger.info("[STARTUP] Background ingestion refreshed serving data: %s rows", stats.get("final_daily_rows"))
+    except Exception as err:  # noqa: BLE001 — stale data must never kill the API
+        logger.warning("[STARTUP] Background ingestion failed; serving existing data. (%s)", err)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"[STARTUP] Initializing {settings.PROJECT_NAME} (v{settings.VERSION})...")
     feature_store.load()
     model_service.load_model()
+    threading.Thread(target=_background_ingestion, name="firms-ingestion", daemon=True).start()
     yield
     print("[SHUTDOWN] Shutting down NASA FIRMS Geospatial AI Backend.")
 

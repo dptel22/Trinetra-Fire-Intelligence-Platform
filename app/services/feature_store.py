@@ -12,35 +12,48 @@ STATIC_COLUMNS = [col for col in settings.MODEL_FEATURES if col not in settings.
 
 
 class FeatureStoreService:
-    """DuckDB-backed H3-day feature store seeded from the real parquet artifacts."""
+    """DuckDB-backed H3-day feature store seeded from the real parquet artifacts.
+
+    Concurrency contract: ONE persistent connection is shared by all reads and
+    (re)seeding, and every access — load(), reload(), get_cell(), query_bbox()
+    — is serialized under self._lock. This guarantees that a background
+    reload() triggered after ingestion can never expose a half-swapped table
+    pair to an in-flight query (both CREATE OR REPLACE statements run inside a
+    single DuckDB transaction, so readers see the old or the new pair, never a
+    mix) and avoids DuckDB's mixed read-only/read-write same-file connection
+    conflict that per-call connections would create.
+    """
 
     def __init__(self, db_path: str = settings.DUCKDB_PATH):
         self.db_path = db_path
         self.loaded = False
         self._lock = Lock()
+        self._conn = None
 
-    def _connect(self, read_only: bool = False):
-        return duckdb.connect(self.db_path, read_only=read_only)
-
-    def load(self) -> None:
-        with self._lock:
-            if self.loaded:
-                return
-            daily_path = Path(settings.H3_DAILY_PARQUET)
-            static_path = Path(settings.OSMWRI_PARQUET)
-            if not daily_path.exists():
-                raise FileNotFoundError(f"Missing H3 daily parquet: {daily_path}")
-            if not static_path.exists():
-                raise FileNotFoundError(f"Missing OSM/WRI parquet: {static_path}")
-
+    def _connection(self):
+        if self._conn is None:
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            conn = self._connect()
-            # Calendar features required by the v3 model contract are derived
-            # from acq_date at seed time: month plus 1-indexed day-of-year
-            # sin/cos with a 365.25-day period.
+            self._conn = duckdb.connect(self.db_path)
+        return self._conn
+
+    def _seed_tables(self) -> None:
+        """(Re)seed both tables from the parquets; caller must hold the lock."""
+        conn = self._connection()
+        daily_path = Path(settings.H3_DAILY_PARQUET)
+        static_path = Path(settings.OSMWRI_PARQUET)
+        if not daily_path.exists():
+            raise FileNotFoundError(f"Missing H3 daily parquet: {daily_path}")
+        if not static_path.exists():
+            raise FileNotFoundError(f"Missing OSM/WRI parquet: {static_path}")
+
+        # Calendar features required by the v3 model contract are derived
+        # from acq_date at seed time: month plus 1-indexed day-of-year
+        # sin/cos with a 365.25-day period.
+        conn.execute("BEGIN TRANSACTION")
+        try:
             conn.execute(
                 """
-                CREATE OR REPLACE TABLE h3_daily AS
+                CREATE OR REPLACE TABLE _h3_daily_staging AS
                 SELECT
                     *,
                     month(CAST(acq_date AS DATE)) AS acq_month,
@@ -50,10 +63,10 @@ class FeatureStoreService:
                 """,
                 [str(daily_path)],
             )
-            total = conn.execute("SELECT count(*) FROM h3_daily").fetchone()[0]
+            total = conn.execute("SELECT count(*) FROM _h3_daily_staging").fetchone()[0]
             for col in ("acq_month", "doy_sin", "doy_cos"):
                 null_count = conn.execute(
-                    f"SELECT count(*) FROM h3_daily WHERE {col} IS NULL"
+                    f"SELECT count(*) FROM _h3_daily_staging WHERE {col} IS NULL"
                 ).fetchone()[0]
                 if null_count == total:
                     raise ValueError(f"Derived column {col} is entirely NULL; check acq_date parsing")
@@ -62,7 +75,7 @@ class FeatureStoreService:
             static_col_list = ", ".join(STATIC_COLUMNS)
             conn.execute(
                 f"""
-                CREATE OR REPLACE TABLE osm_wri_static AS
+                CREATE OR REPLACE TABLE _osm_wri_static_staging AS
                 SELECT h3_08, h3_lat, h3_lon, {static_col_list}
                 FROM (
                     SELECT
@@ -75,24 +88,44 @@ class FeatureStoreService:
                 """,
                 [str(static_path)],
             )
-            conn.close()
-            self.loaded = True
+            # Atomic swap: both tables flip inside one transaction, so a
+            # query can never observe the new daily table against the old
+            # static table (or vice versa).
+            conn.execute("CREATE OR REPLACE TABLE h3_daily AS SELECT * FROM _h3_daily_staging")
+            conn.execute("CREATE OR REPLACE TABLE osm_wri_static AS SELECT * FROM _osm_wri_static_staging")
+            conn.execute("DROP TABLE IF EXISTS _h3_daily_staging")
+            conn.execute("DROP TABLE IF EXISTS _osm_wri_static_staging")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+        self.loaded = True
+
+    def load(self) -> None:
+        with self._lock:
+            if self.loaded:
+                return
+            self._seed_tables()
+
+    def reload(self) -> None:
+        """Force a re-seed from the parquets (after ingestion updates them)."""
+        with self._lock:
+            self._seed_tables()
 
     def get_cell(self, h3_index: str, acq_date: str) -> dict[str, Any] | None:
         self.load()
-        conn = self._connect(read_only=True)
-        row = conn.execute(
-            """
-            SELECT d.*, s.* EXCLUDE (h3_08)
-            FROM h3_daily d
-            LEFT JOIN osm_wri_static s USING (h3_08)
-            WHERE d.h3_08 = ? AND CAST(d.acq_date AS DATE) = CAST(? AS DATE)
-            LIMIT 1
-            """,
-            [h3_index, acq_date],
-        ).fetchone()
-        columns = [col[0] for col in conn.description] if conn.description else []
-        conn.close()
+        with self._lock:
+            row = self._connection().execute(
+                """
+                SELECT d.*, s.* EXCLUDE (h3_08)
+                FROM h3_daily d
+                LEFT JOIN osm_wri_static s USING (h3_08)
+                WHERE d.h3_08 = ? AND CAST(d.acq_date AS DATE) = CAST(? AS DATE)
+                LIMIT 1
+                """,
+                [h3_index, acq_date],
+            ).fetchone()
+            columns = [col[0] for col in self._conn.description] if self._conn.description else []
         return dict(zip(columns, row)) if row else None
 
     def query_bbox(
@@ -104,37 +137,35 @@ class FeatureStoreService:
         acq_date: str,
     ) -> list[dict[str, Any]]:
         self.load()
-        conn = self._connect(read_only=True)
-        rows = conn.execute(
-            """
-            SELECT d.*, s.* EXCLUDE (h3_08)
-            FROM h3_daily d
-            INNER JOIN osm_wri_static s USING (h3_08)
-            WHERE CAST(d.acq_date AS DATE) = CAST(? AS DATE)
-              AND s.h3_lat BETWEEN ? AND ?
-              AND s.h3_lon BETWEEN ? AND ?
-            LIMIT 2500
-            """,
-            [acq_date, min_lat, max_lat, min_lon, max_lon],
-        ).fetchall()
-        columns = [col[0] for col in conn.description] if conn.description else []
-        conn.close()
+        with self._lock:
+            rows = self._connection().execute(
+                """
+                SELECT d.*, s.* EXCLUDE (h3_08)
+                FROM h3_daily d
+                INNER JOIN osm_wri_static s USING (h3_08)
+                WHERE CAST(d.acq_date AS DATE) = CAST(? AS DATE)
+                  AND s.h3_lat BETWEEN ? AND ?
+                  AND s.h3_lon BETWEEN ? AND ?
+                LIMIT 2500
+                """,
+                [acq_date, min_lat, max_lat, min_lon, max_lon],
+            ).fetchall()
+            columns = [col[0] for col in self._conn.description] if self._conn.description else []
         return [dict(zip(columns, row)) for row in rows]
 
     # Temporary compatibility for old spatial endpoint until Agent B rewires it.
     def get_viewport_hexagons(self, min_lat: float, max_lat: float, min_lon: float, max_lon: float, limit: int = 500):
         self.load()
-        conn = self._connect(read_only=True)
-        rows = conn.execute(
-            """
-            SELECT h3_08, h3_lat, h3_lon
-            FROM osm_wri_static
-            WHERE h3_lat BETWEEN ? AND ? AND h3_lon BETWEEN ? AND ?
-            LIMIT ?
-            """,
-            [min_lat, max_lat, min_lon, max_lon, limit],
-        ).fetchall()
-        conn.close()
+        with self._lock:
+            rows = self._connection().execute(
+                """
+                SELECT h3_08, h3_lat, h3_lon
+                FROM osm_wri_static
+                WHERE h3_lat BETWEEN ? AND ? AND h3_lon BETWEEN ? AND ?
+                LIMIT ?
+                """,
+                [min_lat, max_lat, min_lon, max_lon, limit],
+            ).fetchall()
         return [{"h3_index": row[0], "latitude": row[1], "longitude": row[2]} for row in rows]
 
 

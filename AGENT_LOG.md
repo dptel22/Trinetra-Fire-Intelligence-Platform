@@ -287,3 +287,61 @@ Ownership split, interface contract, and per-agent prompts live in
 - Interface impact: none (all export and component prop signatures strictly identical to locked contract).
 - Blockers / questions for the other agent or for Sagar/Dhruv: none.
 
+
+---
+
+### [2026-09-08T21:30:00+05:30] Claude Code — Live FIRMS Ingestion Pipeline (backend/data)
+
+- Files added:
+  - `ingestion/__init__.py` — package doc.
+  - `ingestion/firms_pull.py` — FIRMS area-API pull (`fetch_firms`, `fetch_firms_both`), MAP_KEY from untracked `.env` (FIRMS_MAP_KEY, alias FIRMS_API_KEY), SSRF-hardened URL construction (https-only, fixed host allowlist, resolved-IP must be public, redirects off, regex-validated bbox/date/key), notebook-verbatim harmonization (cells 8+12: confidence l/n/h, daynight D/N, NRT fire-type -1 flags, acq_time validation, dedup on (lat,lon,date,time,satellite), bright_ti4>200, frp>=0, nominal/high filter, N->SNPP/N20->NOAA20). NOTE: live FIRMS responses now carry an extra `instrument` column — parser accepts supersets of the NRT schema and logs extras.
+  - `ingestion/aggregate.py` — notebook-verbatim producer of the locked 28-col daily contract (data-eda cells 20/25/8C/9): daynight has THREE contract values Day/Night/Both; frp_max_night/day NaN-preserving; Phase-8 shift(1)-before-rolling with the window-inclusive-of-current-frp_prev quirk reproduced exactly; is_first_observation = frp_max_lag7.isna(); Phase-9A NaN allowlist; dtype downcast to the shipped parquet schema. Calendar cols (acq_month/doy_sin/doy_cos) intentionally NOT written (FeatureStoreService derives them in SQL; duplicates would break the CREATE TABLE). `pipeline/aggregation.py` was NOT reused because its daynight rule (no "Both") and fillna(0.0) lags do not match the locked serving parquet — deviation documented in module docstring.
+  - `ingestion/osm_wri_load.py` — ports osi-wri-data.ipynb cells 7/9/13/15: WRI per-fuel NearestNeighbors distances in EPSG:7755 (ball_tree, 10 km counts); OSM extraction ported from the osmium CLI to pyosmium 4.3.1 (pip wheel, same six tag filters; closed ways collected via area() to avoid double count), cached once to `data/processed/osm_features_cache.parquet` (mtime-gated); state assignment via pyshp+shapely on the SAME notebook shapefile source pinned to commit 90b700cf2459be79b66f677a6e2c8dd2eff17c30 with sha256 verification (downloaded to `data/raw/india_state_boundary/`); name fixes Telengana/Tamilnadu/Chhattishgarh kept; method vocabulary within/nearest_boundary_tie_break/nearest_unmatched preserved.
+  - `ingestion/run_ingestion.py` — orchestration: raw-input fail-loud validation -> day-chunked FIRMS pull (auto gap-fill from newest stored date, chunks <=10d per FIRMS limit) -> aggregation -> upsert on (h3_08, acq_date) -> temporal-history recompute for affected cells -> static enrichment for new cells (WRI+OSM+state) -> **10-state serving filter (MH/KA/MP/PB/AP/TS/GJ/TN/JH/RJ) applied before any write** (closes the backend-trace bug) -> atomic tmp+os.replace writes of BOTH serving parquets at the exact FeatureStoreService paths -> run-history JSON `data/processed/ingestion_run_history.json` + plausibility gates (order-of-magnitude ranges; historical Phase-6 class counts deliberately NOT reused — they describe the multi-year labeled dataset).
+- Files modified:
+  - `app/services/feature_store.py` — single persistent DuckDB connection; all access (load/reload/queries) serialized under the existing lock; new `reload()` re-seeds both tables inside ONE transaction (staging tables + atomic swap) so a background reload can never expose a half-swapped table pair and DuckDB's mixed read-only/read-write same-file connection conflict is impossible. Public API unchanged.
+  - `app/main.py` — lifespan spawns a daemon background thread running `ensure_fresh_for_backend()` (freshness check = millisecond run-history read; ingestion runs OFF the boot path; feature_store.reload() on success; failure logs and keeps serving stale data). INGESTION_ON_STARTUP=0 disables.
+  - `requirements.txt` / `pyproject.toml` — added requests, python-dotenv, shapely, pyproj, osmium, pyshp; pytest config: `live` marker deselected by default.
+  - `AGENT_LOG.md` — this entry.
+- Data artifacts created (untracked):
+  - `.env` with FIRMS_MAP_KEY (gitignored; key was exposed in a screenshot/URL — ROTATION RECOMMENDED).
+  - `data/raw/india_state_boundary/` (5 pinned shapefile files, sha256-verified).
+  - `data/processed/osm_features_cache.parquet` (built from data/raw/india-260907.osm.pbf).
+- Tests:
+  - `tests/test_ingestion.py` (new, 23 tests): mocked-HTTP fetch/parse/empty-day/bad-key; harmonize filters; daily-contract invariants (Both daynight, NaN allowlist, first-observation leakage semantics, lag values on day 2); WRI/OSM synthetic feature computation; state PIP on the real pinned shapefile; integration run on schema-preserving temp parquet slices asserting pyarrow schema equality with the real serving files + FeatureStoreService load/query on the new date + idempotency (re-run = no row duplication); reload-under-concurrent-queries safety; plausibility gates; `@pytest.mark.live` small-bbox smoke.
+  - Full suite after changes: 50 passed, 1 deselected (live) in ~65s under `.venv` (Python 3.12.13).
+- Verified live so far:
+  - FIRMS date semantics confirmed: `date=D&day_range=1` returns exactly acq_date D; extra `instrument` column present in live responses.
+  - India 2026-09-07: 376 SNPP + 338 NOAA-20 raw rows (fire off-season); 2026-09-08 partial (85 rows at ~21:00 IST).
+  - pyosmium PBF extraction: IN PROGRESS at time of writing (1.7 GB PBF, timing to be recorded when done).
+- Blockers / questions: none. Open item: measured first full-run wall time + final row counts to be appended once the real run completes.
+
+---
+
+### [2026-09-08T23:05:00+05:30] Claude Code — Ingestion LIVE: real run complete, serving parquets migrated, end-to-end verified
+
+- Files changed since previous entry:
+  - `ingestion/firms_pull.py` — MAX_DAY_RANGE 10 → 5: the LIVE FIRMS area API rejects spans >5 for VIIRS NRT ("Invalid day range. Expects [1..5]", HTTP 400 observed 22:44 IST; the docs' 10-day figure is stale for these sources). NASA-docs assumption corrected against the real API.
+  - `ingestion/osm_wri_load.py` — OSM extraction rewritten to a memory-bounded 3-pass FileProcessor design (KeyFilter pass for tags; IdFilter passes for way geometry and node coords). The naive `apply_file(locations=True, idx="flex_mem")` approach buffered node locations for all of India (~3 GB RSS, >30 min, killed); the filtered approach built the full cache in 105 s, bounded RAM.
+  - `app/core/config.py` — CORS_ALLOW_ORIGINS += localhost:5173 / 127.0.0.1:5173 (Vite's actual dev port). Without this the first frontend fetch throws, and api.js silently flips to mock mode ("Showing demo data — live backend unreachable").
+  - `frontend/src/services/api.js` + `frontend/src/components/FireMapPage.jsx` — **OWNERSHIP FLAG (Agents A/B files, integrator edit)**: hardcoded default `acq_date='2025-01-26'` replaced with the current local date (`DEFAULT_ACQ_DATE()` / `toLocaleDateString('en-CA')`). Signatures unchanged; Agent B harness 7/7 PASS, oxlint 0 errors. If Agent A's map-engine rebuild touches these lines, keep the today-default behavior.
+  - `tests/test_ingestion.py` — state-filter assertion updated (real serving parquets are now 10-state-only, so the integration slice no longer drops rows).
+  - `tests/test_training_serving_parity.py` — CELL_CASES re-picked: old sample cells (88209a2297fffff / 88209a2011fffff) live in states removed by the serving filter; replacements (883c124ce1fffff/2026-02-08 non-trivial, 883c12480bfffff/2026-04-24 first-observation) exist in the labeled artifact AND both serving parquets, preserving both case semantics.
+  - `data/processed/backup_nationwide_pre_10state/` — real one-time backup of the original nationwide parquets (36.0 MB + 177.2 MB, Sep 2 builds) before migration; earlier dir contents were test artifacts and were replaced.
+- THE REAL RUN (measured, 2026-09-08 22:53-22:58 IST):
+  - Gap-fill 2026-08-02 → 2026-09-08 in eight 5-day chunks × 2 sources = 16 FIRMS requests, 12,692 raw detections; confidence filter removed 1,127; dedup/sanity removed 0.
+  - Aggregation: 12,692 detections → 9,185 H3-days across 6,163 cells; temporal history recomputed for all affected cells over combined history (leakage-safe Phase-8 semantics).
+  - Static enrichment: 4,856 brand-new cells got state (pinned shapefile PIP) + WRI distances + OSM distances (cache hit 0.05 s); enrichment cost 145.7 s.
+  - 10-state filter: kept 813,789 / dropped 637,941 rows (Chhattisgarh 153k, Odisha 135k, UP 99k, ...). Final serving parquets: 813,789 rows each, date range 2024-08-01 → 2026-09-08, exactly 10 states, pyarrow schemas byte-identical to the pre-migration originals.
+  - Wall clock 291.4 s total; plausibility violations: NONE.
+  - OSM cache build (one-time): 105.5 s for 269,106 features (farmland 117,809, power_infra 111,715, industrial 28,229, quarry 10,654, mineshaft 696, adit 3) — **mining feature parity on live data is real, not the NULL fallback**.
+- End-to-end verification (all observed, not inferred):
+  - `feature_store.load()` + `reload()` clean against the migrated parquets (no lock conflicts once no second process holds the file — running the pytest suite while uvicorn is up WILL fail with a DuckDB file lock; stop the backend first).
+  - Backend restarted clean on :8000; `GET /api/v1/predictions?min_lat=6.75&max_lat=37.1&min_lon=68.03&max_lon=97.42&acq_date=2026-09-08` → 188 REAL predictions (mode=aggregated_macro): industrial 170, wildfire 14, mining 3, agricultural_burn 1; needs_review 1; calibrated probabilities sum to 1.
+  - CORS verified from the Vite origin: OPTIONS + GET both return `access-control-allow-origin: http://localhost:5173` → frontend `fetchPredictions` will succeed and pin `apiMode='live'` (no mock fallback, OfflineBanner renders nothing). Frontend deps installed (`npm ci`); Agent B harness 7/7 PASS; oxlint 0 errors.
+  - Full backend suite: 50 passed, 1 deselected (live FIRMS smoke; run explicitly with `pytest -m live`).
+- Operational notes:
+  - Freshness plan in force: backend startup hook (background thread, INGESTION_ON_STARTUP=0 to disable) — cheap run-history check on boot, ingestion only when stale, atomic feature-store reload after. Manual/backfill: `.venv/Scripts/python.exe -m ingestion.run_ingestion [--date D --day-range N --no-gap-fill]`.
+  - Idempotent re-runs: same-day rerun overwrites by (h3_08, acq_date); history JSON at data/processed/ingestion_run_history.json (last entry ok=true).
+  - FIRMS_MAP_KEY rotation still recommended (it appeared in a screenshot/URL during setup).
+- Blockers / questions: none.

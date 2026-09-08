@@ -4,7 +4,7 @@ data/processed/**
 !data/sample/**
 data/DL_FIRE_*
 data/*.zip
-*.duckdb
+*.duckdb*
 /*.parquet
 notebooks/eda/*.parquet
 

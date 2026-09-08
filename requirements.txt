@@ -15,3 +15,10 @@ python-multipart>=0.0.9
 pytest>=8.0
 httpx>=0.27.0
 ruff>=0.16.0
+# Live ingestion (FIRMS pull + OSM/WRI static features + state assignment)
+requests>=2.31
+python-dotenv>=1.0
+shapely>=2.0
+pyproj>=3.6
+osmium>=4.0
+pyshp>=2.3
