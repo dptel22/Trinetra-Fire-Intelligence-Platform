@@ -40,34 +40,17 @@ export default function SplashScreen() {
         }}
       />
 
-      {/* Radial Dark Vignette & Atmospheric Thermal Glow */}
+      {/* Clean Dark Vignette Overlay */}
       <div 
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'radial-gradient(circle at center, rgba(7, 10, 14, 0.35) 0%, rgba(7, 10, 14, 0.88) 85%, #070A0E 100%)',
+          background: 'radial-gradient(circle at center, rgba(7, 10, 14, 0.45) 0%, rgba(7, 10, 14, 0.85) 75%, #070A0E 100%)',
           pointerEvents: 'none'
         }}
       />
 
-      {/* Subtle Animated Radar Sweep Line */}
-      <div 
-        style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          width: '500px',
-          height: '500px',
-          margin: '-250px 0 0 -250px',
-          borderRadius: '50%',
-          background: 'conic-gradient(from 0deg at 50% 50%, rgba(255, 107, 53, 0) 0deg, rgba(255, 107, 53, 0.12) 300deg, rgba(255, 107, 53, 0.28) 360deg)',
-          animation: 'radarSweep 5s linear infinite',
-          pointerEvents: 'none',
-          opacity: 0.7
-        }}
-      />
-
-      {/* Centered Gateway Content */}
+      {/* Centered Gateway Content - Medium, Minimal, Elegant */}
       <div 
         style={{
           position: 'relative',
@@ -78,111 +61,94 @@ export default function SplashScreen() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '1.75rem',
-          transform: isExiting ? 'translateY(-12px) scale(0.98)' : 'translateY(0) scale(1)',
+          gap: '1.25rem',
+          transform: isExiting ? 'translateY(-10px) scale(0.98)' : 'translateY(0) scale(1)',
           opacity: isExiting ? 0 : 1,
           transition: 'transform 380ms cubic-bezier(0.16, 1, 0.3, 1), opacity 380ms ease-out',
           textAlign: 'center',
-          padding: '2rem'
+          padding: '1.5rem'
         }}
       >
-        {/* Meaningful TRINETRA Emblem: The Cybernetic Third Eye & Satellite Thermal Radar */}
+        {/* Minimal Trinetra Cybernetic Eye & Satellite Emblem (56x56) */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {/* Ambient Outer Pulse Halo */}
+          {/* Subtle Ambient Glow */}
           <div 
             style={{
               position: 'absolute',
-              width: '180px',
-              height: '180px',
+              width: '74px',
+              height: '74px',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255, 107, 53, 0.35) 0%, rgba(255, 107, 53, 0) 70%)',
-              animation: 'pulseGlow 3s ease-in-out infinite'
+              background: 'radial-gradient(circle, rgba(255, 107, 53, 0.4) 0%, rgba(255, 107, 53, 0) 70%)',
+              animation: 'pulseGlow 2.8s ease-in-out infinite'
             }}
           />
 
-          {/* SVG Emblem Component */}
-          <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ position: 'relative', zIndex: 2 }}>
+          <svg width="58" height="58" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ position: 'relative', zIndex: 2 }}>
             <defs>
-              <linearGradient id="triEmberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <linearGradient id="miniEmberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#FFA447" />
                 <stop offset="50%" stopColor="#FF6B35" />
                 <stop offset="100%" stopColor="#D74E26" />
               </linearGradient>
 
-              <radialGradient id="triCoreGlow" cx="50%" cy="50%" r="50%">
+              <radialGradient id="miniCoreGlow" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stopColor="#FFFFFF" />
-                <stop offset="40%" stopColor="#FFA447" />
-                <stop offset="80%" stopColor="#FF6B35" />
-                <stop offset="100%" stopColor="rgba(215, 78, 38, 0)" />
+                <stop offset="50%" stopColor="#FFA447" />
+                <stop offset="100%" stopColor="#FF6B35" />
               </radialGradient>
-
-              <filter id="triDropGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feComposite in="SourceGraphic" in2="blur" operator="over" />
-              </filter>
             </defs>
 
-            {/* Outer Rotating Radar Orbit Track */}
+            {/* Outer Subtle Orbit Ring */}
             <circle 
               cx="50" 
               cy="50" 
-              r="46" 
-              stroke="rgba(255, 107, 53, 0.35)" 
+              r="44" 
+              stroke="rgba(255, 107, 53, 0.4)" 
               strokeWidth="1.2" 
-              strokeDasharray="4 6" 
-              style={{ animation: 'spinClockwise 18s linear infinite', transformOrigin: 'center' }}
+              strokeDasharray="4 5" 
+              style={{ animation: 'spinClockwise 16s linear infinite', transformOrigin: 'center' }}
             />
 
-            {/* Concentric Telemetry Guide Ring */}
-            <circle cx="50" cy="50" r="38" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" />
+            {/* Reticle Cardinal Ticks */}
+            <line x1="50" y1="4" x2="50" y2="11" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
+            <line x1="50" y1="89" x2="50" y2="96" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
+            <line x1="4" y1="50" x2="11" y2="50" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
+            <line x1="89" y1="50" x2="96" y2="50" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
 
-            {/* Cardinal Reticle Markers (North, South, East, West) */}
-            <line x1="50" y1="2" x2="50" y2="10" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
-            <line x1="50" y1="90" x2="50" y2="98" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
-            <line x1="2" y1="50" x2="10" y2="50" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
-            <line x1="90" y1="50" x2="98" y2="50" stroke="#FF6B35" strokeWidth="2" strokeLinecap="round" />
-
-            {/* Orbital Satellite Node */}
-            <circle cx="50" cy="4" r="2.5" fill="#FFFFFF" filter="drop-shadow(0 0 4px #FFFFFF)" />
-
-            {/* The Sanskrit "Third Eye" (Trinetra) Sacred & Cybernetic Ocular Contour */}
+            {/* Trinetra Ocular Contour Path */}
             <path 
-              d="M 16 50 C 32 24, 68 24, 84 50 C 68 76, 32 76, 16 50 Z" 
-              fill="rgba(10, 14, 18, 0.75)" 
-              stroke="url(#triEmberGrad)" 
-              strokeWidth="2.8" 
+              d="M 18 50 C 32 26, 68 26, 82 50 C 68 74, 32 74, 18 50 Z" 
+              fill="rgba(10, 14, 18, 0.85)" 
+              stroke="url(#miniEmberGrad)" 
+              strokeWidth="3" 
               strokeLinejoin="round"
-              filter="url(#triDropGlow)"
             />
 
-            {/* Vertical Third-Eye Inner Flame / Iris Aperture */}
+            {/* Vertical Inner Flame Aperture */}
             <path 
-              d="M 50 28 C 60 40, 60 60, 50 72 C 40 60, 40 40, 50 28 Z" 
-              fill="rgba(255, 107, 53, 0.18)" 
-              stroke="rgba(255, 164, 71, 0.7)" 
+              d="M 50 30 C 58 40, 58 60, 50 70 C 42 60, 42 40, 50 30 Z" 
+              fill="rgba(255, 107, 53, 0.25)" 
+              stroke="rgba(255, 164, 71, 0.6)" 
               strokeWidth="1.2" 
             />
 
-            {/* Concentric Thermal Infrared Iris Lens */}
-            <circle cx="50" cy="50" r="13" fill="url(#triCoreGlow)" />
-            <circle cx="50" cy="50" r="13" stroke="#FFA447" strokeWidth="1.2" />
-
-            {/* Glowing Core Pupil - The Living Sensor Point */}
-            <circle cx="50" cy="50" r="5" fill="#FFFFFF" filter="drop-shadow(0 0 6px #FFFFFF)" />
+            {/* Concentric Thermal Infrared Core */}
+            <circle cx="50" cy="50" r="11" fill="url(#miniCoreGlow)" />
+            <circle cx="50" cy="50" r="4.5" fill="#FFFFFF" />
           </svg>
         </div>
 
-        {/* Platform Title & Meaningful Subtitle */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.45rem' }}>
+        {/* Minimal Title & Clean Subtitle */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem' }}>
           <div 
             style={{
               fontFamily: 'var(--font-heading)',
-              fontSize: '2.4rem',
+              fontSize: '1.65rem',
               fontWeight: 800,
-              letterSpacing: '0.18em',
+              letterSpacing: '0.14em',
               color: '#FFFFFF',
-              textShadow: '0 0 30px rgba(255, 107, 53, 0.6), 0 2px 10px rgba(0,0,0,0.8)',
-              lineHeight: 1
+              textShadow: '0 2px 14px rgba(0,0,0,0.8), 0 0 20px rgba(255, 107, 53, 0.4)',
+              lineHeight: 1.1
             }}
           >
             TRINETRA
@@ -190,90 +156,43 @@ export default function SplashScreen() {
 
           <div 
             style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--accent-ember)',
-              textShadow: '0 0 16px rgba(255, 107, 53, 0.5)'
-            }}
-          >
-            National Industrial Fire & Thermal Intelligence
-          </div>
-
-          <div 
-            style={{
-              fontSize: '0.8rem',
-              color: 'rgba(234, 237, 240, 0.65)',
+              fontSize: '0.78rem',
+              color: 'rgba(234, 237, 240, 0.75)',
               letterSpacing: '0.04em',
-              maxWidth: '420px',
-              marginTop: '0.2rem'
+              fontFamily: 'var(--font-heading)',
+              fontWeight: 500
             }}
           >
-            VIIRS & MODIS Satellite Telemetry · Real-Time CatBoost AI Classification
+            Industrial Fire & Thermal Intelligence
           </div>
         </div>
 
-        {/* Live Mission Status Badge */}
-        <div 
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.35rem 0.85rem',
-            borderRadius: '20px',
-            backgroundColor: 'rgba(46, 204, 113, 0.12)',
-            border: '1px solid rgba(46, 204, 113, 0.35)',
-            fontSize: '0.74rem',
-            fontFamily: 'var(--font-heading)',
-            fontWeight: 700,
-            color: '#2ECC71',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase'
-          }}
-        >
-          <span 
-            style={{
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              backgroundColor: '#2ECC71',
-              boxShadow: '0 0 8px #2ECC71',
-              animation: 'pulseGreen 2s infinite'
-            }}
-          />
-          <span>Telemetry Stream Online · Orbit Pass Synchronized</span>
-        </div>
-
-        {/* High-Tech Gateway Button */}
+        {/* Medium, Sleek, Minimal Start Button */}
         <button
           onClick={handleStart}
           style={{
-            position: 'relative',
-            overflow: 'hidden',
             backgroundColor: '#FF6B35',
-            backgroundImage: 'linear-gradient(135deg, #FF7E47 0%, #FF6B35 50%, #D74E26 100%)',
+            backgroundImage: 'linear-gradient(135deg, #FF7E47 0%, #FF6B35 100%)',
             color: '#FFFFFF',
             fontFamily: 'var(--font-heading)',
-            fontWeight: 800,
-            fontSize: '1.05rem',
-            letterSpacing: '0.08em',
-            padding: '1rem 3rem',
-            borderRadius: '10px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
+            fontWeight: 700,
+            fontSize: '0.92rem',
+            letterSpacing: '0.05em',
+            padding: '0.65rem 1.85rem',
+            borderRadius: '6px',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
             cursor: 'pointer',
-            boxShadow: '0 8px 32px rgba(255, 107, 53, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
-            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            display: 'flex',
+            boxShadow: '0 4px 18px rgba(255, 107, 53, 0.45)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.75rem',
-            marginTop: '0.5rem'
+            gap: '0.45rem',
+            marginTop: '0.25rem'
           }}
-          className="splash-start-btn"
+          className="splash-start-btn-mini"
         >
-          <span>ENTER PLATFORM</span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform 0.2s ease' }} className="btn-arrow">
+          <span>Start</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" className="mini-arrow">
             <line x1="5" y1="12" x2="19" y2="12" />
             <polyline points="12 5 19 12 12 19" />
           </svg>
@@ -283,38 +202,33 @@ export default function SplashScreen() {
       <style>{`
         @keyframes splashPhotoZoom {
           from {
-            transform: scale(1.06);
+            transform: scale(1.04);
           }
           to {
             transform: scale(1.0);
           }
-        }
-        @keyframes radarSweep {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
         }
         @keyframes spinClockwise {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
         @keyframes pulseGlow {
-          0%, 100% { transform: scale(0.95); opacity: 0.6; }
-          50% { transform: scale(1.15); opacity: 0.9; }
+          0%, 100% { transform: scale(0.95); opacity: 0.5; }
+          50% { transform: scale(1.15); opacity: 0.85; }
         }
-        @keyframes pulseGreen {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(0.85); }
-        }
-        .splash-start-btn:hover {
-          transform: translateY(-3px) scale(1.02);
+        .splash-start-btn-mini:hover {
+          transform: translateY(-2px);
           background-color: #ff7a4a !important;
-          box-shadow: 0 14px 44px rgba(255, 107, 53, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+          box-shadow: 0 6px 22px rgba(255, 107, 53, 0.65) !important;
         }
-        .splash-start-btn:hover .btn-arrow {
-          transform: translateX(4px);
+        .splash-start-btn-mini:hover .mini-arrow {
+          transform: translateX(3px);
         }
-        .splash-start-btn:active {
-          transform: translateY(1px) scale(0.99) !important;
+        .splash-start-btn-mini:active {
+          transform: translateY(1px) !important;
+        }
+        .mini-arrow {
+          transition: transform 0.18s ease;
         }
       `}</style>
     </div>
