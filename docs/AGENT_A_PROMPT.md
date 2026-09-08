@@ -51,6 +51,13 @@ TASKS:
    distinct classes to `<ClassificationFilters availableClasses={...}>` — don't
    hardcode the 4+1 list, and don't rely on any health-endpoint flag (see
    AGENTS.md).
+5b. India-only clamping (defensive Layer 2 — the real fix lives at data
+   ingestion, backend side; this is cheap insurance that must not be skipped):
+   (a) set `maxBounds` on the MapLibre `<Map>` to India's bounding box
+   (roughly `[[68, 6], [98, 36]]`) so the map can't be panned outside India;
+   (b) filter the `H3HexagonLayer` data prop client-side, dropping any
+   prediction whose `latitude`/`longitude` falls outside that same box, so a
+   backend regression can never render a stray non-India cell.
 6. Navigation: build `frontend/src/services/mapLocation.js` exporting a
    `useMapLocation(mapRef)` hook (or plain functions, your call) that (a) reads
    `lat`/`lon`/`h3`/`name` from URL search params and calls
