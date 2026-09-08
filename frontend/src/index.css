@@ -627,4 +627,96 @@ p, span, label, div {
   .hero-main-title {
     font-size: 2.15rem;
   }
+  .home-two-col-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .home-two-col-divider {
+    display: none !important;
+  }
+  .architecture-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .sectors-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
+
+/* Telemetry Ribbon */
+.telemetry-ribbon {
+  background: rgba(18, 24, 31, 0.95);
+  border-top: 1px solid var(--hairline-border);
+  border-bottom: 1px solid var(--hairline-border);
+  backdrop-filter: blur(12px);
+}
+
+[data-theme='light'] .telemetry-ribbon {
+  background: #F8FAFC;
+}
+
+/* Action Hub Cards Hover */
+.action-card-ember {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.action-card-ember:hover {
+  background-color: rgba(255, 107, 53, 0.04);
+  box-shadow: inset 0 0 40px rgba(255, 107, 53, 0.08);
+}
+
+.action-card-blue {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.action-card-blue:hover {
+  background-color: rgba(61, 157, 232, 0.04);
+  box-shadow: inset 0 0 40px rgba(61, 157, 232, 0.08);
+}
+
+/* Hotspot Sector Card */
+.sector-card {
+  background: rgba(18, 24, 31, 0.85);
+  border: 1px solid var(--hairline-border);
+  border-radius: 12px;
+  padding: 1.35rem;
+  transition: all 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme='light'] .sector-card {
+  background: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.sector-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 107, 53, 0.4);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] .sector-card:hover {
+  box-shadow: 0 12px 30px rgba(215, 78, 38, 0.12);
+}
+
+/* Architecture Pipeline Card */
+.arch-card {
+  background: rgba(18, 24, 31, 0.6);
+  border: 1px solid var(--hairline-border);
+  border-radius: 12px;
+  padding: 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: all 0.2s ease;
+}
+
+[data-theme='light'] .arch-card {
+  background: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+}
+
+.arch-card:hover {
+  border-color: var(--accent-ember);
+  transform: translateY(-2px);
+}
+
