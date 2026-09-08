@@ -13,6 +13,8 @@ pandas>=2.0
 pyarrow>=14.0
 numpy>=1.26
 python-multipart>=0.0.9
+# Dev-only (local test/lint tooling) — the Dockerfile uninstalls these from
+# the runtime image; do not import them from app/ or ingestion/.
 pytest>=8.0
 httpx>=0.27.0
 ruff>=0.16.0

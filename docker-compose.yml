@@ -38,7 +38,10 @@ services:
       # read-write volume is deferred until multi-run persistence is needed.
       - ./data/processed:/data:ro
       - sih2026-data:/data_writable
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Bootstrap first: seed the writable volume's parquets from the read-only
+    # /data mount if absent (the compose `command:` overrides the Dockerfile
+    # CMD, so the image's own bootstrap would never run here).
+    command: sh -c "mkdir -p /data_writable && for f in /data/*.parquet; do [ -f \"$$f\" ] && cp -n \"$$f\" /data_writable/ || true; done; exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     networks:
       - sih2026-network
 

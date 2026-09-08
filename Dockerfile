@@ -8,7 +8,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Dev-only deps (pytest/httpx/ruff) are installed to keep one pinned file,
+# then pruned in the SAME layer so the runtime image stays lean.
+RUN pip install --no-cache-dir -r requirements.txt \
+    && pip uninstall -y pytest httpx ruff 2>/dev/null; true
 
 COPY app ./app
 COPY pipeline ./pipeline

@@ -1,0 +1,17 @@
+# Keep the build context lean — the Dockerfile COPYs only explicit paths.
+# data/processed parquets are baked in via COPY; everything else under data/
+# (1.7 GB OSM PBF, shapefiles, WRI csv) stays host-side and is volume-mounted
+# when live ingestion runs in a container.
+data/raw/
+data/processed/backup_nationwide_pre_10state/
+data/processed/ingestion_run_history.json
+data/feature_store.duckdb
+data/audit_log.duckdb
+.venv/
+.venv-pinned/
+frontend/
+node_modules/
+.git/
+**/__pycache__/
+*.pyc
+.env

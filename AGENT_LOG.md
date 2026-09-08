@@ -371,3 +371,28 @@ Ownership split, interface contract, and per-agent prompts live in
   - Full suite: 53 passed, 1 deselected, 1 failure in untouched `ingestion/firms_pull.py:360` (`NameError: name 'parts' is not defined` flagged for ingestion owner per boundaries).
 - Blockers / questions:
   - Ingestion owner: note the typo in `ingestion/firms_pull.py:360` (`NameError: name 'parts' is not defined`).
+
+---
+
+## [2026-09-08T23:59:00+05:30] Agent BACK-2 — Data Plane, Ops & Deployment (BACK-2.1 … BACK-2.5 complete)
+
+- Files changed:
+  - `app/main.py` — (2.1) legacy alias routes `/predictions/{cell_id}` and `/predictions/{cell_id}/explain` now wrap `ValueError` with the same 404/400 mapping as the v1 handlers (helper `_map_cell_lookup_error`, 404 iff "No H3-day features found") plus a generic 500 guard — both path styles return the identical `{detail}` body. (2.4a) new `_route_ingestion_logs_into_uvicorn()` called in lifespan: mirrors `ingestion.*` + `uvicorn.startup` records into uvicorn's error handler so "skipping, data current" vs "running background ingestion" is visible at boot.
+  - `app/services/audit_service.py` — (2.3) `__init__` now mkdir(parents=True) on the DB parent dir, killing crash-on-import when AUDIT_DB_PATH points at a fresh volume.
+  - `Dockerfile` — (2.3) `COPY ingestion ./ingestion` (startup hook no longer silently ImportErrors; live ingestion works in-container); dev deps (pytest/httpx/ruff) uninstalled in the same pip layer; bootstrap CMD seeds /data_writable/*.parquet from the baked-in /data on first boot.
+  - `docker-compose.yml` — (2.3) added AUDIT_DB_PATH + H3_DAILY_PARQUET/OSMWRI_PARQUET env pointing at the writable volume; compose `command:` (which overrides the image CMD) runs the same seed bootstrap before uvicorn; comment records the intentional-bake-in (/data ro parquets) vs writable-volume split.
+  - `requirements.txt` — (2.3) added pyarrow>=14.0 (ingestion could not write parquets in the image); dev-only deps annotated.
+  - `.dockerignore` (new) — keeps the 1.7 GB OSM PBF / venvs / frontend / .env out of the build context; data/processed parquets still baked in via explicit COPY.
+  - `ingestion/firms_pull.py` — (2.4b) fetch_firms_both pulls SNPP + NOAA-20 concurrently (ThreadPoolExecutor, 2 requests/chunk vs 5000/10-min rate limit).
+  - `ingestion/run_ingestion.py` — (2.4c) run history now records `fetch.per_chunk = {date: {day_range, per-source raw rows, rows_after_harmonize}}`.
+  - `tests/test_data_plane.py` (new, 10 tests) — (2.2/2.5) DuckDB file-lock skip guard (`duckdb_file_is_locked` + `requires_default_duckdb` skipif; guard self-tested) so pytest-while-uvicorn SKIPS, never fails; schema parity of the daily parquet vs the locked 28-column contract and the static parquet vs the locked 61-column contract (exact order pinned as LOCKED_STATIC_COLUMN_ORDER — NOTE: the shipped static order interleaves WRI dist/count per fuel and OSM pairs per category; `STATIC_FILE_COLUMNS` in run_ingestion has the same name set but a different order); cross-file arrow-type equality for shared daily columns (h3_08 excluded: daily ships it dictionary-encoded, static plain string — locked shipped state); 10-state-only assertions on the real parquets (exact-set on static); freshness max(acq_date) >= today-2 with SKIP when the parquet is byte-identical to the pre-10-state backup; get_cell fast-path + reload-under-lock contract consolidated here from test_ingestion.py (unknown cell → None; new parquet data invisible until reload(); get_cell safe under 4 concurrent query threads x 5 reloads); legacy-alias 404 body parity vs v1 (TestClient).
+  - `AGENT_LOG.md` — this entry.
+- Verification run (all observed, not inferred):
+  - Full suite `.venv\Scripts\python.exe -m pytest -q` → 64 passed, 1 deselected (live), twice: before and after BACK-1's changes landed (sequencing contract honored).
+  - Docker acceptance (2.3): `docker compose up --build backend` boots, GET /health green (model_loaded, calibrators_loaded, review thresholds); audit.duckdb + feature_store.duckdb + seeded serving parquets confirmed on the sih2026-data volume; ingestion.run_ingestion importable in-image. LIVE ingestion attempt in-container (`docker compose run ... python -m ingestion.run_ingestion --day-range 1 --no-gap-fill`, data/raw mounted ro, FIRMS_MAP_KEY injected) → ok=true, 37.2 s, 0 plausibility violations, wrote both serving parquets on the volume (mtime updated, max acq_date = 2026-09-08). One real bug found during verification: compose `command:` overrode the image CMD so the bootstrap never ran (first boot failed lifespan with "Missing H3 daily parquet") — fixed in compose. Verification containers stopped afterwards; port 8000 freed.
+  - Log routing (2.4a): docker logs now surface the startup-hook ingestion messages (observed the raw-input warning instead of silence).
+  - SUPERSEDES the BACK-1 23:35 entry's flagged failure in `ingestion/firms_pull.py:360` (`NameError: parts`): that was a transient mid-edit state of my BACK-2.4b change; fixed before any commit and covered by the 64-passed suite runs.
+- Contradicts or supersedes: only the NameError flag above. Host serving parquets untouched; the in-container live run wrote only to the docker volume.
+- Open items handed off:
+  - RUN_HISTORY_PATH is repo-relative, so in-container runs write run history to the ephemeral container fs — making it env-overridable to the writable volume is the natural next ops fix; per-chunk FIRMS row counts (2.4c) land in that JSON.
+  - `.venv` vs `.venv-pinned` interpreter split (2026-09-08 Codex entry) still unresolved; suite verified under `.venv` (Python 3.12.13).
