@@ -141,13 +141,21 @@ class Settings:
     )
     FEATURE_SCHEMA_VERSION = "v3-h3-day-catboost"
     INGEST_MAX_BATCH_SIZE = 5000
-    # Vite dev server serves on 5173 by default; 3000 kept for legacy setups.
-    CORS_ALLOW_ORIGINS: ClassVar[list[str]] = [
+    _DEFAULT_CORS_ORIGINS: ClassVar[list[str]] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+
+    @property
+    def CORS_ALLOW_ORIGINS(self) -> list[str]:
+        raw = os.environ.get("CORS_ALLOW_ORIGINS")
+        if raw:
+            parsed = [origin.strip() for origin in raw.split(",") if origin.strip()]
+            if parsed:
+                return parsed
+        return list(self._DEFAULT_CORS_ORIGINS)
     TARGET_CLASSES: ClassVar[list[str]] = TARGET_CLASSES
     CAT_FEATURES: ClassVar[list[str]] = CAT_FEATURES
     MODEL_FEATURES: ClassVar[list[str]] = MODEL_FEATURES

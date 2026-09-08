@@ -65,8 +65,19 @@ class CellPredictionDetailResponse(PredictionResponse):
 
 
 class ViewportPredictionsResponse(BaseModel):
-    mode: str
-    zoom: float = 8.0
+    mode: str = Field(
+        ...,
+        description=(
+            "Viewport rendering mode: 'detailed_hexagons' (bbox span <= 20 deg) or "
+            "'aggregated_macro' (wide overview, bbox span > 20 deg). Note: H3 cells are always "
+            "returned at native resolution 8; mode and zoom are informative metadata echoed "
+            "from the query and do not downsample or coarse-aggregate geometries server-side."
+        ),
+    )
+    zoom: float = Field(
+        8.0,
+        description="Echoed client viewport zoom level (informative/decorative; does not alter native H3 resolution).",
+    )
     total_predictions: int
     predictions: list[PredictionResponse]
 

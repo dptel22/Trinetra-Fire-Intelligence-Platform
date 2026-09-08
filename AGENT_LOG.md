@@ -345,3 +345,29 @@ Ownership split, interface contract, and per-agent prompts live in
   - Idempotent re-runs: same-day rerun overwrites by (h3_08, acq_date); history JSON at data/processed/ingestion_run_history.json (last entry ok=true).
   - FIRMS_MAP_KEY rotation still recommended (it appeared in a screenshot/URL during setup).
 - Blockers / questions: none.
+
+---
+
+### [2026-09-08T23:35:00+05:30] Agent BACK-1 — Serving Path & API Surface Complete
+
+- Files touched:
+  - `app/api/endpoints/health.py` (new) — Mounted v1 health check alias matching root `/health` contract (`HealthResponse`).
+  - `app/api/api_router.py` (modified) — Mounted `health.router` under `/api/v1/health` with `System Health` tag.
+  - `app/core/config.py` (modified) — Dynamic property `CORS_ALLOW_ORIGINS` reading comma-separated origins from `os.environ["CORS_ALLOW_ORIGINS"]`, falling back to the 4 default localhost origins (ports 3000 and 5173).
+  - `app/api/endpoints/audit.py` (modified) — Replaced placeholder `"server_resolved"` with real prediction lookup via `model_service.get_cell_detail(cell_id, acq_date)` storing predicted class and confidence.
+  - `app/services/model_service.py` (modified) — Vectorized viewport inference: added `_prepare_batch_pool`, `_calibrate_batch`, and `predict_batch` replacing the 2,500-iteration scalar loop in `get_viewport_predictions` with a single CatBoost `predict_proba` call and vectorized per-class isotonic calibrations, preserving `latency_ms` semantics. Single-row `predict()` left intact as reference implementation.
+  - `app/schemas/prediction.py` (modified) — Documented `mode` and `zoom` semantics as informative/decorative metadata in `ViewportPredictionsResponse`.
+  - `docs/backend-rebuild-coordination.md` (modified) — Appended formal specification of zoom and mode contract and 2,500-cap client-tiling requirements.
+  - `tests/test_api_surface.py` (new) — Dedicated test suite with 4 passing tests covering health parity, CORS env parsing, audit override honesty, and numerical parity between `predict_batch` and the reference loop (probabilities match to ~1e-9).
+  - `.gitignore` (modified) — Updated DuckDB ignore to `*.duckdb*` to prevent `.duckdb.wal` permission locks during git operations.
+  - `AGENT_LOG.md` (this entry).
+- Interface impact:
+  - `GET /api/v1/health` now live and byte-equivalent to `/health`.
+  - `CORS_ALLOW_ORIGINS` dynamically configurable via environment.
+  - `POST /api/v1/audit/override` now persists real prediction class and formatted confidence into `audit_log.duckdb`.
+  - `GET /api/v1/predictions` vector-accelerated with identical response schema and sub-second viewport batch latency.
+- Test verification:
+  - `pytest tests/test_api_surface.py -v` -> 4 passed in 7.93s.
+  - Full suite: 53 passed, 1 deselected, 1 failure in untouched `ingestion/firms_pull.py:360` (`NameError: name 'parts' is not defined` flagged for ingestion owner per boundaries).
+- Blockers / questions:
+  - Ingestion owner: note the typo in `ingestion/firms_pull.py:360` (`NameError: name 'parts' is not defined`).

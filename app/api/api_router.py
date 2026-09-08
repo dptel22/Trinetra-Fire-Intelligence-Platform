@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import audit, classify
+from app.api.endpoints import audit, classify, health
 
 api_router = APIRouter()
 
+# System health check under /api/v1/health
+api_router.include_router(health.router, tags=["System Health"])
 # Canonical H3-day prediction routes (+ legacy classify aliases kept for compatibility)
 api_router.include_router(classify.router, tags=["Classification & Predictions"])
 # Audit trail remains available under /api/v1/audit/*

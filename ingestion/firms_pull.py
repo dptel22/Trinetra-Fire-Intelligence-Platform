@@ -330,24 +330,35 @@ def fetch_firms_both(
     date: str | None = None,
     map_key: str | None = None,
 ) -> tuple[pd.DataFrame, dict]:
-    """Pull both locked NRT sources, tag provenance, concat, harmonize.
+    """Pull both locked NRT sources in parallel, tag provenance, concat, harmonize.
+
+    The two source requests are independent HTTP calls, so they run
+    concurrently (2 threads). FIRMS' documented rate limit is 5000
+    requests/10 min; a full gap-fill uses 2 requests per day-chunk — a tiny
+    fraction of the budget, so parallelism here is safe.
 
     Returns (points_df, stats) where stats carries per-source raw row counts.
     """
     bbox = validate_bbox(bbox)
     date = validate_date(date)
-    parts: list[pd.DataFrame] = []
     stats: dict = {"raw_rows": {}, "source": list(SOURCES)}
-    for src in SOURCES:
-        raw = fetch_firms(src, bbox, day_range=day_range, date=date, map_key=map_key)
-        stats["raw_rows"][src] = int(len(raw))
-        if raw.empty:
-            logger.warning("Zero detections from %s for %s (+%dd) — valid empty day.", src, date, day_range)
-            continue
-        raw = raw.copy()
-        raw["source"] = "nrt"
-        raw["satellite_name"] = SATELLITE_NAME_BY_SOURCE[src]
-        parts.append(raw)
+    parts: list[pd.DataFrame] = []
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _pull(src: str):
+        return src, fetch_firms(src, bbox, day_range=day_range, date=date, map_key=map_key)
+
+    with ThreadPoolExecutor(max_workers=len(SOURCES)) as pool:
+        for src, raw in pool.map(_pull, SOURCES):
+            stats["raw_rows"][src] = int(len(raw))
+            if raw.empty:
+                logger.warning("Zero detections from %s for %s (+%dd) — valid empty day.", src, date, day_range)
+                continue
+            raw = raw.copy()
+            raw["source"] = "nrt"
+            raw["satellite_name"] = SATELLITE_NAME_BY_SOURCE[src]
+            parts.append(raw)
 
     if not parts:
         empty = _empty_frame()

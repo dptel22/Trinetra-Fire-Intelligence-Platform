@@ -253,10 +253,17 @@ def run_ingestion(
         stats["fetch"] = {"mode": "override", "raw_rows": {"override": int(len(points))}}
     else:
         chunks = _plan_day_chunks(target_date, daily_path, day_range, gap_fill)
-        stats["fetch"] = {"chunks": chunks}
+        stats["fetch"] = {"chunks": chunks, "per_chunk": {}}
         frames: list[pd.DataFrame] = []
         for chunk_date, span in chunks:
             pts, chunk_stats = fetch_firms_both(bbox, day_range=span, date=chunk_date)
+            # Per-chunk FIRMS row counts make day-over-day plausibility
+            # comparisons possible straight from the run-history JSON.
+            stats["fetch"]["per_chunk"][chunk_date] = {
+                "day_range": span,
+                **{src: int(n) for src, n in chunk_stats["raw_rows"].items()},
+                "rows_after_harmonize": int(chunk_stats.get("rows_after_harmonize", 0)),
+            }
             stats["fetch"].setdefault("raw_rows", {})
             for k, v in chunk_stats["raw_rows"].items():
                 stats["fetch"]["raw_rows"][f"{k}@{chunk_date}"] = v

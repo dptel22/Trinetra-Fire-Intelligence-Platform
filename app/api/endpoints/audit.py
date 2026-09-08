@@ -21,8 +21,20 @@ def record_analyst_override(request: AnalystOverrideRequest):
     store is wired yet. In production, this would look up the cached prediction.
     """
     try:
-        # Resolve model prediction server-side (demo: mark as server-resolved)
+        # Resolve real model prediction server-side for (cell_id, acq_date)
         model_prediction = "server_resolved"
+        cell_id = request.hotspot_id
+        acq_date = None
+        if "_" in request.hotspot_id:
+            cell_id, acq_date = request.hotspot_id.split("_", 1)
+
+        if acq_date:
+            try:
+                detail = model_service.get_cell_detail(cell_id, acq_date)
+                model_prediction = f"{detail.predicted_class} (confidence: {detail.confidence:.4f})"
+            except Exception as exc:
+                logger.warning("Could not resolve model prediction for hotspot %s: %s", request.hotspot_id, exc)
+                model_prediction = f"unresolved ({exc})"
 
         return audit_service.log_override(
             req=request,

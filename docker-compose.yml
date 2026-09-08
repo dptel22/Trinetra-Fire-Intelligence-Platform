@@ -17,10 +17,25 @@ services:
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
       - DUCKDB_PATH=/data_writable/feature_store.duckdb
+      # Audit trail must live on the writable volume — the baked-in /data is
+      # read-only, so the default repo-relative path would fail in-container.
+      - AUDIT_DB_PATH=/data_writable/audit.duckdb
+      # Serving parquets are seeded onto the writable volume by the image
+      # bootstrap (cp -n from the baked-in /data) so live ingestion can
+      # actually update them inside the container.
+      - H3_DAILY_PARQUET=/data_writable/sih2026_h3_daily_features_firms.parquet
+      - OSMWRI_PARQUET=/data_writable/sih2026_h3_daily_features_with_osm_wri.parquet
     ports:
       - "8000:8000"
     volumes:
       - ./app:/app/app
+      # DECISION (2026-09-08, BACK-2): the base parquets are baked into the
+      # image at /data (read-only) so the container boots with valid serving
+      # data even with no volume mounted. The :ro host mount is the dev-mode
+      # override letting the host's freshly-ingested parquets shadow the
+      # baked-in ones. Live ingestion writes via DUCKDB_PATH/audit db to the
+      # writable named volume below; moving the parquets themselves to a
+      # read-write volume is deferred until multi-run persistence is needed.
       - ./data/processed:/data:ro
       - sih2026-data:/data_writable
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

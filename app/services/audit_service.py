@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 import duckdb
 
@@ -22,6 +23,9 @@ class AuditTrailService:
 
     def __init__(self, db_path: str = settings.AUDIT_DB_PATH):
         self.db_path = db_path
+        # Container deployments point AUDIT_DB_PATH at a mounted volume whose
+        # parent may not exist yet — fail-safe instead of crash-on-import.
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _get_connection(self):

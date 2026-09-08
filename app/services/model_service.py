@@ -390,6 +390,107 @@ class CatBoostModelService:
             context=cell,
         )
 
+    def _prepare_batch_pool(self, rows: list[dict[str, Any]]) -> Pool:
+        if not rows:
+            return Pool(pd.DataFrame(columns=settings.MODEL_FEATURES), cat_features=settings.CAT_FEATURES)
+
+        frame = pd.DataFrame(rows)
+        missing = [col for col in settings.MODEL_FEATURES if col not in frame.columns]
+        if missing:
+            raise ValueError(f"Missing model features: {missing[:8]}")
+
+        frame = frame[settings.MODEL_FEATURES].copy()
+        for col in settings.CAT_FEATURES:
+            frame[col] = frame[col].astype("string").fillna("missing").astype(str)
+
+        for col in frame.columns:
+            if col in settings.CAT_FEATURES:
+                continue
+            if frame[col].dtype == bool:
+                frame[col] = frame[col].astype("int8")
+            else:
+                frame[col] = pd.to_numeric(frame[col], errors="coerce")
+
+        numeric = frame.drop(columns=settings.CAT_FEATURES)
+        if np.isinf(numeric.to_numpy(dtype=float, na_value=np.nan)).any():
+            raise ValueError("Model features contain +/-inf values")
+
+        return Pool(frame, cat_features=settings.CAT_FEATURES)
+
+    def _calibrate_batch(self, raw_probs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Vectorized calibration across all N rows."""
+        assert self.calibrators is not None
+        n_samples = raw_probs.shape[0]
+        if n_samples == 0:
+            return raw_probs.astype(float), np.zeros(0, dtype=bool)
+
+        calibrated_cols = []
+        for cls in self.model_classes:
+            cal = self.calibrators[cls]
+            col_idx = self.model_classes.index(cls)
+            col_pred = cal.predict(raw_probs[:, col_idx])
+            calibrated_cols.append(col_pred)
+
+        calibrated_matrix = np.column_stack(calibrated_cols).astype(float)
+        totals = np.sum(calibrated_matrix, axis=1)
+
+        valid_mask = np.all(np.isfinite(calibrated_matrix), axis=1) & (totals > 0.0)
+
+        out_probs = np.empty_like(raw_probs, dtype=float)
+        is_calibrated = np.zeros(n_samples, dtype=bool)
+
+        if np.any(valid_mask):
+            out_probs[valid_mask] = calibrated_matrix[valid_mask] / totals[valid_mask, np.newaxis]
+            is_calibrated[valid_mask] = True
+
+        if np.any(~valid_mask):
+            out_probs[~valid_mask] = raw_probs[~valid_mask].astype(float)
+            is_calibrated[~valid_mask] = False
+
+        return out_probs, is_calibrated
+
+    def predict_batch(self, rows: list[dict[str, Any]]) -> list[PredictionResponse]:
+        """Batched vector-accelerated prediction for viewport queries."""
+        if not rows:
+            return []
+        self.load_model()
+        started = time.time()
+
+        pool = self._prepare_batch_pool(rows)
+        raw_probs = self.model.predict_proba(pool)
+        prob_matrix, calibrated_flags = self._calibrate_batch(raw_probs)
+
+        batch_latency = round((time.time() - started) * 1000, 2)
+        row_latency = round(batch_latency / len(rows), 2)
+
+        predictions: list[PredictionResponse] = []
+        for cell_features, prob_row, is_cal in zip(rows, prob_matrix, calibrated_flags):
+            predicted_idx = int(np.argmax(prob_row))
+            raw_class = self.model_classes[predicted_idx]
+            confidence = float(prob_row[predicted_idx])
+            predicted_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
+            needs_review = self._needs_review(raw_class, confidence, predicted_class)
+            caveat = self._compose_caveats(policy_caveat, needs_review)
+            lat, lon = self._coordinates(cell_features)
+
+            predictions.append(
+                PredictionResponse(
+                    cell_id=str(cell_features["h3_08"]),
+                    latitude=lat,
+                    longitude=lon,
+                    h3_index=str(cell_features["h3_08"]),
+                    predicted_class=predicted_class,
+                    probabilities=self._probabilities(prob_row),
+                    confidence=round(confidence, 6),
+                    calibrated=bool(is_cal),
+                    needs_review=needs_review,
+                    caveat_flag=caveat,
+                    latency_ms=row_latency,
+                )
+            )
+
+        return predictions
+
     def get_viewport_predictions(
         self,
         min_lat: float,
@@ -401,7 +502,7 @@ class CatBoostModelService:
     ) -> ViewportPredictionsResponse:
         mode = "aggregated_macro" if (max_lat - min_lat > 20.0 or max_lon - min_lon > 20.0) else "detailed_hexagons"
         rows = feature_store.query_bbox(min_lat, max_lat, min_lon, max_lon, acq_date)
-        predictions = [self.predict(row) for row in rows]
+        predictions = self.predict_batch(rows)
         return ViewportPredictionsResponse(
             mode=mode,
             zoom=zoom,

@@ -12,6 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY pipeline ./pipeline
+# The startup hook imports ingestion.run_ingestion — without this COPY the
+# import fails silently (caught and logged), and live ingestion stays
+# permanently off inside the container.
+COPY ingestion ./ingestion
 COPY models/PS26162_catboost_final/inference_bundle ./models/PS26162_catboost_final/inference_bundle
 
 ENV MODEL_PATH=/app/models/PS26162_catboost_final/inference_bundle/catboost_hotspot_classifier.cbm
@@ -25,4 +29,7 @@ COPY data/processed/sih2026_h3_daily_features_with_osm_wri.parquet /data/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Bootstrap: seed the writable volume's parquets from the baked-in /data copy
+# on first boot (so a fresh volume boots green), then run uvicorn. Subsequent
+# boots keep whatever live ingestion last wrote to the volume.
+CMD ["sh", "-c", "mkdir -p /data_writable && for f in /data/*.parquet; do [ -f \"$f\" ] && cp -n \"$f\" /data_writable/ || true; done; exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

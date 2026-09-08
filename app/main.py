@@ -1,9 +1,10 @@
 import logging
+import logging.handlers
 import os
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.api_router import api_router
@@ -18,6 +19,24 @@ from app.services.feature_store import feature_store
 from app.services.model_service import model_service
 
 logger = logging.getLogger("uvicorn.startup")
+
+
+def _route_ingestion_logs_into_uvicorn() -> None:
+    """Mirror ingestion.* log records into uvicorn's handlers.
+
+    uvicorn replaces the root logging config, so the startup-hook messages
+    ("skipping, data current" vs "running background ingestion") would
+    otherwise be invisible at boot. Pointing the ingestion loggers at the
+    uvicorn.error handler keeps them on the console without double printing
+    via the root logger.
+    """
+    uvicorn_handler = logging.getLogger("uvicorn.error").handlers[0] if logging.getLogger("uvicorn.error").handlers else None
+    for name in ("ingestion", "uvicorn.startup"):
+        lg = logging.getLogger(name)
+        if uvicorn_handler is not None and uvicorn_handler not in lg.handlers:
+            lg.handlers.append(uvicorn_handler)
+        lg.propagate = False
+        lg.setLevel(logging.INFO)
 
 
 def _background_ingestion() -> None:
@@ -44,6 +63,7 @@ def _background_ingestion() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"[STARTUP] Initializing {settings.PROJECT_NAME} (v{settings.VERSION})...")
+    _route_ingestion_logs_into_uvicorn()
     feature_store.load()
     model_service.load_model()
     threading.Thread(target=_background_ingestion, name="firms-ingestion", daemon=True).start()
@@ -94,14 +114,35 @@ def get_predictions_root(
 ):
     return model_service.get_viewport_predictions(min_lat, max_lat, min_lon, max_lon, acq_date, zoom)
 
+def _map_cell_lookup_error(err: ValueError) -> HTTPException:
+    """Same contract as the v1 handlers (classify.py): an unknown H3-day cell
+    must surface as 404, not 500, on every path style."""
+    status = 404 if "No H3-day features found" in str(err) else 400
+    return HTTPException(status_code=status, detail=str(err))
+
+
 @app.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse)
 def get_prediction_cell_explanation_root(cell_id: str, acq_date: str = Query(...)):
-    detail = model_service.get_cell_detail(cell_id, acq_date)
-    return model_service.explain(detail.context)
+    try:
+        detail = model_service.get_cell_detail(cell_id, acq_date)
+        return model_service.explain(detail.context)
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise _map_cell_lookup_error(ve)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Cell explanation failed due to an internal server error.")
 
 @app.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse)
 def get_prediction_cell_detail_root(cell_id: str, acq_date: str = Query(...)):
-    return model_service.get_cell_detail(cell_id, acq_date)
+    try:
+        return model_service.get_cell_detail(cell_id, acq_date)
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise _map_cell_lookup_error(ve)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Cell detail query failed due to an internal server error.")
 
 if __name__ == "__main__":
     import uvicorn
