@@ -1,3 +1,9 @@
+
+### [2026-09-08 13:55] Agent A - Finish map engine fixes and validation
+- Files changed: `frontend/src/components/FireMapPage.jsx`, `frontend/src/components/FireMapPage.css`, `frontend/src/services/mapLocation.js`, `frontend/package.json`, `frontend/package-lock.json`
+- What changed: Completed the MapLibre/deck.gl map engine integration with module-scope PMTiles protocol registration, H3 hexagon rendering, dashed review outlines via a companion PathLayer, India bounds/filtering, dynamic class filters, hover details, and inspector clear-selection behavior. Moved the prediction ref mirror into an effect to avoid a render-time ref access warning.
+- Interface impact: none beyond the existing Agent A map integration contract.
+- Blockers / questions for the other agent or for Sagar/Dhruv: PMTiles archive remains a demo-day dependency when `VITE_PMTILES_URL` is unset; existing unrelated lint warnings remain in HomePage, Header, QuickSearchModal, and AnnouncementsModal.
 # Agent Activity & Contract Reconciliation Log
 
 Protocol: Every agent appends — never edits past entries — to `AGENT_LOG.md` at repo root, one entry per unit of work.

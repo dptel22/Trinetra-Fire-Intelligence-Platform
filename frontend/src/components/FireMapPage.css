@@ -1,0 +1,214 @@
+/* FireMapPage.css — layout, map, sidebar, hover-card styles
+   Uses CSS custom properties defined in index.css (--panel-surface etc.)
+   No colours are hard-coded here; all taxonomy colours come from CLASS_COLORS in api.js.
+*/
+
+/* ─── Top-level page shell ─────────────────────────────────────────────────── */
+.firemap-page {
+  background-color: #0a0e12;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Two-pane split below the header ──────────────────────────────────────── */
+.firemap-body {
+  flex: 1;
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 65px);
+  overflow: hidden;
+}
+
+/* ─── Map pane (left) ──────────────────────────────────────────────────────── */
+.firemap-map-pane {
+  flex: 1;
+  height: 100%;
+  position: relative;
+}
+
+/* react-map-gl <Map> renders a child div; we let it fill the pane */
+.firemap-map-pane .maplibregl-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Sidebar (right, 340 px) ──────────────────────────────────────────────── */
+.firemap-sidebar {
+  width: 340px;
+  height: 100%;
+  background-color: var(--panel-surface, #12161c);
+  border-left: 1px solid var(--hairline-border, #2e3440);
+  padding: 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+/* ─── Sidebar section heading label ───────────────────────────────────────── */
+.firemap-section-label {
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #8b949e);
+}
+
+/* ─── Timeframe pill row ───────────────────────────────────────────────────── */
+.firemap-timeframe-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  background: #0a0e12;
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline-border, #2e3440);
+}
+
+.firemap-timeframe-btn {
+  flex: 1;
+  background: transparent;
+  color: var(--text-muted, #8b949e);
+  border: none;
+  border-radius: 4px;
+  padding: 5px 0;
+  font-size: 11px;
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.firemap-timeframe-btn.active {
+  background: var(--panel-surface, #12161c);
+  color: var(--text-primary, #eceff4);
+}
+
+/* ─── Detections count box ─────────────────────────────────────────────────── */
+.firemap-count-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background-color: rgba(234, 237, 240, 0.04);
+  border: 1px solid var(--hairline-border, #2e3440);
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.firemap-count-label {
+  font-size: 0.85rem;
+  color: var(--text-muted, #8b949e);
+}
+
+.firemap-count-value {
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary, #eceff4);
+}
+
+/* ─── Hover / tooltip card ─────────────────────────────────────────────────── */
+/* deck.gl hover info.x/y are canvas-relative — absolute inside the pane (which
+   is position:relative) keeps the card exactly at the cursor. */
+.firemap-tooltip {
+  position: absolute;
+  z-index: 9000;
+  pointer-events: none;
+  background: rgba(18, 22, 28, 0.97);
+  border: 1px solid var(--hairline-border, #2e3440);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 200px;
+  max-width: 280px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-body, system-ui, sans-serif);
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  line-height: 1.5;
+  backdrop-filter: blur(6px);
+}
+
+.firemap-tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.firemap-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.firemap-tooltip-class {
+  font-family: var(--font-heading, system-ui, sans-serif);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.firemap-tooltip-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: auto;
+}
+
+.firemap-tooltip-badge.high { background: rgba(46,204,113,0.15); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
+.firemap-tooltip-badge.review { background: rgba(231,76,60,0.15); color: #e74c3c; border: 1px solid rgba(231,76,60,0.3); }
+.firemap-tooltip-badge.uncertain { background: rgba(120,120,120,0.15); color: #a0a0a0; border: 1px solid rgba(120,120,120,0.3); }
+
+.firemap-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.firemap-tooltip-caveat {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10.5px;
+  color: #f1c40f;
+  line-height: 1.4;
+}
+
+/* ─── Divider ─────────────────────────────────────────────────────────────── */
+.firemap-divider {
+  height: 1px;
+  background-color: var(--hairline-border, #2e3440);
+  margin: 2px 0;
+}
+
+/* ─── Clear-selection button (HexInspectorPanel contract has no onClose) ──── */
+.firemap-clear-btn {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--text-muted, #8b949e);
+  border: 1px solid var(--hairline-border, #2e3440);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-heading, system-ui, sans-serif);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.firemap-clear-btn:hover {
+  color: var(--text-primary, #eceff4);
+  border-color: var(--text-muted, #8b949e);
+}
