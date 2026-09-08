@@ -6,12 +6,14 @@ data/DL_FIRE_*
 data/*.zip
 *.duckdb
 /*.parquet
+notebooks/eda/*.parquet
 
 # Agent/IDE temp
 .qwen/
 .zcode/
 .claude/
 .mimosa/
+.scratch-requirements-repro/
 
 
 # Model artifacts - use GitHub Releases instead of committing binaries
@@ -49,6 +51,8 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+.venv-pinned/
+venv-pinned/
 .env
 .env.local
 .env.*.local
