@@ -22,3 +22,31 @@ Protocol: Every agent appends — never edits past entries — to `AGENT_LOG.md`
 - Supersedes `docs/backend-rebuild-coordination.md` Sections 1.14, 2.29, and Agent A/B logs which documented a 52-feature contract and model path `models/catboost_hotspot_classifier_v1.cbm`. The live locked contract is 55 features and model path `models/PS26162_catboost_final/inference_bundle/catboost_hotspot_classifier.cbm`.
 **Open items handed off:**
 - Step 2 (model manifest creation) and Step 3 (training/serving skew test across all 55 features against real parquet row).
+
+---
+
+## Frontend two-agent split — entry format (PS26162 fire-map frontend)
+
+The frontend work is split across two git worktrees (`frontend-agent-a` → branch
+`agent-a/map-engine`, `frontend-agent-b` → branch `agent-b/data-layer`). Frontend
+agents append entries in this format:
+
+### [ISO timestamp] Agent <A|B> — <one-line summary>
+- Files changed: <list>
+- What changed: <2-4 sentences>
+- Interface impact: <"none" | exact new/changed export or prop signature>
+- Blockers / questions for the other agent or for Sagar/Dhruv: <or "none">
+
+Append-only: never edit another agent's entry. Each worktree has its own copy of
+this file; the integrator merges the two copies when combining the branches.
+Ownership split, interface contract, and per-agent prompts live in
+`AGENTS.md` (shared context), `docs/AGENT_A_PROMPT.md`, and `docs/AGENT_B_PROMPT.md`.
+
+---
+
+## [2026-09-08 13:03] Agent A — Setup: two-agent worktree split established
+
+- Files changed: `AGENT_LOG.md`, `AGENTS.md` (new), `CLAUDE.md` (new), `docs/AGENT_A_PROMPT.md` (new), `docs/AGENT_B_PROMPT.md` (new)
+- What changed: Created the shared-context file and per-agent prompt docs for the frontend two-agent split, adjusted to repo reality: `FireMapPage.jsx` lives at `frontend/src/components/` (no `pages/` dir, no CSS file yet), and `frontend/src/services/api.js` + all five Agent-B components (`ClassificationFilters`, `HexInspectorPanel`, `Legend`, `OfflineBanner`, `DataReliabilityBlock`) already exist and match the interface contract — Agent B's task is audit/gap-fill, not greenfield build. The only unfinished split-doc work is Agent A's map engine (FireMapPage is still React-Leaflet; target stack is MapLibre GL + deck.gl H3HexagonLayer + PMTiles). No branch sync was needed: `origin/main` is fully contained in `feature/frontend`, and origin is currently unreachable (fetch returns "Repository not found").
+- Interface impact: none — docs only. Constraint recorded: `FIRE_COLORS`/`FIRE_LABELS`/`FIRE_CAVEATS` aliases in `api.js` must be preserved (unowned `QuickSearchModal.jsx` and `FireAlertsPage.jsx` import them).
+- Blockers / questions for the other agent or for Sagar/Dhruv: git remote `origin` (https://github.com/dptel22/SIH_2026.git) returns "Repository not found" on fetch — pushes/pulls will fail until this is fixed (repo renamed/private/auth).

@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import QuickSearchModal from './QuickSearchModal';
+import AnnouncementsModal from './AnnouncementsModal';
+import FeedbackModal from './FeedbackModal';
 
 export default function Header() {
   const location = useLocation();
@@ -8,6 +11,12 @@ export default function Header() {
   const [showTutorials, setShowTutorials] = useState(false);
   const [showFaqs, setShowFaqs] = useState(false);
   const [faqOpenIdx, setFaqOpenIdx] = useState(null);
+
+  // Modals for Quick Search, Announcements, and Feedback
+  const [showSearch, setShowSearch] = useState(false);
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(3);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('trinetra_theme') || 'light';
@@ -123,7 +132,7 @@ export default function Header() {
             {/* Quick Search */}
             <a 
               href="#search" 
-              onClick={(e) => { e.preventDefault(); alert("Quick Search: Type cell H3 ID or landmark (e.g. Jamnagar, Paradip)."); }}
+              onClick={(e) => { e.preventDefault(); setShowSearch(true); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -133,6 +142,7 @@ export default function Header() {
                 fontSize: '1.05rem',
                 fontFamily: 'var(--font-heading)',
                 fontWeight: 700,
+                cursor: 'pointer',
                 transition: 'opacity 0.2s ease'
               }}
               className="header-opt-link"
@@ -162,7 +172,7 @@ export default function Header() {
             {/* Announcements */}
             <a 
               href="#announcements" 
-              onClick={(e) => { e.preventDefault(); alert("Announcements: TRINETRA CatBoost 52-feature inference active over India region."); }}
+              onClick={(e) => { e.preventDefault(); setShowAnnouncements(true); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -172,21 +182,46 @@ export default function Header() {
                 fontSize: '1.05rem',
                 fontFamily: 'var(--font-heading)',
                 fontWeight: 700,
+                cursor: 'pointer',
                 transition: 'opacity 0.2s ease'
               }}
               className="header-opt-link"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="#F1C40F" stroke="#F1C40F" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d="M3 11l18-5v12L3 13v-2z" />
-                <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#F1C40F" strokeWidth="2" />
-              </svg>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#F1C40F" stroke="#F1C40F" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M3 11l18-5v12L3 13v-2z" />
+                  <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#F1C40F" strokeWidth="2" />
+                </svg>
+                {unreadAnnouncements > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-7px',
+                      backgroundColor: 'var(--accent-ember)',
+                      color: '#FFFFFF',
+                      fontSize: '0.65rem',
+                      fontWeight: 800,
+                      borderRadius: '50%',
+                      width: '16px',
+                      height: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 8px rgba(255, 107, 53, 0.9)'
+                    }}
+                  >
+                    {unreadAnnouncements}
+                  </span>
+                )}
+              </div>
               <span>Announcements</span>
             </a>
 
             {/* Feedback */}
             <a 
               href="#feedback" 
-              onClick={(e) => { e.preventDefault(); alert("Feedback: Contact spatial-ai@trinetra-intel.org"); }}
+              onClick={(e) => { e.preventDefault(); setShowFeedback(true); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -196,6 +231,7 @@ export default function Header() {
                 fontSize: '1.05rem',
                 fontFamily: 'var(--font-heading)',
                 fontWeight: 700,
+                cursor: 'pointer',
                 transition: 'opacity 0.2s ease'
               }}
               className="header-opt-link"
@@ -441,6 +477,41 @@ export default function Header() {
             </svg>
             <span>FAQS</span>
           </div>
+
+          {/* Item 8: QUICK SEARCH */}
+          <div 
+            onClick={() => { closeDrawer(); setShowSearch(true); }}
+            className="drawer-item-row"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span>QUICK SEARCH</span>
+          </div>
+
+          {/* Item 9: ANNOUNCEMENTS */}
+          <div 
+            onClick={() => { closeDrawer(); setShowAnnouncements(true); }}
+            className="drawer-item-row"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11l18-5v12L3 13v-2z" />
+              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#FFFFFF" strokeWidth="2" />
+            </svg>
+            <span>ANNOUNCEMENTS {unreadAnnouncements > 0 ? `(${unreadAnnouncements})` : ''}</span>
+          </div>
+
+          {/* Item 10: FEEDBACK */}
+          <div 
+            onClick={() => { closeDrawer(); setShowFeedback(true); }}
+            className="drawer-item-row"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>FEEDBACK</span>
+          </div>
         </div>
       </div>
 
@@ -607,6 +678,25 @@ export default function Header() {
           </div>
         </div>
       )}
+
+      {/* Quick Search Modal */}
+      <QuickSearchModal 
+        isOpen={showSearch} 
+        onClose={() => setShowSearch(false)} 
+      />
+
+      {/* Announcements Modal */}
+      <AnnouncementsModal 
+        isOpen={showAnnouncements} 
+        onClose={() => setShowAnnouncements(false)} 
+        onClearBadge={() => setUnreadAnnouncements(0)} 
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={showFeedback} 
+        onClose={() => setShowFeedback(false)} 
+      />
     </>
   );
 }
