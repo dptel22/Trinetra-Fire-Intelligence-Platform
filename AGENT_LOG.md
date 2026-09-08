@@ -1,3 +1,9 @@
+
+### [2026-09-08 13:55] Agent A - Finish map engine fixes and validation
+- Files changed: `frontend/src/components/FireMapPage.jsx`, `frontend/src/components/FireMapPage.css`, `frontend/src/services/mapLocation.js`, `frontend/package.json`, `frontend/package-lock.json`
+- What changed: Completed the MapLibre/deck.gl map engine integration with module-scope PMTiles protocol registration, H3 hexagon rendering, dashed review outlines via a companion PathLayer, India bounds/filtering, dynamic class filters, hover details, and inspector clear-selection behavior. Moved the prediction ref mirror into an effect to avoid a render-time ref access warning.
+- Interface impact: none beyond the existing Agent A map integration contract.
+- Blockers / questions for the other agent or for Sagar/Dhruv: PMTiles archive remains a demo-day dependency when `VITE_PMTILES_URL` is unset; existing unrelated lint warnings remain in HomePage, Header, QuickSearchModal, and AnnouncementsModal.
 # Agent Activity & Contract Reconciliation Log
 
 Protocol: Every agent appends — never edits past entries — to `AGENT_LOG.md` at repo root, one entry per unit of work.
@@ -50,3 +56,62 @@ Ownership split, interface contract, and per-agent prompts live in
 - What changed: Created the shared-context file and per-agent prompt docs for the frontend two-agent split, adjusted to repo reality: `FireMapPage.jsx` lives at `frontend/src/components/` (no `pages/` dir, no CSS file yet), and `frontend/src/services/api.js` + all five Agent-B components (`ClassificationFilters`, `HexInspectorPanel`, `Legend`, `OfflineBanner`, `DataReliabilityBlock`) already exist and match the interface contract — Agent B's task is audit/gap-fill, not greenfield build. The only unfinished split-doc work is Agent A's map engine (FireMapPage is still React-Leaflet; target stack is MapLibre GL + deck.gl H3HexagonLayer + PMTiles). No branch sync was needed: `origin/main` is fully contained in `feature/frontend`, and origin is currently unreachable (fetch returns "Repository not found").
 - Interface impact: none — docs only. Constraint recorded: `FIRE_COLORS`/`FIRE_LABELS`/`FIRE_CAVEATS` aliases in `api.js` must be preserved (unowned `QuickSearchModal.jsx` and `FireAlertsPage.jsx` import them).
 - Blockers / questions for the other agent or for Sagar/Dhruv: git remote `origin` (https://github.com/dptel22/SIH_2026.git) returns "Repository not found" on fetch — pushes/pulls will fail until this is fixed (repo renamed/private/auth).
+
+---
+
+### [2026-09-08T13:06:00+05:30] Agent B — Data Layer & Model-Honesty UI Implementation Complete
+- Files changed:
+  - `frontend/src/services/api.js` (refactored)
+  - `frontend/src/components/DataReliabilityBlock.jsx` (refactored)
+  - `frontend/src/components/ClassificationFilters.jsx` (created)
+  - `frontend/src/components/HexInspectorPanel.jsx` (created)
+  - `frontend/src/components/OfflineBanner.jsx` (created)
+  - `frontend/src/components/Legend.jsx` (created)
+  - `AGENT_LOG.md` (appended)
+- What changed:
+  - Built complete data layer in `api.js` with 2500 server-side cap handling (bounded recursive 2x2 tiling with client-side deduplication), flexible bbox normalization, auto-fallback to high-fidelity mock generator with all 4 trained classes + unclassified fallback, API mode state listener (`onApiModeChange`), caveat parsing (`parseCaveatFlag`), and qualitative-first confidence labels (`confidenceLabel`).
+  - Implemented pure presentational UI components: `ClassificationFilters` (dynamic available classes), `HexInspectorPanel` (qualitative badge primary cue, caveat chips, probability distribution bars, expandable SHAP feature attribution section), `OfflineBanner` (non-blocking demo notice), `Legend` (taxonomy colors & review threshold annotations), and `DataReliabilityBlock` (eliminated fabricated figures, transparent ground-truth review thresholds & canonical caveats).
+  - Preserved backward compatibility aliases (`FIRE_COLORS`, `FIRE_LABELS`, `FIRE_CAVEATS`).
+- Interface impact:
+  - `frontend/src/services/api.js`:
+    - `CLASS_COLORS`, `CLASS_LABELS`, `FIRE_COLORS`, `FIRE_LABELS`, `FIRE_CAVEATS`, `KNOWN_CAVEATS`
+    - `INDIA_BOUNDS: { min_lat, max_lat, min_lon, max_lon }`
+    - `INDIA_CENTER: { lat, lon, zoom }`
+    - `fetchPredictions(bbox, acqDate, zoom) -> Promise<PredictionResponse[]>`
+    - `fetchHealth() -> Promise<HealthResponse>`
+    - `fetchCellDetail(cellId, acqDate) -> Promise<CellPredictionDetailResponse>` (throws in mock mode)
+    - `fetchExplanation(cellId, acqDate) -> Promise<ExplanationResponse>` (mock fallback in mock mode)
+    - `getApiMode() -> 'live' | 'mock'`
+    - `setApiMode(mode: 'live' | 'mock') -> void`
+    - `forceMockMode(enabled: boolean) -> void`
+    - `onApiModeChange(fn: (mode: 'live' | 'mock') => void) -> () => void` (unsubscribe)
+    - `parseCaveatFlag(caveatFlagString: string | null) -> string[]`
+    - `confidenceLabel(prediction: PredictionResponse | null) -> 'High confidence' | 'Needs review' | 'Uncertain'`
+  - Components:
+    - `<ClassificationFilters availableClasses={string[]} activeClasses={Set<string>|string[]} onToggle={(className) => void} />`
+    - `<HexInspectorPanel cell={PredictionResponse | null} onRequestExplanation={() => void} explanation={ExplanationResponse | null} loadingExplanation={boolean} />`
+    - `<OfflineBanner mode={'live' | 'mock'} />` (optional prop; subscribes to `onApiModeChange` when omitted)
+    - `<Legend reviewThresholds={Record<string, number> | null} />`
+    - `<DataReliabilityBlock reviewThresholds={Record<string, number> | null} />`
+- Blockers / questions for Sagar/Dhruv:
+  - None blocking. Bbox 2500-cap tiling is implemented with a max recursion depth of 2 (up to 16 sub-tiles) to prevent infinite loops / network saturation on massive bounds; long-term backend coarse-resolution aggregation endpoint is recommended for pan-India overview zooms.
+
+---
+
+### [2026-09-08T13:18:00+05:30] Agent B — Worktree Migration, Node Test Harness & Wording Refinement
+- Files changed:
+  - `frontend/src/services/api.js` (updated `BASE_URL` with optional chaining `import.meta.env?.VITE_API_URL`)
+  - `frontend/src/components/DataReliabilityBlock.jsx` (wording refined to review-threshold framing)
+  - `frontend/src/components/ClassificationFilters.jsx` (migrated)
+  - `frontend/src/components/HexInspectorPanel.jsx` (migrated)
+  - `frontend/src/components/Legend.jsx` (migrated)
+  - `frontend/src/components/OfflineBanner.jsx` (migrated)
+  - `frontend/test_agent_b.mjs` (new node test harness)
+  - `AGENT_LOG.md` (appended)
+- What changed:
+  - Cleanly migrated all Agent B owned files into worktree `frontend-agent-b` on branch `agent-b/data-layer`.
+  - Updated `api.js` to use `import.meta.env?.VITE_API_URL` for seamless Node ESM loading and Vite bundling.
+  - Added dedicated test suite `frontend/test_agent_b.mjs` with 7 strict test groups verifying taxonomies, caveats parsing, qualitative confidence labels, API mode state machine, mock predictions with strict agricultural_burn checks, mining verbatim caveats, and health/explanation/detail endpoint contracts.
+  - Refined `DataReliabilityBlock.jsx` wording to "Model Reliability & Review Thresholds" avoiding overstatement of backend-confirmed abstention cutoffs.
+- Interface impact: none (all export and component prop signatures strictly identical to locked contract).
+- Blockers / questions for the other agent or for Sagar/Dhruv: none.
