@@ -139,6 +139,8 @@ def test_health_predictions_and_explain_endpoints():
         assert detail_json["cell_id"] == row["h3_08"]
         assert detail_json["caveat_flag"] is not None
         assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in detail_json["caveat_flag"]
+        if detail_json.get("needs_review"):
+            assert settings.CAVEAT_MANIFEST["low_confidence_review"] in detail_json["caveat_flag"]
 
         explain = client.get(f"/predictions/{row['h3_08']}/explain", params={"acq_date": row["acq_date"]})
         assert explain.status_code == 200
@@ -155,7 +157,7 @@ def test_inference_bundle_contract():
     schema = json.loads((Path(settings.INFERENCE_BUNDLE_DIR) / "feature_schema.json").read_text(encoding="utf-8"))
     assert schema["feature_cols"] == settings.MODEL_FEATURES == list(model_service.model.feature_names_)
     assert len(settings.MODEL_FEATURES) == 55
-    assert set(schema["cat_features"]) == set(settings.CAT_FEATURES)
+    assert schema["cat_features"] == settings.CAT_FEATURES
     assert set(schema["target_classes"]) == EXPECTED_CLASSES
     assert set(model_service.calibrators) == EXPECTED_CLASSES
     assert set(model_service.review_thresholds) <= EXPECTED_CLASSES
@@ -184,6 +186,24 @@ def test_review_gate_flags_low_confidence(monkeypatch):
     unflagged = model_service.predict(row)
     assert unflagged.needs_review is False
     assert settings.CAVEAT_MANIFEST["low_confidence_review"] not in (unflagged.caveat_flag or "")
+
+
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires model bundle and OSM/WRI parquet")
+def test_cell_detail_merges_review_caveat_and_explanation_caveats(monkeypatch):
+    """Test that get_cell_detail correctly merges review caveat and explanation caveats without duplication."""
+    model_service.load_model()
+    row = _sample_h3_day_row()
+    monkeypatch.setattr(model_service, "review_thresholds", {cls: 1.01 for cls in settings.TARGET_CLASSES})
+    client = TestClient(app)
+    detail = client.get(f"/predictions/{row['h3_08']}", params={"acq_date": row["acq_date"]})
+    assert detail.status_code == 200
+    detail_json = detail.json()
+    assert detail_json["needs_review"] is True
+    assert detail_json["caveat_flag"] is not None
+    assert settings.CAVEAT_MANIFEST["low_confidence_review"] in detail_json["caveat_flag"]
+    assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in detail_json["caveat_flag"]
+    parts = [p.strip() for p in detail_json["caveat_flag"].split(" | ")]
+    assert len(parts) == len(set(parts)), f"Duplicate caveat segments found: {parts}"
 
 
 class _BrokenCalibrator:

@@ -77,8 +77,9 @@ class CatBoostModelService:
                     "Three-way feature contract mismatch: model, feature_schema.json and "
                     "settings.MODEL_FEATURES must agree exactly"
                 )
-            if set(schema.get("cat_features", [])) != set(settings.CAT_FEATURES):
-                raise ValueError(f"Bundle cat_features mismatch: {schema.get('cat_features')}")
+            # Enforce exact ordered match for categorical features across model, config, and schema
+            if list(schema.get("cat_features", [])) != settings.CAT_FEATURES:
+                raise ValueError(f"Bundle cat_features mismatch: expected {settings.CAT_FEATURES}, got {schema.get('cat_features')}")
             if set(schema.get("target_classes", [])) != set(settings.TARGET_CLASSES):
                 raise ValueError(f"Bundle target_classes mismatch: {schema.get('target_classes')}")
 
@@ -91,7 +92,7 @@ class CatBoostModelService:
             probe = np.array([0.0, 0.5, 1.0])
             for cls, cal in calibrators.items():
                 if not isinstance(cal, IsotonicRegression):
-                    raise ValueError(f"Calibrator for {cls} is {type(cal).__name__}, expected IsotonicRegression")
+                    raise TypeError(f"Calibrator for {cls} is {type(cal).__name__}, expected IsotonicRegression")
                 if not np.all(np.isfinite(cal.predict(probe))):
                     raise ValueError(f"Calibrator for {cls} returns non-finite output on [0,1] probe; check out_of_bounds setting")
 
@@ -119,14 +120,28 @@ class CatBoostModelService:
         if not versions_file.exists():
             return
         recorded = json.loads(versions_file.read_text(encoding="utf-8"))
-        import catboost
-        import sklearn
         import sys
 
-        installed = {"python": ".".join(str(v) for v in sys.version_info[:2]), "catboost": catboost.__version__, "scikit-learn": sklearn.__version__}
+        import catboost
+        import sklearn
+
+        installed = {
+            "python": ".".join(str(v) for v in sys.version_info[:2]),
+            "catboost": catboost.__version__,
+            "scikit-learn": sklearn.__version__,
+        }
         for key, expected in recorded.items():
             actual = installed.get(key)
-            if actual is not None and actual != str(expected):
+            if actual is None:
+                continue
+            if key == "python":
+                # Compare major.minor to avoid false warnings across patch releases (e.g. 3.12.10 vs 3.12.13)
+                actual_cmp = actual
+                expected_cmp = ".".join(str(expected).split(".")[:2])
+            else:
+                actual_cmp = actual
+                expected_cmp = str(expected)
+            if actual_cmp != expected_cmp:
                 logger.warning("Runtime version drift for %s: bundle=%s serving=%s", key, expected, actual)
 
     def _assert_contract(self, model: CatBoostClassifier) -> None:
@@ -179,6 +194,7 @@ class CatBoostModelService:
         return tuple(float(v) for v in h3lib.cell_to_latlng(str(features["h3_08"])))
 
     def _apply_confidence_policy(self, predicted_class: str, confidence: float) -> tuple[str, str | None]:
+        # Feature-flagged off by default; set UNCLASSIFIED_THRESHOLD env var to enable.
         if settings.UNCLASSIFIED_THRESHOLD is not None and confidence < settings.UNCLASSIFIED_THRESHOLD:
             return "unclassified", f"Low confidence below configured UNCLASSIFIED_THRESHOLD={settings.UNCLASSIFIED_THRESHOLD:.3f}"
         if predicted_class == "mining":
@@ -254,6 +270,11 @@ class CatBoostModelService:
         )
 
     def explain(self, cell_features: dict[str, Any], predicted_class: str | None = None) -> ExplanationResponse:
+        """Explain model prediction for a cell via SHAP values.
+
+        Note: This intentionally re-runs inference for isolation and independence,
+        allowing the explain endpoint to be invoked standalone without cached state.
+        """
         self.load_model()
         started = time.time()
         pool = self._prepare_pool(cell_features)

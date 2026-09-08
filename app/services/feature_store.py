@@ -50,11 +50,12 @@ class FeatureStoreService:
                 """,
                 [str(daily_path)],
             )
+            total = conn.execute("SELECT count(*) FROM h3_daily").fetchone()[0]
             for col in ("acq_month", "doy_sin", "doy_cos"):
                 null_count = conn.execute(
                     f"SELECT count(*) FROM h3_daily WHERE {col} IS NULL"
                 ).fetchone()[0]
-                if null_count == conn.execute("SELECT count(*) FROM h3_daily").fetchone()[0]:
+                if null_count == total:
                     raise ValueError(f"Derived column {col} is entirely NULL; check acq_date parsing")
             # DuckDB does NOT support SELECT DISTINCT ON. Use ROW_NUMBER() to
             # take the first row per h3_08 for the static OSM/WRI columns.
