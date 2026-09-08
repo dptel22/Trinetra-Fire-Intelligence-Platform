@@ -50,3 +50,13 @@ Ownership split, interface contract, and per-agent prompts live in
 - What changed: Created the shared-context file and per-agent prompt docs for the frontend two-agent split, adjusted to repo reality: `FireMapPage.jsx` lives at `frontend/src/components/` (no `pages/` dir, no CSS file yet), and `frontend/src/services/api.js` + all five Agent-B components (`ClassificationFilters`, `HexInspectorPanel`, `Legend`, `OfflineBanner`, `DataReliabilityBlock`) already exist and match the interface contract — Agent B's task is audit/gap-fill, not greenfield build. The only unfinished split-doc work is Agent A's map engine (FireMapPage is still React-Leaflet; target stack is MapLibre GL + deck.gl H3HexagonLayer + PMTiles). No branch sync was needed: `origin/main` is fully contained in `feature/frontend`, and origin is currently unreachable (fetch returns "Repository not found").
 - Interface impact: none — docs only. Constraint recorded: `FIRE_COLORS`/`FIRE_LABELS`/`FIRE_CAVEATS` aliases in `api.js` must be preserved (unowned `QuickSearchModal.jsx` and `FireAlertsPage.jsx` import them).
 - Blockers / questions for the other agent or for Sagar/Dhruv: git remote `origin` (https://github.com/dptel22/SIH_2026.git) returns "Repository not found" on fetch — pushes/pulls will fail until this is fixed (repo renamed/private/auth).
+
+---
+
+## [2026-09-08 18:40] Agent: Antigravity — Interactive Modals, Home & Splash Screen UI Overhaul
+
+- Files changed: `frontend/src/components/QuickSearchModal.jsx` (new), `frontend/src/components/AnnouncementsModal.jsx` (new), `frontend/src/components/FeedbackModal.jsx` (new), `frontend/src/components/Header.jsx`, `frontend/src/components/FireMapPage.jsx`, `frontend/src/components/HomePage.jsx`, `frontend/src/components/SplashScreen.jsx`, `frontend/src/index.css`.
+- What changed: Replaced static alert() popups in Header with interactive modals for Quick Search, Announcements, and Ground-Truth Feedback with unread badge tracking. Connected Quick Search with FireMapPage via MapLocationController to flyTo coordinates and open sidebar inspection on result click. Upgraded SplashScreen with a sleek, minimal cybernetic Trinetra emblem. Expanded HomePage with real-time telemetry ribbon, benchmark corridors showcase, 3-stage architecture pipeline, and institutional footer.
+- Interface impact: Exported `QuickSearchModal`, `AnnouncementsModal`, and `FeedbackModal` components. Preserved all `api.js` color and caveat contracts.
+- Blockers / questions for the other agent or for Sagar/Dhruv: none.
+
