@@ -112,3 +112,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+# PMTiles basemap build artifact (regenerate per docs/PMTILES_BUILD.md)
+frontend/public/tiles/*.pmtiles
+frontend/public/tiles/data/

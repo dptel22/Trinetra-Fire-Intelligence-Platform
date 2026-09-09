@@ -39,12 +39,12 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             color: 'var(--text-muted, #8b949e)'
           }}
         >
-          Model Reliability & Review Thresholds
+          Model Reliability &amp; Review Thresholds
         </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem', color: '#abb2bf', lineHeight: 1.5 }}>
-        {/* Industrial & Wildfire */}
+        {/* Industrial */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <span
             style={{
@@ -57,7 +57,24 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Industrial & Wildfire:</strong> High labeled ground truth support. Predictions reviewed below {getThresholdDisplay('industrial', 0.70)} confidence. Grounded in spatial land-cover and facility boundary overlays.
+            <strong style={{ color: '#eceff4' }}>Industrial Facility:</strong> High labeled ground truth support from mapped facility overlays. Predictions reviewed below {getThresholdDisplay('industrial', 0.70)} confidence.
+          </div>
+        </div>
+
+        {/* Wildfire */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: CLASS_COLORS.wildfire,
+              marginTop: 5,
+              flexShrink: 0
+            }}
+          />
+          <div>
+            <strong style={{ color: '#eceff4' }}>Wildfire:</strong> Forest and open-land fire signature class with strong FRP-based evidence. Predictions reviewed below {getThresholdDisplay('wildfire', 0.70)} confidence.
           </div>
         </div>
 

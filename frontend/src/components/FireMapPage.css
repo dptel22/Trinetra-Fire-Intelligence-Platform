@@ -212,3 +212,42 @@
   color: var(--text-primary, #eceff4);
   border-color: var(--text-muted, #8b949e);
 }
+
+/* ── Basemap switcher (Agent A — three self-hosted styles) ─────────────── */
+.firemap-style-switcher {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(15, 18, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
+}
+
+.firemap-style-btn {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.firemap-style-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.firemap-style-btn.active {
+  color: #0B0E13;
+  background: #FF6B35;
+  border-color: #FF6B35;
+}
