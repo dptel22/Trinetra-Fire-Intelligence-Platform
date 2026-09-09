@@ -1,20 +1,24 @@
 /**
- * FireMapPage.jsx — Map Engine (Agent A, branch agent-a/map-engine)
+ * FireMapPage.jsx — Map Engine (Agent A, branch agent-a/basemap-pmtiles)
  *
- * Stack: react-map-gl/maplibre + deck.gl H3HexagonLayer + MapboxOverlay + PMTiles
+ * Stack: react-map-gl/maplibre + deck.gl IconLayer + MapboxOverlay + PMTiles
  *
- * Design corrections vs. original task prompt:
- *   - PathStyleExtension is a PathLayer extension; it CANNOT be applied to
- *     H3HexagonLayer. The needs_review dashed outline is implemented via a
- *     companion PathLayer whose paths are h3-js cellToBoundary polygons
- *     with PathStyleExtension({dash:true}). See AGENT_LOG for details.
- *   - Mining tooltip no longer shows fabricated "74% ± 8% CI" — replaced with
- *     KNOWN_CAVEATS.mining verbatim text per model-honesty rule.
- *   - PMTiles URL is stubbed via VITE_PMTILES_URL env var; absent → dark bg fallback.
- *     Flagged as demo-day dependency in AGENT_LOG.
+ * Basemap: three switchable self-hosted styles (Blue Marble / Streets /
+ * Topographic) from ../services/basemapStyles.js — no CDN, no network beyond
+ * localhost. Vector styles consume the OpenMapTiles-schema PMTiles archive
+ * built by Planetiler (docs/PMTILES_BUILD.md).
  *
- * India bounding box used for both maxBounds and client-side lat/lon filter:
- *   SW [68, 6], NE [98, 36]  (lon, lat — MapLibre convention)
+ * Detections render as per-class SVG fire-pin icons (CLASS_ICONS) instead of
+ * H3 hexagons — one distinct glyph per predicted class. needs_review cells
+ * get a dashed ring under the pin; selection gets a solid halo.
+ *
+ * Map interaction: no maxBounds clamp — free pan/zoom around India and its
+ * neighbours (min zoom 2, max 16). Predictions stay filtered to the India
+ * bbox (the backend only has India data).
+ *
+ * Model honesty: hover tooltip shows the qualitative confidenceLabel badge
+ * only — never a bare numeric %. QuickSearch misses produce an
+ * is_synthetic:true placeholder that is visibly labeled SIMULATED.
  */
 
 import {
@@ -22,10 +26,8 @@ import {
 } from 'react';
 import Map, { useControl } from 'react-map-gl/maplibre';
 import { MapboxOverlay } from '@deck.gl/mapbox';
-import { H3HexagonLayer } from '@deck.gl/geo-layers';
-import { PathLayer } from '@deck.gl/layers';
+import { IconLayer, ScatterplotLayer } from '@deck.gl/layers';
 import { PathStyleExtension } from '@deck.gl/extensions';
-import * as h3lib from 'h3-js';
 import { Protocol } from 'pmtiles';
 import { addProtocol } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -52,6 +54,9 @@ import {
 } from '../services/api';
 
 import { useMapLocation } from '../services/mapLocation';
+import {
+  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS
+} from '../services/basemapStyles';
 
 // ─── PMTiles protocol registration (static, guarded against HMR re-eval) ─────
 let pmtilesRegistered = false;
@@ -69,69 +74,14 @@ registerPmtilesProtocol();
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-// India bounding box: [west, south, east, north] — MapLibre LngLat order
-const INDIA_BOUNDS_MLIB = [[68, 6], [98, 36]]; // [[minLon,minLat],[maxLon,maxLat]]
+// India filter for client-side prediction clamping (backend holds India data
+// only). NOT a map maxBounds — the map itself pans freely (Dhruv, 2026-09-09:
+// "freedom to move around India, around the neighbours").
 const INDIA_FILTER = { minLon: 68, maxLon: 98, minLat: 6, maxLat: 36 };
 
-// VITE_PMTILES_URL stubbed; absent → dark background fallback style.
-// FLAG (demo-day dependency): set VITE_PMTILES_URL in .env once PMTiles archive
-// is generated from the OpenMapTiles build step. See docs/AGENT_LOG.md.
-const PMTILES_URL = import.meta.env?.VITE_PMTILES_URL ?? null;
-
-const MAP_STYLE_FALLBACK = {
-  version: 8,
-  name: 'dark-fallback',
-  sources: {},
-  layers: [
-    { id: 'background', type: 'background', paint: { 'background-color': '#080b0e' } }
-  ]
-};
-
-function buildPMTilesStyle(url) {
-  return {
-    version: 8,
-    sources: {
-      'openmaptiles': {
-        type: 'vector',
-        url: `pmtiles://${url}`,
-        attribution: '© OpenMapTiles © OpenStreetMap'
-      }
-    },
-    layers: [
-      { id: 'background', type: 'background', paint: { 'background-color': '#080b0e' } },
-      {
-        id: 'landcover',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'landcover',
-        paint: { 'fill-color': '#0d1117', 'fill-opacity': 0.8 }
-      },
-      {
-        id: 'water',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'water',
-        paint: { 'fill-color': '#0a1628' }
-      },
-      {
-        id: 'boundary-country',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'boundary',
-        filter: ['==', 'admin_level', 2],
-        paint: { 'line-color': '#2e3440', 'line-width': 1.5 }
-      },
-      {
-        id: 'boundary-state',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'boundary',
-        filter: ['==', 'admin_level', 4],
-        paint: { 'line-color': '#1e2229', 'line-width': 0.7 }
-      }
-    ]
-  };
-}
+// Canonical class ordering for availableClasses (Agent B flag: raw Set spread
+// gave non-deterministic order; Object.keys(CLASS_COLORS) is the taxonomy order).
+const CLASS_ORDER = Object.keys(CLASS_COLORS);
 
 // ─── Hex→RGB util (deck.gl fill colors are [r,g,b,a] 0-255) ─────────────────
 function hexToRgb(hex) {
@@ -195,6 +145,12 @@ export default function FireMapPage() {
   // API mode for OfflineBanner subscription
   const [apiMode, setApiMode] = useState('live');
 
+  // Basemap selection (Blue Marble / Streets / Topographic — all self-hosted)
+  const [basemapId, setBasemapId] = useState('bluemarble');
+
+  // Current map zoom — drives icon sizing and low-zoom decluttering
+  const [zoomLevel, setZoomLevel] = useState(INDIA_CENTER.zoom ?? 5);
+
   // Map instance ref (react-map-gl's Map ref carries .getMap())
   const mapRef = useRef(null);
 
@@ -239,6 +195,7 @@ export default function FireMapPage() {
   const handleMoveEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.();
     if (!map) return;
+    setZoomLevel(map.getZoom());
     const b = map.getBounds();
     setViewport({
       min_lat: b.getSouth(),
@@ -263,7 +220,9 @@ export default function FireMapPage() {
     if (match) {
       setSelectedCell({ ...match, name: detail.name || match.name });
     } else {
-      // Synthetic-cell fallback (e.g. QuickSearch result with no loaded prediction)
+      // Synthetic-cell fallback (e.g. QuickSearch result with no loaded prediction).
+      // Marked is_synthetic so every render path can badge it as SIMULATED —
+      // never presented as a real model output (Agent B F5 handoff).
       const conf = detail.confidence != null
         ? (detail.confidence > 1 ? detail.confidence / 100 : detail.confidence)
         : 0.95;
@@ -278,7 +237,8 @@ export default function FireMapPage() {
         latency_ms: null,
         latitude: detail.lat,
         longitude: detail.lon,
-        name: detail.name
+        name: detail.name,
+        is_synthetic: true
       });
     }
     setExplanation(null);
@@ -317,54 +277,84 @@ export default function FireMapPage() {
   );
 
   // Available classes: only what's actually present in the loaded batch
-  // (so `unclassified` toggle only appears when empirically present — per AGENTS.md)
-  const availableClasses = useMemo(() =>
-    [...new Set(indiaFiltered.map(p => p.predicted_class))],
-    [indiaFiltered]
-  );
-
-  // ── Outline paths for PathLayer (needs_review dashed borders) ────────────
-  // PathStyleExtension is a PathLayer extension — cannot apply to H3HexagonLayer.
-  // We build a companion PathLayer with cellToBoundary polygons. Memoized.
-  const outlinePaths = useMemo(() => {
-    return filteredPredictions.map(p => {
-      let boundary;
-      try {
-        if (typeof h3lib.cellToBoundary === 'function') {
-          // cellToBoundary returns [[lat,lng]...]; PathLayer needs [lng,lat]
-          boundary = h3lib.cellToBoundary(p.h3_index).map(([lat, lng]) => [lng, lat]);
-          // Close the polygon
-          boundary = [...boundary, boundary[0]];
-        }
-      } catch {
-        boundary = null;
-      }
-      return { ...p, boundary };
-    }).filter(p => p.boundary);
-  }, [filteredPredictions]);
+  // (so `unclassified` toggle only appears when empirically present — per AGENTS.md),
+  // emitted in canonical taxonomy order (CLASS_ORDER), not Set insertion order.
+  const availableClasses = useMemo(() => {
+    const present = new Set(indiaFiltered.map(p => p.predicted_class));
+    return CLASS_ORDER.filter(cls => present.has(cls));
+  }, [indiaFiltered]);
 
   // ── Deck.gl layers ────────────────────────────────────────────────────────
-  const layers = useMemo(() => {
-    const selectedId = selectedCell?.h3_index ?? selectedCell?.cell_id;
+  // Per-class fire-pin icons (Dhruv, 2026-09-09: "instead of hexagons, generate
+  // or get icons" — one distinct glyph per classification). Below zoom 6 the
+  // national view can hold ~2500 detections; icons are decluttered to the top
+  // 600 by calibrated confidence so the overview stays readable. Presentation-
+  // only ranking — no data is fabricated or relabeled.
+  const iconSize = zoomLevel <= 4.5 ? 26
+    : zoomLevel <= 6 ? 32
+    : zoomLevel <= 8 ? 40 : 48;
 
-    const hexLayer = new H3HexagonLayer({
-      id: 'h3-hexagons',
-      data: filteredPredictions,
-      getHexagon: d => d.h3_index,
-      extruded: false,
-      filled: true,
-      stroked: false,
-      getFillColor: d => {
-        const rgb = CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified;
-        const isSelected = (d.h3_index ?? d.cell_id) === selectedId;
-        const opacity = isSelected
-          ? 230
-          : d.predicted_class === 'unclassified' ? 77 : 140; // 0.9 / 0.3 / 0.55 × 255
-        return [...rgb, opacity];
-      },
+  const displayPredictions = useMemo(() => {
+    if (zoomLevel >= 6 || filteredPredictions.length <= 600) return filteredPredictions;
+    return [...filteredPredictions]
+      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .slice(0, 600);
+  }, [filteredPredictions, zoomLevel]);
+
+  const layers = useMemo(() => {
+    // Dashed ring under needs_review pins (visible caveat cue)
+    const reviewRingLayer = new ScatterplotLayer({
+      id: 'review-rings',
+      data: displayPredictions.filter(d => d.needs_review),
+      getPosition: d => [d.longitude, d.latitude],
+      radiusUnits: 'pixels',
+      getRadius: iconSize / 2 + 5,
+      stroked: true,
+      filled: false,
+      lineWidthUnits: 'pixels',
+      getLineWidth: 1.6,
+      getColor: d => [
+        ...(CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified), 190
+      ],
+      getDashArray: [4, 3],
+      dashJustified: true,
+      extensions: [new PathStyleExtension({ dash: true })],
+      pickable: false,
+      updateTriggers: {
+        getRadius: [iconSize],
+        getColor: [activeClasses]
+      }
+    });
+
+    // Solid halo under the selected pin
+    const selectionHaloLayer = new ScatterplotLayer({
+      id: 'selection-halo',
+      data: selectedCell?.latitude != null && selectedCell?.longitude != null
+        ? [selectedCell]
+        : [],
+      getPosition: d => [d.longitude, d.latitude],
+      radiusUnits: 'pixels',
+      getRadius: iconSize / 2 + 8,
+      stroked: true,
+      filled: false,
+      lineWidthUnits: 'pixels',
+      getLineWidth: 2.4,
+      getColor: [255, 255, 255, 220],
+      pickable: false,
+      updateTriggers: { getRadius: [iconSize] }
+    });
+
+    const iconLayer = new IconLayer({
+      id: 'fire-icons',
+      data: displayPredictions,
+      getPosition: d => [d.longitude, d.latitude],
+      getIcon: d => CLASS_ICONS[d.predicted_class] ?? CLASS_ICONS.unclassified,
+      sizeUnits: 'pixels',
+      getSize: iconSize,
+      getColor: [255, 255, 255],
       pickable: true,
       autoHighlight: true,
-      highlightColor: [255, 255, 255, 60],
+      highlightColor: [255, 255, 255, 90],
       onClick: ({ object }) => {
         if (object) {
           setSelectedCell(object);
@@ -375,42 +365,16 @@ export default function FireMapPage() {
         setHoverInfo(object ? { x, y, cell: object } : null);
       },
       updateTriggers: {
-        getFillColor: [selectedId, activeClasses]
+        getIcon: [],
+        getSize: [iconSize]
       }
     });
 
-    const outlineLayer = new PathLayer({
-      id: 'hex-outlines',
-      data: outlinePaths,
-      getPath: d => d.boundary,
-      getWidth: d => {
-        const isSelected = (d.h3_index ?? d.cell_id) === selectedId;
-        return isSelected ? 3 : 1;
-      },
-      getColor: d => {
-        const rgb = CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified;
-        return [...rgb, 200];
-      },
-      widthUnits: 'pixels',
-      getDashArray: d => d.needs_review ? [3, 2] : [1, 0],
-      dashJustified: true,
-      extensions: [new PathStyleExtension({ dash: true })],
-      pickable: false,
-      updateTriggers: {
-        getWidth: [selectedId],
-        getColor: [activeClasses],
-        getDashArray: []
-      }
-    });
-
-    return [hexLayer, outlineLayer];
-  }, [filteredPredictions, outlinePaths, selectedCell, activeClasses]);
+    return [reviewRingLayer, selectionHaloLayer, iconLayer];
+  }, [displayPredictions, selectedCell, activeClasses, iconSize]);
 
   // ── Map style ─────────────────────────────────────────────────────────────
-  const mapStyle = useMemo(() =>
-    PMTILES_URL ? buildPMTilesStyle(PMTILES_URL) : MAP_STYLE_FALLBACK,
-    []
-  );
+  const mapStyle = useMemo(() => buildBasemapStyle(basemapId), [basemapId]);
 
   // ── Class toggle ──────────────────────────────────────────────────────────
   const handleToggleClass = useCallback((cls) => {
@@ -441,12 +405,27 @@ export default function FireMapPage() {
               zoom: INDIA_CENTER.zoom ?? 5
             }}
             mapStyle={mapStyle}
-            maxBounds={INDIA_BOUNDS_MLIB}
+            minZoom={2}
+            maxZoom={16}
             onMoveEnd={debouncedMoveEnd}
             style={{ width: '100%', height: '100%' }}
           >
             <DeckOverlay layers={layers} />
           </Map>
+
+          {/* ── Basemap switcher (all styles self-hosted) ── */}
+          <div className="firemap-style-switcher" role="group" aria-label="Basemap style">
+            {BASEMAP_OPTIONS.map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`firemap-style-btn${basemapId === opt.id ? ' active' : ''}`}
+                onClick={() => setBasemapId(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           {/* ── Hover tooltip ── */}
           {hoverInfo && (
@@ -476,10 +455,11 @@ export default function FireMapPage() {
                       <span>H3</span>
                       <code style={{ fontFamily: 'monospace', fontSize: 10 }}>{c.h3_index}</code>
                     </div>
-                    <div className="firemap-tooltip-row">
-                      <span>Conf.</span>
-                      <strong>{(c.confidence * 100).toFixed(0)}%</strong>
-                    </div>
+                    {c.is_synthetic && (
+                      <div className="firemap-tooltip-caveat" style={{ color: '#E74C3C', fontWeight: 700 }}>
+                        SIMULATED — no model prediction for this location today
+                      </div>
+                    )}
                     {caveats.length > 0 && (
                       <div className="firemap-tooltip-caveat">
                         ⚠️ {caveats[0]}
