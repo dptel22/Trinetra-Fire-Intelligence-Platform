@@ -112,6 +112,19 @@ class FeatureStoreService:
         with self._lock:
             self._seed_tables()
 
+    def latest_acq_date(self) -> str | None:
+        """Newest acq_date in the daily table (ISO yyyy-mm-dd), or None if empty.
+
+        Lets the UI ask for the freshest ingested day instead of guessing a
+        calendar date the store may not hold (empty-200 silent-blank failure).
+        """
+        self.load()
+        with self._lock:
+            row = self._connection().execute(
+                "SELECT max(CAST(acq_date AS DATE)) FROM h3_daily"
+            ).fetchone()
+        return row[0].isoformat() if row and row[0] is not None else None
+
     def get_cell(self, h3_index: str, acq_date: str) -> dict[str, Any] | None:
         self.load()
         with self._lock:

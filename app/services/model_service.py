@@ -335,6 +335,11 @@ class CatBoostModelService:
         )
 
     def health(self) -> dict[str, Any]:
+        try:
+            latest_acq_date = feature_store.latest_acq_date()
+        except Exception:
+            logger.warning("health(): could not read latest acq_date (store not seeded?)", exc_info=True)
+            latest_acq_date = None
         return {
             "model_loaded": self.is_loaded,
             "schema_version": settings.FEATURE_SCHEMA_VERSION,
@@ -345,6 +350,7 @@ class CatBoostModelService:
             "review_thresholds": dict(self.review_thresholds) if self.review_thresholds else None,
             "startup_latency_ms": self.startup_latency_ms,
             "target_classes": settings.TARGET_CLASSES,
+            "latest_acq_date": latest_acq_date,
         }
 
     def predict_single(self, record_dict: dict[str, Any]) -> PredictionResponse:

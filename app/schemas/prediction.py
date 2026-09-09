@@ -94,4 +94,5 @@ class HealthResponse(BaseModel):
     review_thresholds: dict[str, float] | None = None
     startup_latency_ms: float | None = None
     target_classes: list[str]
+    latest_acq_date: str | None = None
 
