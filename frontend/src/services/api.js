@@ -23,13 +23,18 @@ export const CLASS_LABELS = {
 export const FIRE_COLORS = CLASS_COLORS;
 export const FIRE_LABELS = CLASS_LABELS;
 
-// Default Geographic Viewport & Bounds for India
+// Default Geographic Viewport & Bounds for India.
+// Single shared geography contract (matches the ingestion INDIA_BBOX and the
+// backend fetch area exactly): west 68.03, south 6.75, east 97.42, north 37.10.
+// The bbox bounds fetches and map framing only — whether a detection is
+// Indian is decided server-side by the India polygon land mask, never by the
+// bbox alone.
 export const INDIA_CENTER = { lat: 20.5937, lon: 78.9629, zoom: 5 };
 export const INDIA_BOUNDS = {
-  min_lat: 8.0,
-  max_lat: 37.0,
-  min_lon: 68.0,
-  max_lon: 97.0
+  min_lat: 6.75,
+  max_lat: 37.10,
+  min_lon: 68.03,
+  max_lon: 97.42
 };
 
 // Canonical Caveat Text (Verbatim from Backend Specifications)
@@ -41,6 +46,29 @@ export const KNOWN_CAVEATS = {
 export const FIRE_CAVEATS = KNOWN_CAVEATS;
 
 export const PRIMARY_CLASSES = ['industrial', 'mining', 'agricultural_burn', 'wildfire'];
+
+/**
+ * Client-side India-territory check for one prediction.
+ *
+ * Server provenance (`geography`) is authoritative when present. Legacy or
+ * malformed responses WITHOUT provenance fall back to conservative geometry:
+ * the shared bbox plus the Sri Lanka box (south of 9.85N and east of 80E —
+ * Indian mainland at those latitudes stays west of 80E). Anything without
+ * usable coordinates is rejected.
+ */
+export function isOutsideIndia(p) {
+  if (!p) return true;
+  if (p.geography === 'outside_india') return true;
+  if (p.geography) return false;
+  const lat = p.latitude;
+  const lon = p.longitude;
+  if (typeof lat !== 'number' || typeof lon !== 'number'
+    || Number.isNaN(lat) || Number.isNaN(lon)) return true;
+  if (lat < INDIA_BOUNDS.min_lat || lat > INDIA_BOUNDS.max_lat) return true;
+  if (lon < INDIA_BOUNDS.min_lon || lon > INDIA_BOUNDS.max_lon) return true;
+  if (lat <= 9.85 && lon >= 80.0) return true; // Sri Lanka box
+  return false;
+}
 
 export function formatFeatureName(featureName = '') {
   const known = {
@@ -233,7 +261,16 @@ export function getAvailableClasses(predictions) {
  * @param {string} [filename] - Optional custom filename
  * @returns {string} CSV text content
  */
-export function exportPredictionsToCsv(predictions, filename) {
+/**
+ * Serializes predictions into RFC 4180 CSV format and triggers a browser download.
+ * @param {Array} predictions - List of PredictionResponse objects
+ * @param {string} [filename] - Optional custom filename
+ * @param {object} [metadata] - Provenance appended as trailing columns.
+ * @param {string} [metadata.acqDate] - Acquisition date of the exported rows.
+ * @param {string} [metadata.dataMode] - 'live' | 'historical' | 'demo' | 'offline'.
+ * @returns {string} CSV text content
+ */
+export function exportPredictionsToCsv(predictions, filename, metadata = {}) {
   if (!Array.isArray(predictions) || predictions.length === 0) {
     throw new Error('No predictions available to export');
   }
@@ -249,7 +286,9 @@ export function exportPredictionsToCsv(predictions, filename) {
     'needs_review',
     'caveat_flag',
     'latency_ms',
-    'is_synthetic'
+    'is_synthetic',
+    'acq_date',
+    'data_mode'
   ];
 
   const escapeCsvField = (val) => {
@@ -274,7 +313,9 @@ export function exportPredictionsToCsv(predictions, filename) {
       escapeCsvField(p.needs_review ?? ''),
       escapeCsvField(p.caveat_flag ?? ''),
       escapeCsvField(p.latency_ms ?? ''),
-      escapeCsvField(p.is_synthetic ?? false)
+      escapeCsvField(p.is_synthetic ?? false),
+      escapeCsvField(p.acq_date ?? metadata.acqDate ?? ''),
+      escapeCsvField(p.data_mode ?? metadata.dataMode ?? '')
     ];
     rows.push(row.join(','));
   }
@@ -329,10 +370,10 @@ function normalizeBbox(bbox) {
     }
   }
   if (typeof bbox === 'object') {
-    const min_lat = bbox.min_lat ?? bbox.south ?? bbox._sw?.lat ?? 8.0;
-    const max_lat = bbox.max_lat ?? bbox.north ?? bbox._ne?.lat ?? 37.0;
-    const min_lon = bbox.min_lon ?? bbox.west ?? bbox._sw?.lng ?? 68.0;
-    const max_lon = bbox.max_lon ?? bbox.east ?? bbox._ne?.lng ?? 97.0;
+    const min_lat = bbox.min_lat ?? bbox.south ?? bbox._sw?.lat ?? INDIA_BOUNDS.min_lat;
+    const max_lat = bbox.max_lat ?? bbox.north ?? bbox._ne?.lat ?? INDIA_BOUNDS.max_lat;
+    const min_lon = bbox.min_lon ?? bbox.west ?? bbox._sw?.lng ?? INDIA_BOUNDS.min_lon;
+    const max_lon = bbox.max_lon ?? bbox.east ?? bbox._ne?.lng ?? INDIA_BOUNDS.max_lon;
     return { min_lat, max_lat, min_lon, max_lon };
   }
   return INDIA_BOUNDS;
@@ -446,6 +487,237 @@ export async function fetchLatestAcqDate() {
   } catch {
     return null;
   }
+}
+
+// --- Alerts status derivation (pure, testable) -----------------------------
+
+/**
+ * Derives the operational status shown on the alerts page. Never infers LIVE
+ * merely because rows exist: a failed live request is OFFLINE, mock mode is
+ * DEMO, a backend-reported historical/demo/offline data mode wins, and an
+ * older-than-newest selection is HISTORICAL.
+ * @param {object} params
+ * @param {string} [params.apiMode] - 'live' | 'mock' (from getApiMode()).
+ * @param {boolean} [params.hasError] - The fetch for the selected date failed.
+ * @param {boolean} [params.isHistorical] - Selected date < newest available.
+ * @param {string} [params.backendDataMode] - Backend-reported mode for the date.
+ * @returns {'LIVE'|'HISTORICAL'|'DEMO'|'OFFLINE'}
+ */
+export function deriveAlertsStatus({ apiMode = 'live', hasError = false, isHistorical = false, backendDataMode = null } = {}) {
+  if (apiMode === 'mock') return 'DEMO';
+  if (hasError) return 'OFFLINE';
+  if (backendDataMode === 'demo') return 'DEMO';
+  if (backendDataMode === 'offline') return 'OFFLINE';
+  if (backendDataMode === 'historical') return 'HISTORICAL';
+  if (backendDataMode === 'live' && !isHistorical) return 'LIVE';
+  return isHistorical ? 'HISTORICAL' : 'LIVE';
+}
+
+const STALE_INGESTION_DAYS = 3;
+const IMPLAUSIBLY_LOW_DAILY_ROWS = 200;
+
+function calendarDaysBetween(fromIso, toIso) {
+  const from = new Date(`${fromIso}T00:00:00Z`);
+  const to = new Date(`${toIso}T00:00:00Z`);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return null;
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+/**
+ * ingestion_status of a single archived day → visible warning, or null when ok.
+ * @param {string|null} status - 'ok'|'plausibility_warning'|'failed'|'no_run_record'
+ * @returns {string|null}
+ */
+export function ingestionStatusWarning(status) {
+  if (!status || status === 'ok') return null;
+  if (status === 'plausibility_warning') {
+    return 'Ingestion plausibility warning: the stored row count for this date looks implausible, so the feed may be incomplete.';
+  }
+  if (status === 'failed') {
+    return 'The most recent ingestion run failed — this data is last-known and must not be treated as current.';
+  }
+  if (status === 'no_run_record') {
+    return 'No ingestion run record exists for this date; it is served from the historical archive, not a live FIRMS pull.';
+  }
+  return null;
+}
+
+/**
+ * Turns /health ingestion provenance into human-readable staleness warnings.
+ * @param {object} params
+ * @param {object|null} params.ingestion - health.ingestion provenance block.
+ * @param {string|null} params.latestAcqDate - newest stored ISO date.
+ * @param {string} [params.today] - ISO yyyy-mm-dd (defaults to today, injectable for tests).
+ * @returns {{warnings: string[], stale: boolean, lowVolume: boolean}}
+ */
+export function assessIngestionFreshness({ ingestion = null, latestAcqDate = null, today = new Date().toLocaleDateString('en-CA') } = {}) {
+  const warnings = [];
+  let stale = false;
+  let lowVolume = false;
+
+  if (!latestAcqDate) {
+    warnings.push('The backend did not report a newest acquisition date, so data freshness cannot be confirmed.');
+    return { warnings, stale, lowVolume };
+  }
+
+  const ageDays = calendarDaysBetween(latestAcqDate, today);
+  if (ageDays != null && ageDays >= STALE_INGESTION_DAYS) {
+    stale = true;
+    warnings.push(`FIRMS ingestion is ${ageDays} days behind the current date (newest stored observation: ${latestAcqDate}). Treat the feed as stale.`);
+  }
+
+  if (ingestion && ingestion.available) {
+    if (ingestion.last_run_ok === false) {
+      warnings.push('The most recent ingestion run failed. Shown data is last-known, not a live pull.');
+    }
+    const rows = ingestion.final_daily_rows;
+    if (typeof rows === 'number' && rows > 0 && rows < IMPLAUSIBLY_LOW_DAILY_ROWS) {
+      lowVolume = true;
+      warnings.push(`Implausibly low national ingestion volume: only ${rows} rows were retained for the latest run, so the feed may be incomplete.`);
+    }
+  } else {
+    warnings.push('Ingestion provenance is unavailable from the backend; ingestion freshness cannot be verified.');
+  }
+
+  return { warnings, stale, lowVolume };
+}
+
+// --- Strict live fetch (operational alerts: never silently mock) -----------
+
+/**
+ * Live-only variant of fetchPredictions for operational alert surfaces.
+ * Differences from fetchPredictions:
+ *  - a live failure THROWS instead of silently returning simulated rows;
+ *  - the global api mode is never flipped to mock by a failed live call;
+ *  - when demo mode is explicitly active, simulated rows are returned so the
+ *    caller can label them DEMO (never presented as live).
+ */
+export async function fetchPredictionsStrict(bbox, acqDate, zoom = 8) {
+  const normBbox = normalizeBbox(bbox);
+  const effectiveDate = acqDate || DEFAULT_ACQ_DATE();
+  const effectiveZoom = typeof zoom === 'number' ? Math.max(1, Math.min(20, zoom)) : 8.0;
+
+  if (currentMode === 'mock') {
+    return generateMockPredictions(normBbox, effectiveDate);
+  }
+  return fetchPredictionsWithTiling(normBbox, effectiveDate, effectiveZoom, 0);
+}
+
+// --- Archive API (Agent 1 contract: /api/v1/archive/*) ----------------------
+
+const ARCHIVE_BASE = `${BASE_URL}/api/v1/archive`;
+
+/**
+ * Dates available in the backend archive. Never invents dates: a non-OK
+ * response throws and the caller must show an error/offline state.
+ * @returns {Promise<{availableDates: string[], newestDate: string|null, oldestDate: string|null, source: string, dataMode: string}>}
+ */
+export async function fetchArchiveDates() {
+  const res = await fetch(`${ARCHIVE_BASE}/dates`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} from ${ARCHIVE_BASE}/dates`);
+  }
+  const data = await res.json();
+  const availableDates = Array.isArray(data?.available_dates)
+    ? data.available_dates.filter((d) => typeof d === 'string' && d.length >= 8)
+    : [];
+  return {
+    availableDates,
+    newestDate: data?.newest_date ?? availableDates[availableDates.length - 1] ?? null,
+    oldestDate: data?.oldest_date ?? availableDates[0] ?? null,
+    source: typeof data?.source === 'string' ? data.source : '',
+    dataMode: typeof data?.data_mode === 'string' ? data.data_mode : 'offline'
+  };
+}
+
+/**
+ * One archived day of predictions with server-side filters.
+ * A 404 carrying error "archive_date_not_available" rejects with
+ * err.notAvailable = true so the UI can distinguish "no data for this date"
+ * from a generic backend error.
+ * @param {object} params
+ * @returns {Promise<{total, acqDate, predictions, dataMode, source, modelVersion, ingestionRunId, ingestionStatus}>}
+ */
+export async function fetchArchivePredictions({
+  acqDate,
+  className = null,
+  state = null,
+  needsReview = null,
+  minConfidence = null,
+  maxConfidence = null,
+  limit = 200,
+  offset = 0
+} = {}) {
+  if (!acqDate) throw new Error('fetchArchivePredictions requires an acq_date');
+  const params = new URLSearchParams({ acq_date: acqDate });
+  if (className) params.set('class_name', className);
+  if (state) params.set('state', state);
+  if (needsReview === true || needsReview === false) params.set('needs_review', String(needsReview));
+  if (typeof minConfidence === 'number') params.set('min_confidence', String(minConfidence));
+  if (typeof maxConfidence === 'number') params.set('max_confidence', String(maxConfidence));
+  params.set('limit', String(Math.min(1000, Math.max(1, limit))));
+  params.set('offset', String(Math.max(0, offset)));
+
+  const res = await fetch(`${ARCHIVE_BASE}/predictions?${params}`);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} from ${ARCHIVE_BASE}/predictions`);
+    try {
+      const body = await res.json();
+      if (body?.detail?.error === 'archive_date_not_available') {
+        err.notAvailable = true;
+        err.acqDate = body.detail.acq_date ?? acqDate;
+        err.newestDate = body.detail.newest_date ?? null;
+        err.oldestDate = body.detail.oldest_date ?? null;
+      }
+    } catch { /* non-JSON error body: keep generic error */ }
+    throw err;
+  }
+  const data = await res.json();
+  return {
+    total: data?.total ?? 0,
+    acqDate: data?.acq_date ?? acqDate,
+    predictions: Array.isArray(data?.predictions) ? data.predictions : [],
+    dataMode: typeof data?.data_mode === 'string' ? data.data_mode : 'historical',
+    source: typeof data?.source === 'string' ? data.source : '',
+    modelVersion: data?.model_version ?? '',
+    ingestionRunId: data?.ingestion_run_id ?? null,
+    ingestionStatus: data?.ingestion_status ?? null
+  };
+}
+
+/**
+ * Per-day archive summary (totals, needs-review totals, class/state breakdowns).
+ * @param {object} [params]
+ * @param {string} [params.startDate]
+ * @param {string} [params.endDate]
+ * @returns {Promise<{startDate, endDate, days: Array, unavailableDates: string[], dataMode, source}>}
+ */
+export async function fetchArchiveSummary({ startDate = null, endDate = null } = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+  const qs = params.toString();
+  const res = await fetch(`${ARCHIVE_BASE}/summary${qs ? `?${qs}` : ''}`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} from ${ARCHIVE_BASE}/summary`);
+  }
+  const data = await res.json();
+  return {
+    startDate: data?.start_date ?? '',
+    endDate: data?.end_date ?? '',
+    days: Array.isArray(data?.days)
+      ? data.days.map((d) => ({
+        date: d?.date,
+        total: d?.total ?? 0,
+        needsReviewTotal: d?.needs_review_total ?? 0,
+        byClass: d?.by_class ?? {},
+        byState: d?.by_state ?? {}
+      }))
+      : [],
+    unavailableDates: Array.isArray(data?.unavailable_dates) ? data.unavailable_dates : [],
+    dataMode: typeof data?.data_mode === 'string' ? data.data_mode : 'offline',
+    source: typeof data?.source === 'string' ? data.source : ''
+  };
 }
 
 /**
