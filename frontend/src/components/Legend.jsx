@@ -1,5 +1,5 @@
 import React from 'react';
-import { CLASS_COLORS, CLASS_LABELS } from '../services/api';
+import { CLASS_COLORS, CLASS_LABELS, PRIMARY_CLASSES } from '../services/api';
 
 /**
  * Legend component
@@ -10,30 +10,11 @@ import { CLASS_COLORS, CLASS_LABELS } from '../services/api';
  * - availableClasses: string[] | null
  */
 export default function Legend({ reviewThresholds = null, availableClasses = null }) {
-  const baseClasses = ['industrial', 'mining', 'agricultural_burn', 'wildfire'];
+  const baseClasses = PRIMARY_CLASSES;
   const showUnclassified = availableClasses
     ? availableClasses.includes('unclassified')
     : false;
   const classes = showUnclassified ? [...baseClasses, 'unclassified'] : baseClasses;
-
-  const getThresholdText = (cls) => {
-    if (cls === 'unclassified') {
-      return 'Abstention fallback';
-    }
-    if (cls === 'agricultural_burn') {
-      return 'Threshold 1.01 (Always reviewed)';
-    }
-    if (reviewThresholds && reviewThresholds[cls] !== undefined) {
-      return `Reviewed below ${(reviewThresholds[cls] * 100).toFixed(0)}% conf`;
-    }
-    if (cls === 'mining') {
-      return 'Reviewed below 85% conf';
-    }
-    if (cls === 'industrial' || cls === 'wildfire') {
-      return 'Reviewed below 70% conf';
-    }
-    return null;
-  };
 
   return (
     <div
@@ -64,7 +45,6 @@ export default function Legend({ reviewThresholds = null, availableClasses = nul
         {classes.map((cls) => {
           const color = CLASS_COLORS[cls] || '#787878';
           const label = CLASS_LABELS[cls] || cls;
-          const thresholdHint = getThresholdText(cls);
 
           return (
             <div
@@ -72,7 +52,7 @@ export default function Legend({ reviewThresholds = null, availableClasses = nul
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-start',
                 gap: '8px',
                 fontSize: '0.78rem'
               }}
@@ -87,20 +67,9 @@ export default function Legend({ reviewThresholds = null, availableClasses = nul
                     flexShrink: 0
                   }}
                 />
-                <span style={{ color: '#eceff4', fontWeight: 500 }}>{label}</span>
+                <span style={{ color: 'var(--text-primary, #eceff4)', fontWeight: 500 }}>{label}</span>
               </div>
 
-              {thresholdHint && (
-                <span
-                  style={{
-                    fontSize: '0.7rem',
-                    color: cls === 'agricultural_burn' ? '#f39c12' : 'var(--text-muted, #8b949e)',
-                    fontFamily: 'monospace'
-                  }}
-                >
-                  {thresholdHint}
-                </span>
-              )}
             </div>
           );
         })}

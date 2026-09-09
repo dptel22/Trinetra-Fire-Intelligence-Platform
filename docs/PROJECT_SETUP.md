@@ -23,7 +23,8 @@ The prediction unit is `(h3_08, acq_date)`. H3 resolution is 8. Trained classes 
 | `data/raw/` | FIRMS, OSM, WRI, and boundary inputs; ignored |
 | `data/processed/` | Serving parquets, caches, run history, and runtime databases; ignored |
 | `frontend/src/` | React application and API client |
-| `frontend/public/tiles/` | Optional local PMTiles basemap; ignored |
+| `frontend/public/tiles/bluemarble/` | Included Web-Mercator Blue Marble fallback tiles |
+| `frontend/public/tiles/india.pmtiles` | Optional high-detail vector basemap; ignored because it is multi-GB |
 | `tests/` | Backend, ingestion, data-plane, and model parity tests |
 | `docs/` | Architecture and operating documentation |
 | `AGENT_LOG.md` | Append-only changes, verification, errors, and handoffs |
@@ -82,6 +83,21 @@ data/processed/sih2026_h3_daily_features_with_osm_wri.parquet
 ```
 
 If those files are absent, the frontend may use its explicitly marked mock/offline mode for UI work. The backend never fabricates predictions.
+
+For a reproducible demo with real backend predictions, download the pinned serving-data release directly:
+
+```powershell
+Invoke-WebRequest `
+  -Uri https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip `
+  -OutFile $env:TEMP\sih2026-serving-data-v1.zip
+Expand-Archive $env:TEMP\sih2026-serving-data-v1.zip -DestinationPath data/processed -Force
+```
+
+Or let setup perform the same download:
+
+```powershell
+.\scripts\setup.ps1 -Mode demo -DownloadServingData
+```
 
 Live mode:
 
@@ -210,6 +226,21 @@ Acceptance requires: model loaded; non-null latest date when data exists; predic
 | OSM feature cache | India PBF | ignored | generate once | ingestion |
 | PMTiles | India PBF + Planetiler | ignored | optional generate | MapLibre |
 | DuckDB files | backend/runtime | ignored | automatic | backend/audit |
+
+### Files intentionally not committed
+
+GitHub cannot reasonably carry the multi-GB PMTiles archive, raw India OSM extract,
+processed serving parquets, or runtime databases. Use these paths instead:
+
+| File | Download or regeneration path |
+| --- | --- |
+| Serving parquets | [Direct release ZIP](https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip) or `./scripts/setup.ps1 -Mode demo -DownloadServingData` |
+| India PMTiles | Generate locally with [`docs/PMTILES_BUILD.md`](PMTILES_BUILD.md) from an India `.osm.pbf`; then set `VITE_PMTILES_URL=/tiles/india.pmtiles` |
+| Raw FIRMS data | Download through the NASA FIRMS API using `FIRMS_MAP_KEY`, or regenerate via `ingestion.run_ingestion` |
+| Runtime DuckDB files | Generated automatically under `data/` when the backend starts or ingestion runs |
+
+The smaller Blue Marble fallback tiles are included in the repository, so the map
+still has a usable basemap without downloading the PMTiles archive.
 
 ## Current project state
 

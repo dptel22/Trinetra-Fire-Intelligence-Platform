@@ -40,6 +40,84 @@ export const KNOWN_CAVEATS = {
 };
 export const FIRE_CAVEATS = KNOWN_CAVEATS;
 
+export const PRIMARY_CLASSES = ['industrial', 'mining', 'agricultural_burn', 'wildfire'];
+
+export function formatFeatureName(featureName = '') {
+  const known = {
+    frp_max: 'Peak fire intensity',
+    frp_mean: 'Average fire intensity',
+    dist_osm_power_infra_km: 'Distance from mapped power infrastructure',
+    dist_to_industrial_facility_m: 'Distance from mapped industrial facility',
+    dist_osm_industrial_km: 'Distance from mapped industrial land use',
+    dist_osm_mining_km: 'Distance from mapped mining area',
+    dist_osm_agriculture_km: 'Distance from mapped agricultural land',
+    fire_history_recurrent_ratio: 'Recurrence of the thermal signal',
+    daynight: 'Observation time',
+    pct_high_confidence: 'High-confidence detection share'
+  };
+  if (known[featureName]) return known[featureName];
+  return featureName
+    .replace(/^dist_/, 'Distance from ')
+    .replace(/^n_(?:osm|wri)_/, 'Nearby ')
+    .replace(/_km$/, '')
+    .replace(/_m$/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function humanizeAttribution(attr = {}) {
+  const name = formatFeatureName(attr.feature_name);
+  const direction = Number(attr.shap_value ?? 0) >= 0 ? 'supports' : 'argues against';
+  const value = attr.feature_value ?? 'not available';
+  const detail = attr.description || `${name} is ${value}.`;
+  return { name, value, direction, detail };
+}
+
+function probabilityFor(probabilities, className) {
+  const item = (probabilities || []).find((p) => p.class_name === className);
+  return Number(item?.probability ?? 0);
+}
+
+/**
+ * Presentation-only assessment for the two analyst questions. It never
+ * replaces the calibrated four-class model output with a new model label.
+ */
+export function deriveClassificationAssessment(cell = {}, explanation = {}) {
+  const predictedClass = explanation.predicted_class || cell.predicted_class || 'unclassified';
+  const probabilities = explanation.probabilities || cell.probabilities || [];
+  const industrialProbability = probabilityFor(probabilities, 'industrial');
+  const wildfireProbability = probabilityFor(probabilities, 'wildfire');
+  const text = (explanation.feature_attributions || [])
+    .map((a) => `${a.feature_name || ''} ${a.description || ''}`.toLowerCase())
+    .join(' ');
+  const industrialEvidence = /(industrial|facility|flare|power infra|power infrastructure|recurrent|stationary)/.test(text);
+  const wildfireEvidence = /(wildfire|vegetation|forest|canopy|open land|land cover)/.test(text);
+  const review = cell.needs_review === true || explanation.needs_review === true || predictedClass === 'unclassified';
+
+  let gasFlare = 'Insufficient evidence';
+  if (predictedClass === 'industrial' && industrialProbability >= 0.7 && industrialEvidence && !review) {
+    gasFlare = 'Yes';
+  } else if ((predictedClass !== 'industrial' && industrialProbability < 0.5) || predictedClass === 'wildfire') {
+    gasFlare = 'No';
+  }
+
+  let wildfire = 'Insufficient evidence';
+  if (predictedClass === 'wildfire' && wildfireProbability >= 0.7 && !review) {
+    wildfire = 'Yes';
+  } else if ((predictedClass === 'industrial' || predictedClass === 'mining') && industrialProbability >= 0.7 && !wildfireEvidence) {
+    wildfire = 'No';
+  }
+
+  return {
+    primaryClass: CLASS_LABELS[predictedClass] || predictedClass,
+    gasFlare,
+    wildfire,
+    note: review
+      ? 'This assessment is provisional because the hotspot is flagged for analyst review.'
+      : 'This is an evidence-based interpretation of the four-class prediction, not a separate satellite label.'
+  };
+}
+
 // --- API Mode State Management ---
 let currentMode = 'live'; // 'live' | 'mock'
 const modeListeners = new Set();

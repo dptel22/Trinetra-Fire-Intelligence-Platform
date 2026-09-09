@@ -456,3 +456,11 @@ Ownership split, interface contract, and per-agent prompts live in
 - Published GitHub release `serving-data-2026-09-09` for `dptel22/SIH_2026`.
 - Assets include `sih2026-serving-data-v1.zip`, `SHA256SUMS.json`, and the FIRMS serving parquet; the ZIP contains both serving parquets.
 - Updated `scripts/setup.ps1` with `-DownloadServingData` and documented the release URL in `docs/PROJECT_SETUP.md`.
+
+### 2026-09-09T21:36:09+05:30 Codex — UI, Blue Marble, and reproducibility cleanup
+
+- Updated the frontend classification filters, legend, reliability copy, hotspot inspector, evidence-based explanation text, and class-specific map markers.
+- Replaced the stretched single-image Blue Marble source with locally generated Web-Mercator tiles under `frontend/public/tiles/bluemarble/`; added `frontend/scripts/build_bluemarble_tiles.py` for regeneration.
+- Added direct serving-data release download instructions and explicit regeneration paths for ignored PMTiles, raw FIRMS data, and runtime databases in `docs/PROJECT_SETUP.md`.
+- Interface impact: visual-only frontend changes and operator documentation; no backend API/schema changes.
+- Verification: frontend test suite 9/9 groups passed; `npm run build` passed; `git diff --check` passed; local map preview visually verified the tiled Blue Marble layer and class markers.

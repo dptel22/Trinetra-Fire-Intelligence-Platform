@@ -1,7 +1,8 @@
 // Basemap styles + per-class fire icons (Agent A — map engine).
 //
 // Three switchable basemaps, ALL self-hosted (offline demo):
-//   bluemarble — NASA Blue Marble static satellite image (public/tiles/bluemarble.jpg)
+//   bluemarble — NASA Blue Marble Web-Mercator raster tiles
+//                (public/tiles/bluemarble/{z}/{x}/{y}.jpg)
 //                + admin boundaries / place labels from the local PMTiles archive.
 //   streets    — light OpenMapTiles-schema vector style from the local PMTiles archive.
 //   topographic— earth-tone vector style from the same archive.
@@ -15,9 +16,9 @@
 const PMTILES_URL = import.meta.env?.VITE_PMTILES_URL ?? null;
 
 // True when the offline vector archive is configured via VITE_PMTILES_URL.
-// When false the map runs on the degraded Blue Marble fallback (single
-// stretched image) or flat backgrounds — the UI surfaces a "basemap pack not
-// installed" notice instead of failing silently (docs/PMTILES_BUILD.md).
+// When false the map runs on the local Blue Marble raster tiles and flat vector
+// fallbacks — the UI surfaces a "basemap pack not installed" notice instead of
+// failing silently (docs/PMTILES_BUILD.md).
 export const PMTILES_AVAILABLE = Boolean(PMTILES_URL);
 
 const GLYPHS_URL = '/fonts/glyphs/{fontstack}/{range}.pbf';
@@ -111,11 +112,12 @@ function buildBlueMarbleStyle() {
   ];
   const sources = {
     bluemarble: {
-      type: 'image',
-      url: '/tiles/bluemarble.jpg',
-      coordinates: [
-        [-180, 85.0511], [180, 85.0511], [180, -85.0511], [-180, -85.0511]
-      ]
+      type: 'raster',
+      tiles: ['/tiles/bluemarble/{z}/{x}/{y}.jpg'],
+      tileSize: 256,
+      minzoom: 0,
+      maxzoom: 6,
+      attribution: BM_ATTR
     }
   };
   Object.assign(sources, vectorSources());
@@ -404,51 +406,64 @@ export function buildBasemapStyle(id) {
   }
 }
 
-// ─── Per-class fire icons (SVG map pins, data URIs — no network) ─────────────
+// ─── Per-class detection markers (flat, high-clarity icon system) ───────────
+// One restrained marker shape keeps the map calm; the white pictogram carries
+// the class meaning so the taxonomy is not dependent on color alone.
 
-const PIN_PATH =
-  'M48 8 C31 8 18 20.5 18 36 C18 58 48 90 48 90 C48 90 78 58 78 36 C78 20.5 65 8 48 8 Z';
+const ICON_SIZE = 72;
 
-function pinSvg(fill, glyph) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
-  <path d="${PIN_PATH}" fill="${fill}" stroke="#FFFFFF" stroke-width="4"/>
+function markerSvg(fill, glyph) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ICON_SIZE}" height="${ICON_SIZE}" viewBox="0 0 72 72">
+  <rect x="7" y="7" width="58" height="58" rx="18" fill="#0B1626" fill-opacity="0.92" stroke="#0B1626" stroke-width="5"/>
+  <rect x="10" y="10" width="52" height="52" rx="15" fill="${fill}" stroke="#FFFFFF" stroke-width="2.5"/>
   ${glyph}
 </svg>`;
-}
-
-function icon(fill, glyph) {
   return {
-    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pinSvg(fill, glyph))}`,
-    width: 96,
-    height: 96,
-    anchorX: 48,
-    anchorY: 88,
+    url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    anchorX: ICON_SIZE / 2,
+    anchorY: ICON_SIZE / 2,
     mask: false
   };
 }
 
-// White glyphs centered ~ (48, 38) inside the pin head.
-export const CLASS_ICONS = {
-  industrial: icon('#E67E22', `
-    <path d="M34 50 V32 l9 6 v-6 l9 6 V25 h9 v25 z" fill="#FFFFFF"/>`),
-  mining: icon('#95A5A6', `
-    <g stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none">
-      <path d="M38 60 L58 32"/>
-      <path d="M31 35 Q48 22 65 35"/>
-    </g>`),
-  agricultural_burn: icon('#F1C40F', `
-    <g stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" fill="none">
-      <path d="M48 60 V29"/>
-      <path d="M48 30 l-9 -7 M48 30 l9 -7"/>
-      <path d="M48 40 l-9 -7 M48 40 l9 -7"/>
-      <path d="M48 50 l-9 -7 M48 50 l9 -7"/>
-    </g>`),
-  wildfire: icon('#E74C3C', `
-    <path d="M48 21 L62 44 h-7 L64 56 H32 L41 44 h-7 Z" fill="#FFFFFF"/>
-    <rect x="45" y="56" width="6" height="9" fill="#FFFFFF"/>`),
-  unclassified: icon('#787878', `
-    <text x="48" y="50" font-family="Arial, Helvetica, sans-serif" font-size="36"
-      font-weight="bold" fill="#FFFFFF" text-anchor="middle">?</text>`)
+const ICON_COLORS = {
+  industrial: '#F28C28',
+  mining: '#8FA3AE',
+  agricultural_burn: '#E9B923',
+  wildfire: '#E8554F',
+  unclassified: '#697783'
 };
+
+// Pictograms are deliberately simple so they remain recognizable at z4–z16.
+const GLYPHS = {
+  industrial: `<path d="M27 51 V39 h12 l7 5 v-17 h6 v24 h-6 V51 Z" fill="#FFFFFF"/>
+    <path d="M51 27 c0-3 3-3 3-6 c3 3 3 6 0 8 c-2 1-3 0-3-2 Z" fill="#FFFFFF"/>`,
+  wildfire: `<path d="M36 51 c-5-7-1-13 5-18 c0 5 3 6 4 9 c2-4 2-8 1-13 c8 7 11 13 8 20
+    a12 12 0 0 1-23 2 c-1-4 1-7 4-10 c0 4 1 7 1 10 Z" fill="#FFFFFF"/>`,
+  mining: `<g stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" fill="none">
+    <path d="M29 49 L49 29"/><path d="M42 27 Q51 27 57 34"/>
+    <path d="M47 47 l8 8"/>
+  </g>`,
+  agricultural_burn: `<g stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" fill="none">
+    <path d="M36 53 V33 M36 41 l-7-6 M36 44 l7-7 M36 48 l-7-6"/>
+    <path d="M46 53 V38 M46 44 l7-6 M46 47 l-7-5"/>
+    <path d="M27 56 H56" stroke-width="3.8"/>
+  </g>`,
+  unclassified: `<text x="36" y="49" font-family="Arial, Helvetica, sans-serif" font-size="25"
+    font-weight="bold" fill="#FFFFFF" text-anchor="middle">?</text>`
+};
+
+function buildClassIcons(withGlyph) {
+  const out = {};
+  for (const [cls, fill] of Object.entries(ICON_COLORS)) {
+    out[cls] = markerSvg(fill, withGlyph ? GLYPHS[cls] : '');
+  }
+  return out;
+}
+
+export const CLASS_DOT_ICONS = buildClassIcons(false);
+export const CLASS_ICONS = buildClassIcons(true);
 
 export const BASEMAP_ATTRIBUTIONS = { bluemarble: BM_ATTR, streets: OMT_ATTR, topographic: OMT_ATTR };

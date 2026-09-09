@@ -55,7 +55,7 @@ import {
 
 import { useMapLocation } from '../services/mapLocation';
 import {
-  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, PMTILES_AVAILABLE
+  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, CLASS_DOT_ICONS, PMTILES_AVAILABLE
 } from '../services/basemapStyles';
 
 // ─── PMTiles protocol registration (static, guarded against HMR re-eval) ─────
@@ -75,9 +75,15 @@ registerPmtilesProtocol();
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 // India filter for client-side prediction clamping (backend holds India data
-// only). NOT a map maxBounds — the map itself pans freely (Dhruv, 2026-09-09:
-// "freedom to move around India, around the neighbours").
+// only). INDIA_MAX_BOUNDS clamps the map itself to India + a small ring of
+// neighbours, so panning drifts off to the Gulf of Oman or Kazakhstan (where
+// there is no data) is impossible (user: "locked to close neighbours around
+// India, focus on India only").
 const INDIA_FILTER = { minLon: 68, maxLon: 98, minLat: 6, maxLat: 36 };
+const INDIA_MAX_BOUNDS = [
+  [INDIA_FILTER.minLon - 7, INDIA_FILTER.minLat - 6], // SW (Arabian Sea, Gulf of Mannar)
+  [INDIA_FILTER.maxLon + 7, INDIA_FILTER.maxLat + 6]  // NE (Myanmar, Tibet, Bay of Bengal)
+];
 
 // Canonical class ordering for availableClasses (Agent B flag: raw Set spread
 // gave non-deterministic order; Object.keys(CLASS_COLORS) is the taxonomy order).
@@ -322,9 +328,12 @@ export default function FireMapPage() {
   // national view can hold ~2500 detections; icons are decluttered to the top
   // 600 by calibrated confidence so the overview stays readable. Presentation-
   // only ranking — no data is fabricated or relabeled.
-  const iconSize = zoomLevel <= 4.5 ? 26
-    : zoomLevel <= 6 ? 32
-    : zoomLevel <= 8 ? 40 : 48;
+  // Flat class markers stay readable over satellite imagery; the glyph fades
+  // in only at regional zoom where it can be recognized without clutter.
+  const useGlyphIcons = true;
+  const iconSize = zoomLevel <= 4.5 ? 28
+    : zoomLevel <= 6 ? 34
+    : zoomLevel <= 8 ? 44 : 52;
 
   const displayPredictions = useMemo(() => {
     if (zoomLevel >= 6 || filteredPredictions.length <= 600) return filteredPredictions;
@@ -383,7 +392,8 @@ export default function FireMapPage() {
       id: 'fire-icons',
       data: displayPredictions,
       getPosition: d => [d.longitude, d.latitude],
-      getIcon: d => CLASS_ICONS[d.predicted_class] ?? CLASS_ICONS.unclassified,
+      getIcon: d => (useGlyphIcons ? CLASS_ICONS : CLASS_DOT_ICONS)[d.predicted_class]
+        ?? CLASS_DOT_ICONS.unclassified,
       sizeUnits: 'pixels',
       getSize: iconSize,
       getColor: [255, 255, 255],
@@ -398,7 +408,7 @@ export default function FireMapPage() {
       },
       onHover: handleIconHover,
       updateTriggers: {
-        getIcon: [],
+        getIcon: [useGlyphIcons],
         getSize: [iconSize]
       }
     });
@@ -438,8 +448,9 @@ export default function FireMapPage() {
               zoom: INDIA_CENTER.zoom ?? 5
             }}
             mapStyle={mapStyle}
-            minZoom={2}
+            minZoom={PMTILES_AVAILABLE ? 3 : 4}
             maxZoom={PMTILES_AVAILABLE ? 16 : 9}
+            maxBounds={INDIA_MAX_BOUNDS}
             onMoveEnd={debouncedMoveEnd}
             style={{ width: '100%', height: '100%' }}
           >
@@ -460,9 +471,9 @@ export default function FireMapPage() {
               Never silent: an empty 200 used to look like a broken map. */}
           {!loadingPredictions && filteredPredictions.length === 0 && (
             <div className="firemap-empty-state">
-              <div className="firemap-empty-title">No detections in view</div>
+              <div className="firemap-empty-title">No matching detections</div>
               <div className="firemap-empty-sub">
-                Nothing classified for {acqDate} in the current viewport.
+                Nothing matches the selected classes for {acqDate} in the current viewport.
                 {isToday ? '' : ' Try panning over India or switching the observation date.'}
               </div>
             </div>
@@ -556,7 +567,7 @@ export default function FireMapPage() {
               }}
             >
               <span style={{ color: 'var(--text-muted, #8b949e)', fontWeight: 500 }}>Live Ingestion:</span>
-              <span style={{ color: '#eceff4', fontFamily: 'monospace', fontWeight: 600 }}>
+              <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>
                 {acqDate}{isToday ? ' (Today)' : ' (Newest available)'}
               </span>
             </div>
@@ -599,7 +610,7 @@ export default function FireMapPage() {
             <div className="firemap-section-label">Detections in View</div>
             <div className="firemap-count-box">
               <span className="firemap-count-label">Total visible</span>
-              <span className="firemap-count-value">{filteredPredictions.length}</span>
+              <span className="firemap-count-value">{loadingPredictions ? '…' : filteredPredictions.length}</span>
             </div>
           </div>
 

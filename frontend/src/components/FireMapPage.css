@@ -114,6 +114,45 @@
   color: var(--text-primary, #eceff4);
 }
 
+/* Inspector explanation: readable in both dark and light themes. */
+.classification-assessment {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--hairline-border, #2e3440);
+  border-radius: 6px;
+  background: var(--panel-surface, #12161c);
+  color: var(--text-primary, #eceff4);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.classification-assessment-title {
+  color: var(--text-primary, #eceff4);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.assessment-yes { color: #21c66d; font-weight: 700; }
+.assessment-no { color: var(--text-primary, #eceff4); font-weight: 600; }
+.assessment-insufficient-evidence { color: #d99a22; font-weight: 700; }
+
+.classification-assessment-note,
+.feature-audit {
+  color: var(--text-muted, #8b949e);
+  font-size: 11px;
+}
+
+.feature-audit {
+  display: block;
+  margin-top: 3px;
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+
 /* ─── Hover / tooltip card ─────────────────────────────────────────────────── */
 /* deck.gl hover info.x/y are canvas-relative — absolute inside the pane (which
    is position:relative) keeps the card exactly at the cursor. */
