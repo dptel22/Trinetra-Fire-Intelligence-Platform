@@ -14,6 +14,12 @@
 
 const PMTILES_URL = import.meta.env?.VITE_PMTILES_URL ?? null;
 
+// True when the offline vector archive is configured via VITE_PMTILES_URL.
+// When false the map runs on the degraded Blue Marble fallback (single
+// stretched image) or flat backgrounds — the UI surfaces a "basemap pack not
+// installed" notice instead of failing silently (docs/PMTILES_BUILD.md).
+export const PMTILES_AVAILABLE = Boolean(PMTILES_URL);
+
 const GLYPHS_URL = '/fonts/glyphs/{fontstack}/{range}.pbf';
 const OMT_ATTR = '© OpenMapTiles © OpenStreetMap contributors';
 const BM_ATTR = 'NASA Visible Earth (Blue Marble) · © OpenMapTiles © OpenStreetMap contributors';
