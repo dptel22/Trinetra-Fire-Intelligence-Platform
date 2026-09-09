@@ -174,7 +174,6 @@ export default function FireMapPage() {
     predictionsRef.current = predictions;
   }, [predictions]);
 
-  const [dateRange, setDateRange] = useState('24hrs');
   // Live FIRMS ingestion targets the current day; default to today's date.
   const [acqDate] = useState(() => new Date().toLocaleDateString('en-CA'));
 
@@ -505,20 +504,25 @@ export default function FireMapPage() {
 
         {/* ── Sidebar ── */}
         <aside className="firemap-sidebar">
-          {/* Timeframe scan range (cosmetic — acqDate wiring is Phase 4 / Agent B) */}
+          {/* Observation Date — honest display honoring backend single acq_date contract */}
           <div>
-            <div className="firemap-section-label">Timeframe Scan Range</div>
-            <div className="firemap-timeframe-bar">
-              {['Today', '24hrs', '7 days'].map(range => (
-                <button
-                  key={range}
-                  type="button"
-                  className={`firemap-timeframe-btn${dateRange === range ? ' active' : ''}`}
-                  onClick={() => setDateRange(range)}
-                >
-                  {range}
-                </button>
-              ))}
+            <div className="firemap-section-label">Observation Date</div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '7px 12px',
+                backgroundColor: 'var(--panel-surface, #1e222a)',
+                border: '1px solid var(--hairline-border, #2e3440)',
+                borderRadius: '6px',
+                fontSize: '0.82rem'
+              }}
+            >
+              <span style={{ color: 'var(--text-muted, #8b949e)', fontWeight: 500 }}>Live Ingestion:</span>
+              <span style={{ color: '#eceff4', fontFamily: 'monospace', fontWeight: 600 }}>
+                {acqDate} (Today)
+              </span>
             </div>
           </div>
 
@@ -529,8 +533,8 @@ export default function FireMapPage() {
             onToggle={handleToggleClass}
           />
 
-          {/* Legend */}
-          <Legend reviewThresholds={reviewThresholds} />
+          {/* Legend — empirical unclassified visibility */}
+          <Legend reviewThresholds={reviewThresholds} availableClasses={availableClasses} />
 
           {/* Clear-selection control — HexInspectorPanel contract has no onClose */}
           {selectedCell && (

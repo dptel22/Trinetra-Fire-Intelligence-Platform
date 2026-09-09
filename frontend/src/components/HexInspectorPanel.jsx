@@ -37,6 +37,48 @@ export default function HexInspectorPanel({
     );
   }
 
+  if (cell.notFound) {
+    return (
+      <div
+        style={{
+          padding: '1.25rem',
+          backgroundColor: 'var(--panel-surface, #1e222a)',
+          border: '1px solid var(--hairline-border, #2e3440)',
+          borderRadius: '8px',
+          color: 'var(--text-muted, #8b949e)',
+          fontSize: '0.85rem',
+          textAlign: 'left'
+        }}
+      >
+        <h4 style={{ color: '#eceff4', margin: '0 0 6px 0', fontSize: '1rem', fontFamily: 'var(--font-heading)' }}>
+          {cell.name || 'Location Inspected'}
+        </h4>
+        {cell.latitude != null && cell.longitude != null && (
+          <p style={{ margin: '0 0 10px 0', fontSize: '0.78rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+            [{cell.latitude.toFixed(4)}, {cell.longitude.toFixed(4)}]
+          </p>
+        )}
+        <div
+          style={{
+            backgroundColor: 'rgba(231, 76, 60, 0.12)',
+            border: '1px solid rgba(231, 76, 60, 0.35)',
+            borderRadius: '6px',
+            padding: '10px 12px',
+            color: '#e74c3c',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            lineHeight: 1.4
+          }}
+        >
+          No model prediction available for this location today.
+        </div>
+        <p style={{ margin: '8px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          No active thermal anomaly was detected during the latest VIIRS/MODIS satellite passes over this coordinate.
+        </p>
+      </div>
+    );
+  }
+
   const predictedClass = cell.predicted_class || 'unclassified';
   const classColor = CLASS_COLORS[predictedClass] || '#787878';
   const classLabel = CLASS_LABELS[predictedClass] || predictedClass;
@@ -133,6 +175,28 @@ export default function HexInspectorPanel({
           {labelQuality}
         </span>
       </div>
+
+      {/* Simulated / Demo Badge */}
+      {cell.is_synthetic && (
+        <div
+          style={{
+            backgroundColor: 'rgba(241, 196, 15, 0.15)',
+            color: '#F1C40F',
+            border: '1px solid rgba(241, 196, 15, 0.5)',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <span>⚠️</span>
+          <span>SIMULATED DATA — Offline Demonstration Hotspot</span>
+        </div>
+      )}
 
       {/* Caveat Chips (if any) */}
       {caveats.length > 0 && (
@@ -256,7 +320,7 @@ export default function HexInspectorPanel({
                     key={idx}
                     style={{
                       backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                      borderLeft: `2px solid ${attr.contribution?.startsWith('+') ? '#98c379' : '#e06c75'}`,
+                      borderLeft: `2px solid ${parseFloat(attr.shap_value ?? attr.contribution) > 0 ? '#98c379' : '#e06c75'}`,
                       padding: '4px 8px',
                       borderRadius: '0 4px 4px 0',
                       fontSize: '0.75rem'
@@ -295,7 +359,7 @@ export default function HexInspectorPanel({
           fontFamily: 'monospace'
         }}
       >
-        {cell.latitude && cell.longitude && (
+        {cell.latitude != null && cell.longitude != null && (
           <span>Lat: {Number(cell.latitude).toFixed(4)}, Lon: {Number(cell.longitude).toFixed(4)}</span>
         )}
         {cell.latency_ms !== undefined && (
