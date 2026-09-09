@@ -23,17 +23,12 @@ from app.core.config import settings
 from app.services.feature_store import feature_store
 from app.services.model_service import model_service
 
-# Deterministic (h3_08, acq_date) pairs chosen per requirements. Each exists in
-# the labeled training artifact AND in both serving parquets
-# (sih2026_h3_daily_features_firms.parquet + sih2026_h3_daily_features_with_osm_wri.parquet).
-# Re-picked 2026-09-08: the serving parquets are now 10-state filtered
-# (ingestion/run_ingestion.py), so cells in non-serving states are gone.
-CELL_CASES = {
-    # is_first_observation == 0, non-trivial history: frp_max_lag7=6.08, active_days_7d=1
-    "non_trivial": ("883c124ce1fffff", "2026-02-08"),
-    # is_first_observation == 1; FRP lag columns are NULL in the training artifact.
-    "first_observation_null_lag": ("883c12480bfffff", "2026-04-24"),
-}
+# Deterministic (h3_08, acq_date) pairs resolved from the real training
+# artifact, which must also exist in both serving parquets. Re-resolved on
+# 2026-09-09: serving coverage is now all-India (10-state restriction retired),
+# and the previously hard-coded February/April cells never existed in this
+# environment's store (CSV-window dates only). Resolved below, after
+# _locate_training_artifact is defined.
 
 # Columns that hold lag/rolling history. These are the only columns where the
 # known NULL-vs-0.0 fill divergence (AGENT_LOG.md, 2026-09-03) may appear.
@@ -68,6 +63,25 @@ def _locate_training_artifact() -> Path:
     if fallback.exists():
         return fallback
     raise FileNotFoundError("Could not locate labeled training parquet artifact")
+
+
+def _resolve_cell_cases() -> dict[str, tuple[str, str]]:
+    df = pd.read_parquet(_locate_training_artifact())
+    df = df.assign(_date=df["acq_date"].astype(str).str.slice(0, 10)).sort_values(["h3_08", "_date"])
+    non_trivial = df[df["frp_max_lag7"].notna()]
+    first_obs = df[(df["is_first_observation"] == 1) & (df["frp_max_lag7"].isna())]
+    if non_trivial.empty or first_obs.empty:
+        raise FileNotFoundError("No suitable parity cases in the training artifact")
+    nt, fo = non_trivial.iloc[0], first_obs.iloc[0]
+    return {
+        # is_first_observation == 0, non-trivial history
+        "non_trivial": (str(nt["h3_08"]), str(nt["_date"])),
+        # is_first_observation == 1; FRP lag columns are NULL in the training artifact.
+        "first_observation_null_lag": (str(fo["h3_08"]), str(fo["_date"])),
+    }
+
+
+CELL_CASES = _resolve_cell_cases()
 
 
 def _training_row_for(h3: str, acq_date: str) -> dict:
@@ -117,8 +131,8 @@ def test_feature_column_set_and_order_parity():
 @pytest.mark.parametrize(
     ("h3", "acq_date", "case"),
     [
-        pytest.param("883c124ce1fffff", "2026-02-08", "non_trivial"),
-        pytest.param("883c12480bfffff", "2026-04-24", "first_observation_null_lag"),
+        pytest.param(*CELL_CASES["non_trivial"], "non_trivial"),
+        pytest.param(*CELL_CASES["first_observation_null_lag"], "first_observation_null_lag"),
     ],
     ids=["non_trivial_lag", "first_observation_null_lag"],
 )

@@ -176,6 +176,9 @@ def test_static_columns_available_in_parquet():
 def test_review_gate_flags_low_confidence(monkeypatch):
     model_service.load_model()
     row = _sample_h3_day_row()
+    # Pin a training-geography state: this test exercises the confidence gate,
+    # not the geographic-generalization flag (which forces needs_review).
+    row["state"] = "Maharashtra"
 
     monkeypatch.setattr(model_service, "review_thresholds", {cls: 1.01 for cls in settings.TARGET_CLASSES})
     flagged = model_service.predict(row)

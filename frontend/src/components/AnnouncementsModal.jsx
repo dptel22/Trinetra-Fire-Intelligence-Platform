@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export const INITIAL_ANNOUNCEMENTS = [
+const INITIAL_ANNOUNCEMENTS = [
   {
     id: 'ann-1',
     title: 'CatBoost 52-Feature Real-Time Model Operational',

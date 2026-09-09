@@ -13,9 +13,14 @@ import {
   getApiMode,
   onApiModeChange
 } from '../services/api';
-import { AlertCard } from './FireAlertsPage';
+import { AlertCard, StatusBadge } from './FireAlertsPage';
 
 const PAGE_SIZE = 25;
+
+// The backend caps /archive/summary at 31 served days per request (it runs
+// model inference per day). Requests are bounded to this window up front so a
+// growing archive degrades the wide cards instead of failing the whole call.
+const SUMMARY_WINDOW_DAYS = 31;
 
 const selectStyle = {
   backgroundColor: 'var(--bg-dark, #0a0e12)',
@@ -69,6 +74,7 @@ export default function ArchivePage() {
   const [ingestionStatus, setIngestionStatus] = useState(null);
 
   const [summary, setSummary] = useState(null);
+  const [summaryError, setSummaryError] = useState(null);
 
   const [selectedClass, setSelectedClass] = useState('all');
   const [selectedState, setSelectedState] = useState('all');
@@ -89,25 +95,33 @@ export default function ArchivePage() {
   const bootstrap = useCallback(async () => {
     setLoadingDates(true);
     setDatesError(null);
+    setSummaryError(null);
     try {
-      const [datesRes, summaryRes] = await Promise.allSettled([fetchArchiveDates(), fetchArchiveSummary({})]);
-      if (datesRes.status === 'rejected') {
-        setDatesError(datesRes.reason?.message || 'Archive dates endpoint unreachable');
-        setAvailableDates([]);
-        setNewestDate(null);
-        return;
-      }
-      const { availableDates: dates, newestDate: newest, oldestDate: oldest, source } = datesRes.value;
+      const { availableDates: dates, newestDate: newest, oldestDate: oldest, source } = await fetchArchiveDates();
       setAvailableDates(dates);
       setNewestDate(newest);
       setOldestDate(oldest);
       setSourceLabel(source);
-      if (summaryRes.status === 'fulfilled') {
-        setSummary(summaryRes.value);
-      }
       if (newest) {
         setAcqDate(newest);
       }
+      if (dates.length > 0) {
+        try {
+          setSummary(await fetchArchiveSummary({
+            // Bound the span to the backend's 31-day cap once the archive
+            // outgrows it; the summary then covers the most recent days.
+            startDate: dates.length > SUMMARY_WINDOW_DAYS ? dates[dates.length - SUMMARY_WINDOW_DAYS] : null
+          }));
+        } catch (err) {
+          console.error('[ArchivePage] Archive summary failed:', err);
+          setSummary(null);
+          setSummaryError(err.message || 'Archive summary request failed');
+        }
+      }
+    } catch (err) {
+      setDatesError(err?.message || 'Archive dates endpoint unreachable');
+      setAvailableDates([]);
+      setNewestDate(null);
     } finally {
       setLoadingDates(false);
     }
@@ -155,15 +169,9 @@ export default function ArchivePage() {
   // eslint-disable-next-line react/set-state-in-effect
   useEffect(() => { bootstrap(); }, [bootstrap]);
 
-  // Reload rows when the date or any filter changes (skips the very first
-  // render; bootstrap loads the newest date itself).
-  const firstRenderRef = useRef(true);
+  // Reload rows whenever the date or any filter changes. bootstrap only sets
+  // acqDate (never loads rows itself), so this single effect owns row loading.
   useEffect(() => {
-    if (firstRenderRef.current) {
-      firstRenderRef.current = false;
-      if (acqDate) loadRowsRef.current(acqDate);
-      return;
-    }
     if (acqDate) loadRowsRef.current(acqDate);
   }, [acqDate, selectedClass, selectedState, needsReviewOnly, minConfidence]);
 
@@ -234,7 +242,7 @@ export default function ArchivePage() {
     return {
       days: days.length,
       total: days.reduce((acc, d) => acc + (d.total || 0), 0),
-      needsReview: days.reduce((acc, d) => acc + (d.needs_review_total || 0), 0)
+      needsReview: days.reduce((acc, d) => acc + (d.needsReviewTotal || d.needs_review_total || 0), 0)
     };
   }, [summary]);
 
@@ -271,22 +279,7 @@ export default function ArchivePage() {
               <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent-blue, #3d9de8)' }}>
                 Historical Record
               </span>
-              <span
-                role="status"
-                aria-label={`Archive status: ${statusLabel}`}
-                style={{
-                  padding: '3px 10px',
-                  borderRadius: '12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.06em',
-                  backgroundColor: statusLabel === 'DEMO' ? 'rgba(241, 196, 15, 0.15)' : 'rgba(61, 157, 232, 0.15)',
-                  color: statusLabel === 'DEMO' ? '#a07d00' : '#2478bd',
-                  border: `1px solid ${statusLabel === 'DEMO' ? 'rgba(241, 196, 15, 0.5)' : 'rgba(61, 157, 232, 0.45)'}`
-                }}
-              >
-                {statusLabel}
-              </span>
+              <StatusBadge status={statusLabel} labelPrefix="Archive status" />
               <span aria-live="polite" style={{ fontSize: '0.75rem', color: 'var(--text-muted, #55595E)', fontFamily: 'monospace' }}>
                 {acqDate ? `Viewing ${acqDate}` : 'No date selected'}
                 {oldestDate && newestDate ? ` · archive spans ${oldestDate} → ${newestDate}` : ''}
@@ -369,16 +362,34 @@ export default function ArchivePage() {
           </div>
         )}
 
-        {/* Summary totals */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-          <div style={summaryCardStyle}>
-            <div aria-live="polite" style={{ fontFamily: 'monospace', fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary, #eceff4)' }}>
-              {archiveTotals.total}
-            </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #55595E)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Archived predictions ({archiveTotals.days} day{archiveTotals.days === 1 ? '' : 's'})
-            </div>
+        {/* Summary totals (or an explicit unavailable state, never silent zeros) */}
+        {summaryError ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '1.5rem',
+              padding: '12px 16px',
+              backgroundColor: 'rgba(241, 196, 15, 0.12)',
+              border: '1px solid rgba(241, 196, 15, 0.5)',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              color: '#6b5200'
+            }}
+          >
+            ⚠ Archive-wide summary is unavailable ({summaryError}). Per-day browsing below is unaffected.
           </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+            <div style={summaryCardStyle}>
+              <div aria-live="polite" style={{ fontFamily: 'monospace', fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary, #eceff4)' }}>
+                {archiveTotals.total}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #55595E)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {availableDates.length > SUMMARY_WINDOW_DAYS
+                  ? `Archived predictions (latest ${SUMMARY_WINDOW_DAYS} days)`
+                  : `Archived predictions (${archiveTotals.days} day${archiveTotals.days === 1 ? '' : 's'})`}
+              </div>
+            </div>
           <div style={summaryCardStyle}>
             <div style={{ fontFamily: 'monospace', fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary, #eceff4)' }}>
               {archiveTotals.needsReview}
@@ -403,7 +414,8 @@ export default function ArchivePage() {
               Review-flagged on this day
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Date navigation + filters toolbar */}
         <div

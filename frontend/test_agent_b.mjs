@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   CLASS_COLORS,
   CLASS_LABELS,
@@ -8,6 +9,7 @@ import {
   KNOWN_CAVEATS,
   INDIA_BOUNDS,
   INDIA_CENTER,
+  isOutsideIndia,
   parseCaveatFlag,
   confidenceLabel,
   getApiMode,
@@ -24,6 +26,7 @@ import {
 
 let totalGroups = 0;
 let passedGroups = 0;
+const fireMapSource = readFileSync(new URL('./src/components/FireMapPage.jsx', import.meta.url), 'utf8');
 
 function runGroup(name, fn) {
   totalGroups++;
@@ -78,6 +81,11 @@ runGroup('Taxonomy and Color/Label Constants', () => {
   assert.ok(FIRE_CAVEATS);
   assert.ok(INDIA_CENTER.lat && INDIA_CENTER.lon);
   assert.ok(INDIA_BOUNDS.min_lat && INDIA_BOUNDS.max_lat);
+  assert.ok(INDIA_CENTER.zoom <= 4.5, 'National map framing must start at a usable zoom');
+});
+
+runGroup('Map empty-state wording', () => {
+  assert.match(fireMapSource, />No detections in view</);
 });
 
 // 2. parseCaveatFlag: single; multiple with " | "; null; empty; whitespace
@@ -271,7 +279,57 @@ await runGroupAsync('exportPredictionsToCsv format & is_synthetic check', async 
 setApiMode('live');
 assert.strictEqual(getApiMode(), 'live');
 
+// 10. Shared India geography contract + client-side provenance filtering
+runGroup('India bounds contract & outside-India client filter', () => {
+  // Single shared geography contract — must equal the ingestion INDIA_BBOX
+  // (west 68.03, south 6.75, east 97.42, north 37.10) used by backend fetches.
+  assert.deepStrictEqual(INDIA_BOUNDS, {
+    min_lat: 6.75,
+    max_lat: 37.10,
+    min_lon: 68.03,
+    max_lon: 97.42
+  });
+
+  // isOutsideIndia: server provenance is authoritative when present...
+  assert.strictEqual(isOutsideIndia({ geography: 'outside_india', latitude: 11, longitude: 76 }), true);
+  assert.strictEqual(isOutsideIndia({ geography: 'training_geography', latitude: 19, longitude: 72.8 }), false);
+  assert.strictEqual(isOutsideIndia({ geography: 'india_outside_training', latitude: 20.3, longitude: 85.8 }), false);
+  assert.strictEqual(isOutsideIndia({ geography: 'unexpected_value', latitude: 2, longitude: 2 }), true, 'Unknown provenance must fall back to conservative geometry');
+
+  // ...and legacy/malformed responses WITHOUT provenance fall back to
+  // conservative geometry: Sri Lanka box, out-of-bbox, and coordinate-less
+  // cells must all be rejected even when geography is missing.
+  assert.strictEqual(isOutsideIndia({ latitude: 7.61, longitude: 81.03 }), true, 'Sri Lanka, no geography');
+  assert.strictEqual(isOutsideIndia({ latitude: 15.0, longitude: 88.0 }), false, 'Bay of Bengal inside bbox, no geography — kept by geometry fallback');
+  assert.strictEqual(isOutsideIndia({ latitude: 2.0, longitude: 81.0 }), true, 'outside bbox south');
+  assert.strictEqual(isOutsideIndia({ latitude: 45.0, longitude: 76.0 }), true, 'outside bbox north');
+  assert.strictEqual(isOutsideIndia({}), true, 'no coordinates at all');
+  assert.strictEqual(isOutsideIndia(null), true);
+  assert.strictEqual(isOutsideIndia({ latitude: 11.0, longitude: 76.9 }), false, 'plain valid India coordinate');
+
+  // FireMapPage filter composition: outside-India provenance and Sri Lanka
+  // coordinate (missing geography) never render or count.
+  const predictions = [
+    { latitude: 11.0, longitude: 76.9, predicted_class: 'wildfire', geography: 'training_geography', confidence: 0.9 },
+    { latitude: 20.3, longitude: 85.8, predicted_class: 'industrial', geography: 'india_outside_training', confidence: 0.8 },
+    { latitude: 7.61, longitude: 81.03, predicted_class: 'wildfire', geography: 'outside_india', confidence: 0.95 }, // Sri Lanka, provenance
+    { latitude: 7.61, longitude: 81.03, predicted_class: 'mining', confidence: 0.9 } // Sri Lanka, MISSING geography
+  ];
+  const INDIA_FILTER = {
+    minLon: INDIA_BOUNDS.min_lon, maxLon: INDIA_BOUNDS.max_lon,
+    minLat: INDIA_BOUNDS.min_lat, maxLat: INDIA_BOUNDS.max_lat
+  };
+  const indiaFiltered = predictions.filter(p =>
+    !isOutsideIndia(p) &&
+    p.latitude >= INDIA_FILTER.minLat && p.latitude <= INDIA_FILTER.maxLat &&
+    p.longitude >= INDIA_FILTER.minLon && p.longitude <= INDIA_FILTER.maxLon
+  );
+  assert.strictEqual(indiaFiltered.length, 2);
+  assert.strictEqual(
+    indiaFiltered.filter(p => p.geography === 'india_outside_training').length, 1
+  );
+});
+
 console.log(`\n========================================`);
 console.log(`Summary: ${passedGroups} / ${totalGroups} test groups PASSED.`);
 console.log(`========================================`);
-

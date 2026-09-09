@@ -144,6 +144,21 @@ def test_audit_override_error_sanitization(client, caplog):
         assert SENSITIVE_LEAK_STRING in caplog.text
 
 
+def test_audit_prediction_lookup_does_not_persist_internal_error(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.api.endpoints.audit.model_service.get_cell_detail",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError(SENSITIVE_LEAK_STRING)),
+    )
+    response = client.post(
+        "/api/v1/audit/override",
+        json={**SAMPLE_AUDIT_OVERRIDE, "hotspot_id": "cell_2024-05-15"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["model_prediction"] == "unresolved"
+    assert SENSITIVE_LEAK_STRING not in response.text
+
+
 def test_audit_logs_error_sanitization(client, caplog):
     with patch("app.api.endpoints.audit.audit_service.get_logs") as mock_logs:
         mock_logs.side_effect = RuntimeError(SENSITIVE_LEAK_STRING)

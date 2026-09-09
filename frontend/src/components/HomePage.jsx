@@ -17,13 +17,14 @@ export default function HomePage() {
       { threshold: 0.15 }
     );
 
-    if (aboutRef.current) {
-      observer.observe(aboutRef.current);
+    const observedNode = aboutRef.current;
+    if (observedNode) {
+      observer.observe(observedNode);
     }
 
     return () => {
-      if (aboutRef.current) {
-        observer.unobserve(aboutRef.current);
+      if (observedNode) {
+        observer.unobserve(observedNode);
       }
     };
   }, []);
@@ -50,7 +51,21 @@ export default function HomePage() {
                 <p className="hero-main-subtext">
                   Classifying thermal anomalies across India by source — industrial facilities (including gas flares), wildfires, mining operations, and agricultural burns — using satellite thermal infrared signals and spatial infrastructure records.
                 </p>
-                {/* Hero text content - CTA button removed */}
+                <div className="hero-actions">
+                  <Link to="/fire-map" className="tri-btn-ember hero-action-primary">
+                    Open fire map <span aria-hidden="true">→</span>
+                  </Link>
+                  <Link to="/fire-alerts" className="hero-action-secondary">
+                    View alerts <span aria-hidden="true">↗</span>
+                  </Link>
+                </div>
+                <div className="hero-taxonomy" aria-label="Fire classification taxonomy">
+                  <span className="hero-taxonomy-label">Classifies</span>
+                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-industrial" />Industrial</span>
+                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-mining" />Mining</span>
+                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-agri" />Agricultural</span>
+                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-wildfire" />Wildfire</span>
+                </div>
               </div>
 
               {/* Right Column: Floating 3D News & Intelligence Cards Overlapping Hero */}
@@ -59,14 +74,14 @@ export default function HomePage() {
                 <Link to="/fire-map" className="floating-3d-card glow-industrial">
                   <div className="card-thumbnail-container">
                     <img src="/images/hero-wildfire.jpg" alt="Refinery Flare" />
-                    <span className="card-badge">Industrial</span>
+                    <span className="card-badge">Industrial Facility</span>
                   </div>
                   <div className="card-body-text">
                     <div className="card-title">
                       Jamnagar Petrochemical Thermal Anomaly
                     </div>
                     <div className="card-meta">
-                      Confidence 96% · 12m ago
+                      Illustrative gas-flare assessment
                     </div>
                   </div>
                 </Link>
@@ -75,7 +90,7 @@ export default function HomePage() {
                 <Link to="/fire-alerts" className="floating-3d-card glow-wildfire">
                   <div className="card-thumbnail-container">
                     <img src="/images/hero-wildfire.jpg" alt="Wildfire Alert" />
-                    <span className="card-badge" style={{ background: 'var(--color-wildfire)', color: '#fff' }}>
+                    <span className="card-badge card-badge-wildfire">
                       Wildfire
                     </span>
                   </div>
@@ -84,25 +99,25 @@ export default function HomePage() {
                       Shimla Canopy Wildfire Surge
                     </div>
                     <div className="card-meta">
-                      FRP 84MW · 34m ago
+                      Illustrative open-land assessment
                     </div>
                   </div>
                 </Link>
 
-                {/* Floating Card 3 - Logistics Glow */}
-                <Link to="/fire-alerts" className="floating-3d-card glow-logistics">
+                {/* Floating Card 3 - Mining Glow */}
+                <Link to="/fire-map" className="floating-3d-card glow-mining">
                   <div className="card-thumbnail-container">
-                    <img src="/images/hero-wildfire.jpg" alt="Port Logistics" />
-                    <span className="card-badge" style={{ background: 'var(--accent-blue)', color: '#0A0E12' }}>
-                      Logistics
+                    <img src="/images/hero-wildfire.jpg" alt="Mining and smelter context" />
+                    <span className="card-badge card-badge-mining">
+                      Mining / Smelter
                     </span>
                   </div>
                   <div className="card-body-text">
                     <div className="card-title">
-                      Paradip Bulk Terminal Perimeter
+                      Infrastructure-context assessment
                     </div>
                     <div className="card-meta">
-                      850m to asset · 1h ago
+                      Illustrative mining-context assessment
                     </div>
                   </div>
                 </Link>
@@ -156,7 +171,7 @@ export default function HomePage() {
               Fire Map
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem', maxWidth: '480px' }}>
-              Live thermal detections over India, colour-coded by classification — industrial, wildfire, gas flare, mining, agricultural burn.
+              Live thermal detections over India, classified as industrial facility, mining / smelter, agricultural burn, or wildfire. Gas flare is an evidence-based industrial assessment, not a separate class.
             </p>
             <Link 
               to="/fire-map" 
@@ -245,5 +260,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-

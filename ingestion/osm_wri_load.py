@@ -65,11 +65,21 @@ STATE_SHA256 = {
     "cpg": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
 }
 
-# osi-wri-data.ipynb cell 3.
+# osi-wri-data.ipynb cell 3. Kept for training/evaluation documentation and
+# run-history statistics ONLY — never as a runtime serving exclusion filter
+# (inference is all-India; see run_ingestion.py state gate).
 TRAIN_STATES = ["Maharashtra", "Karnataka", "Madhya Pradesh", "Punjab", "Andhra Pradesh", "Telangana"]
 TEST_A_STATES = ["Gujarat", "Tamil Nadu"]
 TEST_B_STATES = ["Jharkhand", "Rajasthan"]
 SERVING_STATES = TRAIN_STATES + TEST_A_STATES + TEST_B_STATES
+
+# Points whose nearest state boundary is farther than this are not Indian
+# territory: FIRMS 375 m pixels can sit a few km off a coarse coastline, but
+# the closest India–Sri Lanka approach is ~20 km, so 5 km cleanly separates
+# coastal noise from foreign detections.
+OFFSHORE_TOLERANCE_KM = 5.0
+OUTSIDE_INDIA_STATE = "Outside India"
+OUTSIDE_INDIA_METHOD = "outside_india"
 
 # osi-wri-data.ipynb cell 7: source-name fixes (37 shapes, 36 unique names).
 STATE_NAME_FIXES = {
@@ -454,11 +464,17 @@ def load_state_polygons() -> tuple[list[tuple[str, object]], list[tuple[str, obj
 
 
 def assign_states(cells: pd.DataFrame) -> pd.DataFrame:
-    """Point-in-polygon state assignment with nearest-boundary resolution.
+    """Point-in-polygon state assignment with an India land mask.
 
     Returns state / state_assignment_method / _state_distance_km columns with
-    the notebook's method vocabulary: 'within', 'nearest_boundary_tie_break',
-    'nearest_unmatched'.
+    the method vocabulary: 'within', 'nearest_boundary_tie_break',
+    'outside_india'.
+
+    Membership in the union of the 36 state/UT polygons decides whether a
+    point is Indian territory. The nearest-boundary rule survives only as a
+    small numerical-edge-case tolerance (OFFSHORE_TOLERANCE_KM) for coastal
+    FIRMS pixels; genuinely offshore points (Sri Lanka, Bay of Bengal open
+    water, ...) get OUTSIDE_INDIA_STATE instead of a nearest Indian state.
     """
     polys_4326, polys_7755 = load_state_polygons()
     geoms_4326 = [g for _, g in polys_4326]
@@ -495,14 +511,23 @@ def assign_states(cells: pd.DataFrame) -> pd.DataFrame:
                 methods_out[i] = "nearest_boundary_tie_break"
                 dists_out[i] = float(d0) / 1000.0
         else:
-            # Nearest-state resolution path (offshore / numerical edge cases).
+            # Outside the union of Indian state/UT polygons. Only a tiny
+            # offshore numerical edge case (coastal pixel vs coarse shapefile
+            # boundary) may resolve to the nearest state; anything farther is
+            # explicitly outside India, never a nearest-state assignment.
             best = min(
                 ((geom_7755.distance(pt_7755), name) for name, geom_7755 in polys_7755),
                 key=lambda t: (t[0], t[1]),
             )
-            names_out[i] = best[1]
-            methods_out[i] = "nearest_boundary_tie_break" if best[0] == 0 else "nearest_unmatched"
-            dists_out[i] = float(best[0]) / 1000.0
+            best_km = float(best[0]) / 1000.0
+            if best_km <= OFFSHORE_TOLERANCE_KM:
+                names_out[i] = best[1]
+                methods_out[i] = "nearest_boundary_tie_break"
+                dists_out[i] = best_km
+            else:
+                names_out[i] = OUTSIDE_INDIA_STATE
+                methods_out[i] = OUTSIDE_INDIA_METHOD
+                dists_out[i] = best_km
 
     return pd.DataFrame(
         {

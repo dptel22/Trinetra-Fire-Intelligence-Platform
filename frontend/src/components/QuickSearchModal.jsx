@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FIRE_COLORS, FIRE_LABELS } from '../services/api';
+import { FIRE_COLORS } from '../services/api';
 
-export const SEARCH_HOTSPOTS = [
+const SEARCH_HOTSPOTS = [
   {
     id: 'jamnagar',
     name: 'Jamnagar Petrochemical Complex',

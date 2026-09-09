@@ -3,13 +3,12 @@ import { CLASS_COLORS, CLASS_LABELS, PRIMARY_CLASSES } from '../services/api';
 
 /**
  * Legend component
- * Visual map legend displaying locked taxonomy colors and optional review thresholds.
+ * Visual map legend displaying the locked taxonomy colors.
  * 
  * Props:
- * - reviewThresholds: Record<string, number> | null
  * - availableClasses: string[] | null
  */
-export default function Legend({ reviewThresholds = null, availableClasses = null }) {
+export default function Legend({ availableClasses = null }) {
   const baseClasses = PRIMARY_CLASSES;
   const showUnclassified = availableClasses
     ? availableClasses.includes('unclassified')

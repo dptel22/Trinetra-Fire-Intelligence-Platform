@@ -37,12 +37,12 @@ const STATUS_STYLES = {
  * (older archived date or backend-reported historical), DEMO (simulated
  * rows), OFFLINE (backend unreachable / fetch failed).
  */
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, labelPrefix = 'Feed status' }) {
   const s = STATUS_STYLES[status] || STATUS_STYLES.OFFLINE;
   return (
     <span
       role="status"
-      aria-label={`Feed status: ${status}`}
+      aria-label={`${labelPrefix}: ${status}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -336,6 +336,7 @@ export default function FireAlertsPage() {
 
   // ── Load predictions for the selected date ────────────────────────────────
   const loadAlertsRef = useRef(null);
+  const datesDataModeRef = useRef(null);
   const loadAlerts = useCallback(async (dateArg) => {
     const date = dateArg || acqDate;
     if (!date) return;
@@ -356,6 +357,10 @@ export default function FireAlertsPage() {
         const data = await fetchPredictionsStrict(INDIA_BOUNDS, date, 5);
         const arr = Array.isArray(data) ? data : (data?.predictions ?? []);
         setAlerts(arr);
+        // Newest day goes through the live feed again: restore the mode the
+        // dates endpoint reported, so a previously viewed archive day's
+        // 'historical' does not bleed into the newest day's status.
+        setBackendDataMode(datesDataModeRef.current);
         setPerDateIngestionStatus(null);
         setTruncatedTotal(null);
       }
@@ -408,6 +413,7 @@ export default function FireAlertsPage() {
       }
       setAvailableDates(dates);
       setNewestDate(newest);
+      datesDataModeRef.current = mode;
       setBackendDataMode(mode);
 
       if (!newest) {

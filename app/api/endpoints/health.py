@@ -11,6 +11,14 @@ def health_check():
     """
     v1 Health Check endpoint alias.
     Provides identical health contract to the root /health endpoint,
-    including DuckDB connection, model status, and review thresholds.
+    including DuckDB connection, model status, review thresholds, and the
+    ingestion data-quality/provenance block.
     """
-    return {"status": "healthy", "database": "connected", **model_service.health()}
+    from ingestion.run_ingestion import ingestion_provenance
+
+    return {
+        "status": "healthy",
+        "database": "connected",
+        **model_service.health(),
+        "ingestion": ingestion_provenance(),
+    }

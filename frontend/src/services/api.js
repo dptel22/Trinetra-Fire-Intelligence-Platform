@@ -29,7 +29,8 @@ export const FIRE_LABELS = CLASS_LABELS;
 // The bbox bounds fetches and map framing only — whether a detection is
 // Indian is decided server-side by the India polygon land mask, never by the
 // bbox alone.
-export const INDIA_CENTER = { lat: 20.5937, lon: 78.9629, zoom: 5 };
+// National framing must survive the narrow map pane beside the sidebar.
+export const INDIA_CENTER = { lat: 20.5937, lon: 78.9629, zoom: 4 };
 export const INDIA_BOUNDS = {
   min_lat: 6.75,
   max_lat: 37.10,
@@ -59,7 +60,7 @@ export const PRIMARY_CLASSES = ['industrial', 'mining', 'agricultural_burn', 'wi
 export function isOutsideIndia(p) {
   if (!p) return true;
   if (p.geography === 'outside_india') return true;
-  if (p.geography) return false;
+  if (p.geography === 'training_geography' || p.geography === 'india_outside_training') return false;
   const lat = p.latitude;
   const lon = p.longitude;
   if (typeof lat !== 'number' || typeof lon !== 'number'

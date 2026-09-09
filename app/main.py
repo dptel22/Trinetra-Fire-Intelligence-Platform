@@ -101,7 +101,14 @@ def root():
 
 @app.get("/health", response_model=HealthResponse)
 def health_check():
-    return {"status": "healthy", "database": "connected", **model_service.health()}
+    from ingestion.run_ingestion import ingestion_provenance
+
+    return {
+        "status": "healthy",
+        "database": "connected",
+        **model_service.health(),
+        "ingestion": ingestion_provenance(),
+    }
 
 @app.get("/predictions", response_model=ViewportPredictionsResponse)
 def get_predictions_root(
