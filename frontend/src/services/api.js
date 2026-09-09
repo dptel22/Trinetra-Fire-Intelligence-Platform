@@ -355,6 +355,22 @@ async function fetchPredictionsWithTiling(bbox, acqDate, zoom, depth = 0) {
 }
 
 /**
+ * Newest acq_date the backend actually holds (from /api/v1/health).
+ * The UI must query THIS date, not the calendar date — the store only
+ * contains ingested days, and an exact-date match on an uningested day
+ * returns a valid empty 200 (which used to leave the map silently blank).
+ * @returns {Promise<string|null>} ISO yyyy-mm-dd, or null when unavailable
+ */
+export async function fetchLatestAcqDate() {
+  try {
+    const h = await fetchHealth();
+    return h?.latest_acq_date ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Health check endpoint.
  * @returns {Promise<object>} HealthResponse
  */

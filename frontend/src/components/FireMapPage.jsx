@@ -55,7 +55,7 @@ import {
 
 import { useMapLocation } from '../services/mapLocation';
 import {
-  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS
+  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, PMTILES_AVAILABLE
 } from '../services/basemapStyles';
 
 // ─── PMTiles protocol registration (static, guarded against HMR re-eval) ─────
@@ -124,8 +124,12 @@ export default function FireMapPage() {
     predictionsRef.current = predictions;
   }, [predictions]);
 
-  // Live FIRMS ingestion targets the current day; default to today's date.
-  const [acqDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  // Observation date: starts at today, then snaps to the newest date the
+  // backend actually holds (latest_acq_date from /health). Requesting a
+  // calendar day with no ingested data yields a valid empty 200 — the map
+  // must query the store's real newest day, not guess one.
+  const [acqDate, setAcqDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const isToday = acqDate === new Date().toLocaleDateString('en-CA');
 
   // activeClasses is a Set — seeded with all 5, matching original all-on default
   const [activeClasses, setActiveClasses] = useState(
@@ -136,8 +140,28 @@ export default function FireMapPage() {
   const [explanation, setExplanation] = useState(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
 
-  // Hover tooltip state: {x, y, cell} or null
+  // Hover tooltip state: {x, y, cell} or null. React state only changes when
+  // the hovered FEATURE changes — position updates while hovering the same
+  // pin go straight to the tooltip DOM node, otherwise every mouse-move
+  // re-renders the whole page (the "glitchy map" shudder).
   const [hoverInfo, setHoverInfo] = useState(null);
+  const hoverCellRef = useRef(null);
+  const tooltipRef = useRef(null);
+
+  const handleIconHover = useCallback(({ object, x, y }) => {
+    if (object) {
+      if (hoverCellRef.current !== object) {
+        hoverCellRef.current = object;
+        setHoverInfo({ x, y, cell: object });
+      } else if (tooltipRef.current) {
+        tooltipRef.current.style.left = `${x + 12}px`;
+        tooltipRef.current.style.top = `${y + 12}px`;
+      }
+    } else if (hoverCellRef.current) {
+      hoverCellRef.current = null;
+      setHoverInfo(null);
+    }
+  }, []);
 
   // Health / review thresholds for Legend + DataReliabilityBlock
   const [reviewThresholds, setReviewThresholds] = useState(null);
@@ -172,20 +196,28 @@ export default function FireMapPage() {
   useEffect(() => {
     fetchHealth().then((h) => {
       if (h?.review_thresholds) setReviewThresholds(h.review_thresholds);
+      const latest = h?.latest_acq_date;
+      if (latest) setAcqDate(latest);
     }).catch(() => {});
   }, []);
 
   // ── Predictions fetch ─────────────────────────────────────────────────────
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
   useEffect(() => {
     let isMounted = true;
     async function load() {
-      const zoom = mapRef.current?.getMap?.()?.getZoom?.() ?? 5;
-      const clampedZoom = Math.max(1, Math.min(20, zoom));
-      const res = await fetchPredictions(viewport, acqDate, clampedZoom);
-      if (!isMounted) return;
-      // res is PredictionResponse[] (Agent B's api.js returns the array directly)
-      const arr = Array.isArray(res) ? res : (res?.predictions ?? []);
-      setPredictions(arr);
+      setLoadingPredictions(true);
+      try {
+        const zoom = mapRef.current?.getMap?.()?.getZoom?.() ?? 5;
+        const clampedZoom = Math.max(1, Math.min(20, zoom));
+        const res = await fetchPredictions(viewport, acqDate, clampedZoom);
+        if (!isMounted) return;
+        // res is PredictionResponse[] (Agent B's api.js returns the array directly)
+        const arr = Array.isArray(res) ? res : (res?.predictions ?? []);
+        setPredictions(arr);
+      } finally {
+        if (isMounted) setLoadingPredictions(false);
+      }
     }
     load();
     return () => { isMounted = false; };
@@ -344,6 +376,9 @@ export default function FireMapPage() {
       updateTriggers: { getRadius: [iconSize] }
     });
 
+    // oxlint-disable-next-line react/refs -- handleIconHover reads refs only
+    // inside the hover event handler, never during render; the useMemo merely
+    // captures the stable callback for the layer.
     const iconLayer = new IconLayer({
       id: 'fire-icons',
       data: displayPredictions,
@@ -361,9 +396,7 @@ export default function FireMapPage() {
           setExplanation(null);
         }
       },
-      onHover: ({ object, x, y }) => {
-        setHoverInfo(object ? { x, y, cell: object } : null);
-      },
+      onHover: handleIconHover,
       updateTriggers: {
         getIcon: [],
         getSize: [iconSize]
@@ -371,7 +404,7 @@ export default function FireMapPage() {
     });
 
     return [reviewRingLayer, selectionHaloLayer, iconLayer];
-  }, [displayPredictions, selectedCell, activeClasses, iconSize]);
+  }, [displayPredictions, selectedCell, activeClasses, iconSize, handleIconHover]);
 
   // ── Map style ─────────────────────────────────────────────────────────────
   const mapStyle = useMemo(() => buildBasemapStyle(basemapId), [basemapId]);
@@ -406,12 +439,34 @@ export default function FireMapPage() {
             }}
             mapStyle={mapStyle}
             minZoom={2}
-            maxZoom={16}
+            maxZoom={PMTILES_AVAILABLE ? 16 : 9}
             onMoveEnd={debouncedMoveEnd}
             style={{ width: '100%', height: '100%' }}
           >
             <DeckOverlay layers={layers} />
           </Map>
+
+          {/* Basemap pack missing → the current style is a degraded fallback.
+              Surface it instead of letting a stretched static image look broken. */}
+          {!PMTILES_AVAILABLE && (
+            <div className="firemap-basemap-notice">
+              Offline basemap pack not installed — running on low-res satellite
+              fallback (zoom capped). See docs/PMTILES_BUILD.md to enable full
+              vector basemaps.
+            </div>
+          )}
+
+          {/* Empty state — explicit signal when the queried date has no data.
+              Never silent: an empty 200 used to look like a broken map. */}
+          {!loadingPredictions && filteredPredictions.length === 0 && (
+            <div className="firemap-empty-state">
+              <div className="firemap-empty-title">No detections in view</div>
+              <div className="firemap-empty-sub">
+                Nothing classified for {acqDate} in the current viewport.
+                {isToday ? '' : ' Try panning over India or switching the observation date.'}
+              </div>
+            </div>
+          )}
 
           {/* ── Basemap switcher (all styles self-hosted) ── */}
           <div className="firemap-style-switcher" role="group" aria-label="Basemap style">
@@ -430,6 +485,7 @@ export default function FireMapPage() {
           {/* ── Hover tooltip ── */}
           {hoverInfo && (
             <div
+              ref={tooltipRef}
               className="firemap-tooltip"
               style={{ left: hoverInfo.x + 12, top: hoverInfo.y + 12 }}
             >
@@ -501,7 +557,7 @@ export default function FireMapPage() {
             >
               <span style={{ color: 'var(--text-muted, #8b949e)', fontWeight: 500 }}>Live Ingestion:</span>
               <span style={{ color: '#eceff4', fontFamily: 'monospace', fontWeight: 600 }}>
-                {acqDate} (Today)
+                {acqDate}{isToday ? ' (Today)' : ' (Newest available)'}
               </span>
             </div>
           </div>
