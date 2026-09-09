@@ -2,7 +2,8 @@ param(
     [ValidateSet('demo', 'live')]
     [string]$Mode = 'demo',
     [switch]$SkipInstall,
-    [switch]$RunIngestion
+    [switch]$RunIngestion,
+    [switch]$DownloadServingData
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,7 +42,15 @@ $daily = 'data/processed/sih2026_h3_daily_features_firms.parquet'
 $static = 'data/processed/sih2026_h3_daily_features_with_osm_wri.parquet'
 if (-not (Test-Path $daily) -or -not (Test-Path $static)) {
     if ($Mode -eq 'demo') {
-        Write-Warning 'Serving parquets are missing. UI mock mode is available, but real backend predictions require both files.'
+        if ($DownloadServingData) {
+            $releaseUrl = 'https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip'
+            $zip = Join-Path $env:TEMP 'sih2026-serving-data-v1.zip'
+            Invoke-WebRequest -Uri $releaseUrl -OutFile $zip
+            Expand-Archive -LiteralPath $zip -DestinationPath 'data/processed' -Force
+            Write-Host 'Downloaded serving data release serving-data-2026-09-09.'
+        } else {
+            Write-Warning 'Serving parquets are missing. Re-run with -DownloadServingData, or use explicitly flagged UI mock mode.'
+        }
     } else {
         if (-not (Get-ChildItem 'data/raw' -Filter '*.osm.pbf' -File -ErrorAction SilentlyContinue)) { throw 'Live mode requires an India .osm.pbf under data/raw/.' }
         if (-not (Test-Path 'data/raw/globalpowerplantdatabasev130/global_power_plant_database.csv')) { throw 'Live mode requires the WRI CSV under data/raw/globalpowerplantdatabasev130/.' }

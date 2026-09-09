@@ -64,6 +64,14 @@ npm run dev
 
 Open `http://localhost:5173`.
 
+If the serving parquets are not already present, download the pinned release bundle automatically:
+
+```powershell
+.\scripts\setup.ps1 -Mode demo -DownloadServingData
+```
+
+Release: `https://github.com/dptel22/SIH_2026/releases/tag/serving-data-2026-09-09`. The ZIP contains both serving parquets and `SHA256SUMS.json`.
+
 ## Demo and live modes
 
 Demo mode requires no FIRMS key. It still requires the two serving parquets for real backend predictions:
@@ -197,8 +205,8 @@ Acceptance requires: model loaded; non-null latest date when data exists; predic
 | Artifact | Source | Git | Action | Consumer |
 | --- | --- | --- | --- | --- |
 | `.cbm`, calibrators, schema, thresholds, manifest | inference bundle | tracked | none | model service |
-| FIRMS serving parquet | NASA + ingestion | ignored | generate/download | feature store |
-| OSM/WRI serving parquet | PBF + WRI + ingestion | ignored | generate | feature store |
+| FIRMS serving parquet | NASA + ingestion or serving-data release | ignored | download/generate | feature store |
+| OSM/WRI serving parquet | PBF + WRI + ingestion or serving-data release | ignored | download/generate | feature store |
 | OSM feature cache | India PBF | ignored | generate once | ingestion |
 | PMTiles | India PBF + Planetiler | ignored | optional generate | MapLibre |
 | DuckDB files | backend/runtime | ignored | automatic | backend/audit |
@@ -210,4 +218,3 @@ The reconciled agent history records a verified 55-feature model contract, real 
 ## Agent protocol
 
 Read `AGENTS.md`, this runbook, and the latest `AGENT_LOG.md` entries before work. Every meaningful change appends one log entry containing timestamp/agent, scope, files, interface impact, verification results, errors/blockers, and handoff items. Never rewrite old entries.
-

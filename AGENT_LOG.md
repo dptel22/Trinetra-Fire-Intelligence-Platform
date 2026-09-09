@@ -450,3 +450,9 @@ Ownership split, interface contract, and per-agent prompts live in
 - Verification passed: PowerShell parsing, demo setup, `git diff --check`, frontend lint, and frontend production build.
 - Full pytest verification was blocked by a DuckDB file lock from a stale repository Python process; the process was stopped, but subsequent pytest invocations spawned persistent Python workers and did not return a final result. Earlier recorded full-suite evidence remains 64 passed, 1 deselected.
 - No backend service was running during `scripts/verify.ps1`, so live health/latest-date/prediction smoke checks were not claimed.
+
+### 2026-09-09 Codex — Serving data release
+
+- Published GitHub release `serving-data-2026-09-09` for `dptel22/SIH_2026`.
+- Assets include `sih2026-serving-data-v1.zip`, `SHA256SUMS.json`, and the FIRMS serving parquet; the ZIP contains both serving parquets.
+- Updated `scripts/setup.ps1` with `-DownloadServingData` and documented the release URL in `docs/PROJECT_SETUP.md`.
