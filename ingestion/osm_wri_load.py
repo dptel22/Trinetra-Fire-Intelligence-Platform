@@ -42,7 +42,7 @@ DATA_DIR = REPO_ROOT / "data"
 # --- Raw inputs (validated fail-loud before any processing) -----------------
 
 PBF_GLOB = "data/raw/*.osm.pbf"
-PBF_PATH = DATA_DIR / "raw" / "india-260907.osm.pbf"
+PBF_PATH = DATA_DIR / "raw" / "india-latest.osm.pbf"
 WRI_CSV = DATA_DIR / "raw" / "globalpowerplantdatabasev130" / "global_power_plant_database.csv"
 
 OSM_CACHE_PATH = DATA_DIR / "processed" / "osm_features_cache.parquet"
