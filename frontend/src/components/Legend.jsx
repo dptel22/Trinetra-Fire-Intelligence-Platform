@@ -7,9 +7,14 @@ import { CLASS_COLORS, CLASS_LABELS } from '../services/api';
  * 
  * Props:
  * - reviewThresholds: Record<string, number> | null
+ * - availableClasses: string[] | null
  */
-export default function Legend({ reviewThresholds = null }) {
-  const classes = ['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified'];
+export default function Legend({ reviewThresholds = null, availableClasses = null }) {
+  const baseClasses = ['industrial', 'mining', 'agricultural_burn', 'wildfire'];
+  const showUnclassified = availableClasses
+    ? availableClasses.includes('unclassified')
+    : false;
+  const classes = showUnclassified ? [...baseClasses, 'unclassified'] : baseClasses;
 
   const getThresholdText = (cls) => {
     if (cls === 'unclassified') {

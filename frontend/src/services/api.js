@@ -129,16 +129,117 @@ export function getH3Boundary(h3Index) {
   return null;
 }
 
+/**
+ * Extracts unique predicted classes present in a batch of predictions,
+ * ordered by canonical taxonomy. 'unclassified' is included iff empirically present.
+ * @param {Array} predictions - List of PredictionResponse objects
+ * @returns {string[]} List of unique class names present in the batch
+ */
+export function getAvailableClasses(predictions) {
+  if (!Array.isArray(predictions) || predictions.length === 0) {
+    return [];
+  }
+  const set = new Set();
+  for (const p of predictions) {
+    if (p && p.predicted_class) {
+      set.add(p.predicted_class);
+    }
+  }
+  const CANONICAL_ORDER = ['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified'];
+  return CANONICAL_ORDER.filter((cls) => set.has(cls));
+}
+
+/**
+ * Serializes predictions into RFC 4180 CSV format and triggers a browser download.
+ * @param {Array} predictions - List of PredictionResponse objects
+ * @param {string} [filename] - Optional custom filename
+ * @returns {string} CSV text content
+ */
+export function exportPredictionsToCsv(predictions, filename) {
+  if (!Array.isArray(predictions) || predictions.length === 0) {
+    throw new Error('No predictions available to export');
+  }
+
+  const headers = [
+    'cell_id',
+    'latitude',
+    'longitude',
+    'h3_index',
+    'predicted_class',
+    'confidence',
+    'calibrated',
+    'needs_review',
+    'caveat_flag',
+    'latency_ms',
+    'is_synthetic'
+  ];
+
+  const escapeCsvField = (val) => {
+    if (val === null || val === undefined) return '';
+    const str = String(val);
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const rows = [headers.join(',')];
+  for (const p of predictions) {
+    const row = [
+      escapeCsvField(p.cell_id ?? p.h3_index ?? ''),
+      escapeCsvField(p.latitude ?? ''),
+      escapeCsvField(p.longitude ?? ''),
+      escapeCsvField(p.h3_index ?? ''),
+      escapeCsvField(p.predicted_class ?? ''),
+      escapeCsvField(p.confidence ?? ''),
+      escapeCsvField(p.calibrated ?? ''),
+      escapeCsvField(p.needs_review ?? ''),
+      escapeCsvField(p.caveat_flag ?? ''),
+      escapeCsvField(p.latency_ms ?? ''),
+      escapeCsvField(p.is_synthetic ?? false)
+    ];
+    rows.push(row.join(','));
+  }
+
+  const csvContent = '\uFEFF' + rows.join('\r\n');
+  const downloadName = filename || `trinetra_predictions_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', downloadName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  return csvContent;
+}
+
 // --- Backend API Endpoints ---
 
 /**
  * Normalizes various bounding box parameter formats.
+ *
+ * Canonical input format for a 4-element array is a REST/Leaflet-style
+ * `[min_lon, min_lat, max_lon, max_lat]` (GeoJSON ordering: longitude first).
+ * The `bbox[0] >= 60 && bbox[2] <= 100` branch is an India-specific heuristic
+ * that accepts this lon/lat order when the longitudes fall inside India's
+ * bounds. A 4-element array whose values do NOT match that heuristic is
+ * interpreted as `[min_lat, max_lat, min_lon, max_lon]` for backward
+ * compatibility. Callers should prefer the canonical lon-first form and pass
+ * explicit `min_lat/max_lat/min_lon/max_lon` object form when in doubt.
  */
 function normalizeBbox(bbox) {
   if (!bbox) return INDIA_BOUNDS;
   if (Array.isArray(bbox)) {
     if (bbox.length === 4) {
-      // [min_lon, min_lat, max_lon, max_lat] or [min_lat, max_lat, min_lon, max_lon]
+      // Canonical: [min_lon, min_lat, max_lon, max_lat] (GeoJSON lon-lat order).
+      // Fallback (legacy): [min_lat, max_lat, min_lon, max_lon].
       if (bbox[0] < bbox[2] && bbox[1] < bbox[3] && bbox[0] >= 60 && bbox[2] <= 100) {
         return { min_lon: bbox[0], min_lat: bbox[1], max_lon: bbox[2], max_lat: bbox[3] };
       }
@@ -507,7 +608,8 @@ function generateMockPredictions(bbox, _acqDate = '2025-01-26') {
         calibrated: true,
         needs_review: needsReview,
         caveat_flag: caveatFlag,
-        latency_ms: 2.1
+        latency_ms: 2.1,
+        is_synthetic: true
       });
     });
   });

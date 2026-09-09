@@ -1,0 +1,94 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - generic [ref=f4e5]:
+      - button "Toggle navigation menu" [ref=f4e6] [cursor=pointer]
+      - link "TRINETRA Industrial Fire Intelligence" [ref=f4e8] [cursor=pointer]:
+        - /url: /home
+        - generic [ref=f4e11]:
+          - generic [ref=f4e12]: TRINETRA
+          - generic [ref=f4e13]: Industrial Fire Intelligence
+    - generic [ref=f4e15]:
+      - link "Quick Search" [ref=f4e16] [cursor=pointer]:
+        - /url: "#search"
+      - link "3 Announcements" [ref=f4e22] [cursor=pointer]:
+        - /url: "#announcements"
+        - generic [ref=f4e23]: "3"
+        - generic [ref=f4e28]: Announcements
+      - link "Feedback" [ref=f4e29] [cursor=pointer]:
+        - /url: "#feedback"
+      - button "Dark" [ref=f4e33] [cursor=pointer]
+  - generic [ref=f4e37]:
+    - generic [ref=f4e38]:
+      - generic [ref=f4e39]: TRINETRA
+      - button [ref=f4e44] [cursor=pointer]
+    - generic [ref=f4e48]:
+      - generic [ref=f4e49] [cursor=pointer]:
+        - generic [ref=f4e50]: FIRE MAP
+        - generic [ref=f4e55]: Interactively browse global MODIS & VIIRS thermal fire locations over India
+      - generic [ref=f4e56] [cursor=pointer]: ACTIVE FIRE DATA
+      - generic [ref=f4e60] [cursor=pointer]: SATELLITE IMAGERY
+      - generic [ref=f4e66] [cursor=pointer]: FIRE ALERTS
+      - generic [ref=f4e71] [cursor=pointer]: DOWNLOAD ARCHIVED DATA
+      - generic [ref=f4e76] [cursor=pointer]: TUTORIALS
+      - generic [ref=f4e81] [cursor=pointer]: FAQS
+      - generic [ref=f4e86] [cursor=pointer]: QUICK SEARCH
+      - generic [ref=f4e91] [cursor=pointer]: ANNOUNCEMENTS (3)
+      - generic [ref=f4e96] [cursor=pointer]: FEEDBACK
+  - generic [ref=f4e100]:
+    - generic [ref=f4e101]:
+      - generic [ref=f4e102]:
+        - region "Map" [ref=f4e103]
+        - group [ref=f4e104]:
+          - generic "Toggle attribution" [ref=f4e105] [cursor=pointer]
+          - link "MapLibre" [ref=f4e107] [cursor=pointer]:
+            - /url: https://maplibre.org/
+      - group "Basemap style" [ref=f4e108]:
+        - button "Blue Marble" [ref=f4e109] [cursor=pointer]
+        - button "Streets" [ref=f4e110] [cursor=pointer]
+        - button "Topographic" [ref=f4e111] [cursor=pointer]
+    - complementary [ref=f4e112]:
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]: Timeframe Scan Range
+        - generic [ref=f4e115]:
+          - button "Today" [ref=f4e116] [cursor=pointer]
+          - button "24hrs" [ref=f4e117] [cursor=pointer]
+          - button "7 days" [ref=f4e118] [cursor=pointer]
+      - generic [ref=f4e119]:
+        - generic [ref=f4e120]: Classification Legend
+        - generic [ref=f4e121]:
+          - generic [ref=f4e122]:
+            - generic [ref=f4e123]: Industrial Facility
+            - generic [ref=f4e126]: Reviewed below 70% conf
+          - generic [ref=f4e127]:
+            - generic [ref=f4e128]: Mining / Smelter
+            - generic [ref=f4e131]: Reviewed below 85% conf
+          - generic [ref=f4e132]:
+            - generic [ref=f4e133]: Agricultural Burn
+            - generic [ref=f4e136]: Threshold 1.01 (Always reviewed)
+          - generic [ref=f4e137]:
+            - generic [ref=f4e138]: Wildfire
+            - generic [ref=f4e141]: Reviewed below 70% conf
+          - generic [ref=f4e142]:
+            - generic [ref=f4e143]: Unclassified Thermal Source
+            - generic [ref=f4e146]: Abstention fallback
+      - paragraph [ref=f4e148]: Select a hexagon hotspot on the map to inspect predictions & model explanations.
+      - generic [ref=f4e149]:
+        - generic [ref=f4e150]: Detections in View
+        - generic [ref=f4e151]:
+          - generic [ref=f4e152]: Total visible
+          - generic [ref=f4e153]: "0"
+      - generic [ref=f4e154]:
+        - generic [ref=f4e155]: Model Reliability & Review Thresholds
+        - generic [ref=f4e157]:
+          - generic [ref=f4e160]:
+            - strong [ref=f4e161]: "Industrial & Wildfire:"
+            - text: High labeled ground truth support. Predictions reviewed below 70% confidence. Grounded in spatial land-cover and facility boundary overlays.
+          - generic [ref=f4e164]:
+            - strong [ref=f4e165]: "Mining / Smelter:"
+            - text: Mining has lower labeled support and should be read cautiously. Calibrated review threshold set at 85% confidence.
+          - generic [ref=f4e168]:
+            - strong [ref=f4e169]: "Agricultural Burn:"
+            - text: Review threshold 1.01 — all detections automatically flagged for human analyst review. Relies on distance-threshold rule under active refinement.
+          - generic [ref=f4e172]:
+            - strong [ref=f4e173]: "Unclassified Fallback:"
+            - text: Low-confidence fallback class for thermal hotspots that do not meet classification confidence criteria, preventing false-alarm operational actions.

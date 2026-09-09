@@ -17,7 +17,9 @@ import {
   fetchPredictions,
   fetchHealth,
   fetchExplanation,
-  fetchCellDetail
+  fetchCellDetail,
+  getAvailableClasses,
+  exportPredictionsToCsv
 } from './src/services/api.js';
 
 let totalGroups = 0;
@@ -217,6 +219,54 @@ await runGroupAsync('Mock endpoints contract (fetchHealth, fetchExplanation, fet
   assert.strictEqual(threw, true, 'fetchCellDetail in mock mode must throw an error');
 });
 
+// 8. getAvailableClasses empirical filtering & locked taxonomy ordering
+runGroup('getAvailableClasses empirical filtering & taxonomy ordering', () => {
+  assert.deepStrictEqual(getAvailableClasses([]), []);
+  assert.deepStrictEqual(getAvailableClasses(null), []);
+  assert.deepStrictEqual(getAvailableClasses(undefined), []);
+
+  const sample1 = [
+    { predicted_class: 'wildfire' },
+    { predicted_class: 'industrial' }
+  ];
+  // Must be ordered according to canonical taxonomy: ['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified']
+  assert.deepStrictEqual(getAvailableClasses(sample1), ['industrial', 'wildfire']);
+
+  // unclassified only present when empirically in batch
+  const sample2 = [
+    { predicted_class: 'agricultural_burn' },
+    { predicted_class: 'mining' },
+    { predicted_class: 'unclassified' }
+  ];
+  assert.deepStrictEqual(getAvailableClasses(sample2), ['mining', 'agricultural_burn', 'unclassified']);
+
+  const sampleNoUnclass = [
+    { predicted_class: 'mining' },
+    { predicted_class: 'industrial' }
+  ];
+  assert.strictEqual(getAvailableClasses(sampleNoUnclass).includes('unclassified'), false);
+});
+
+// 9. exportPredictionsToCsv format validation & mock is_synthetic
+await runGroupAsync('exportPredictionsToCsv format & is_synthetic check', async () => {
+  forceMockMode(true);
+  const preds = await fetchPredictions(INDIA_BOUNDS, '2025-01-26', 8);
+
+  // Every mock cell must have is_synthetic === true
+  assert.ok(preds.every(p => p.is_synthetic === true), 'All mock predictions must have is_synthetic: true');
+
+  const csv = exportPredictionsToCsv(preds, 'test_export.csv');
+  assert.ok(typeof csv === 'string');
+  assert.ok(csv.startsWith('\uFEFFcell_id,latitude,longitude,h3_index,predicted_class,confidence,calibrated,needs_review,caveat_flag,latency_ms,is_synthetic'));
+
+  const lines = csv.trim().split(/\r?\n/);
+  // Header + prediction count
+  assert.strictEqual(lines.length, preds.length + 1);
+
+  // Error case on empty list
+  assert.throws(() => exportPredictionsToCsv([]), /No predictions/);
+});
+
 // Reset mode to live
 setApiMode('live');
 assert.strictEqual(getApiMode(), 'live');
@@ -224,3 +274,4 @@ assert.strictEqual(getApiMode(), 'live');
 console.log(`\n========================================`);
 console.log(`Summary: ${passedGroups} / ${totalGroups} test groups PASSED.`);
 console.log(`========================================`);
+

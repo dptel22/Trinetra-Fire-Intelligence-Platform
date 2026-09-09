@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import QuickSearchModal from './QuickSearchModal';
 import AnnouncementsModal from './AnnouncementsModal';
 import FeedbackModal from './FeedbackModal';
 
 export default function Header() {
-  const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showTutorials, setShowTutorials] = useState(false);
@@ -52,8 +51,8 @@ export default function Header() {
       a: 'TRINETRA indexes all detections using Uber H3 Resolution 8 spatial grid cells (~0.7 km² area), allowing instant spatial boundary joins and proximity queries.'
     },
     {
-      q: 'Can I download historical archived thermal data?',
-      a: 'Yes! Navigate to Download Archived Data from the menu or Fire Alerts panel to export past thermal detections in CSV or GeoJSON format.'
+      q: 'Can I download or export thermal anomaly data?',
+      a: 'Yes! Navigate to the Fire Alerts page and click "Export CSV" to download all current detections, classifications, calibrated confidence metrics, and review flags in standard RFC 4180 CSV format.'
     }
   ];
 
@@ -404,31 +403,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Item 2: ACTIVE FIRE DATA */}
-          <div 
-            onClick={() => handleNav('/fire-map?filter=active')}
-            className="drawer-item-row"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z" />
-            </svg>
-            <span>ACTIVE FIRE DATA</span>
-          </div>
-
-          {/* Item 3: SATELLITE IMAGERY */}
-          <div 
-            onClick={() => handleNav('/fire-map?layer=satellite')}
-            className="drawer-item-row"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
-            <span>SATELLITE IMAGERY</span>
-          </div>
-
-          {/* Item 4: FIRE ALERTS */}
+          {/* Item 2: FIRE ALERTS */}
           <div 
             onClick={() => handleNav('/fire-alerts')}
             className="drawer-item-row"
@@ -440,9 +415,9 @@ export default function Header() {
             <span>FIRE ALERTS</span>
           </div>
 
-          {/* Item 5: DOWNLOAD ARCHIVED DATA */}
+          {/* Item 3: EXPORT CSV DATA */}
           <div 
-            onClick={() => handleNav('/fire-alerts?tab=archive')}
+            onClick={() => handleNav('/fire-alerts')}
             className="drawer-item-row"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -450,7 +425,7 @@ export default function Header() {
               <rect x="1" y="3" width="22" height="5" />
               <line x1="10" y1="12" x2="14" y2="12" />
             </svg>
-            <span>DOWNLOAD ARCHIVED DATA</span>
+            <span>EXPORT CSV DATA</span>
           </div>
 
           {/* Item 6: TUTORIALS */}

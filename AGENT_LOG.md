@@ -1,5 +1,31 @@
 
-### [2026-09-08 13:55] Agent A - Finish map engine fixes and validation
+### [2026-09-09T09:45:00+05:30] Agent B — Adversarial Review: 4 owned-file fixes + 3 Agent A bug flags
+
+**Scope:** Adversarial review pass over all Agent B components and api.js. No Agent A file was touched.
+
+**Files changed (Agent B scope):**
+- `frontend/src/components/HexInspectorPanel.jsx`
+  - **B4 fix:** `attr.contribution?.startsWith('+')` was a brittle string-based SHAP sign check. If the backend returns a float `shap_value` without an explicit `+` prefix, positive contributions were colored red. Replaced with `parseFloat(attr.shap_value ?? attr.contribution) > 0` — works for both string (`"+1.84"`) and numeric (`1.84`) payloads.
+  - **B7 fix:** `cell.latitude && cell.longitude` is falsy at equator (latitude === 0). Replaced with `cell.latitude != null && cell.longitude != null`.
+- `frontend/src/components/DataReliabilityBlock.jsx`
+  - **B5 fix:** The combined "Industrial & Wildfire" single-dot row misrepresented the taxonomy — wildfire is a distinct trained class with its own canonical color `#E74C3C` and its own 0.70 review threshold. Split into two separate rows, each with their own color swatch and description.
+- `frontend/src/components/FireAlertsPage.jsx`
+  - **B6 fix:** Double-fetch bug on mount. `loadAlerts` (useCallback) and a separate inline `useEffect` were both firing on mount, resulting in two concurrent identical network requests. Replaced with a single `useEffect(() => { loadAlerts(); }, [loadAlerts])`. Refresh button path unchanged.
+- `frontend/src/components/OfflineBanner.jsx`
+  - **B9 fix:** Pulsing dot had no CSS animation. The OFFLINE state could be missed on a glance. Added `@keyframes offlinePulse` injected once into `document.head` (guarded by ID check to prevent HMR re-injection). Dot now opacity+glow-pulses at 1.6 s interval.
+
+**Verification:**
+- `node test_agent_b.mjs` → 9/9 PASS (all tests maintained).
+- `npm run lint` → 0 errors, 5 pre-existing warnings (all in non-owned files).
+
+**Agent A Bug Flags (DO NOT EDIT — flag only per ownership rules):**
+- **B1 — `FireMapPage.jsx:322`:** `availableClasses` is derived as `[...new Set(indiaFiltered.map(p => p.predicted_class))]`. This bypasses `getAvailableClasses()` in `api.js` which enforces canonical taxonomy ordering (`['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified']`). The raw `Set` insertion order is non-deterministic and can produce `['wildfire', 'industrial', ...]`. Both `ClassificationFilters` and `Legend` receive this list and rely on order. **Fix:** Replace with `import { getAvailableClasses } from '../services/api'` and `getAvailableClasses(indiaFiltered)`.
+- **B2 — `FireMapPage.jsx:481`:** Hover tooltip shows `(c.confidence * 100).toFixed(0)%` — a bare numeric confidence percentage. AGENTS.md states: _"Never show a fabricated or unverifiable numeric confidence figure — always render the backend's actual `caveat_flag` text."_ Qualitative label (`confidenceLabel()`) is already shown in the tooltip. The bare `%` number should be removed or replaced with the qualitative label only.
+- **B3 — `FireMapPage.jsx:271-282`:** Synthetic fallback cell created for QuickSearch misses does not set `is_synthetic: true`. As a result `HexInspectorPanel`'s "SIMULATED DATA — Offline Demonstration Hotspot" banner never fires for those cells. **Fix:** Add `is_synthetic: true` to the object literal at line ~282.
+
+---
+
+
 - Files changed: `frontend/src/components/FireMapPage.jsx`, `frontend/src/components/FireMapPage.css`, `frontend/src/services/mapLocation.js`, `frontend/package.json`, `frontend/package-lock.json`
 - What changed: Completed the MapLibre/deck.gl map engine integration with module-scope PMTiles protocol registration, H3 hexagon rendering, dashed review outlines via a companion PathLayer, India bounds/filtering, dynamic class filters, hover details, and inspector clear-selection behavior. Moved the prediction ref mirror into an effect to avoid a render-time ref access warning.
 - Interface impact: none beyond the existing Agent A map integration contract.
