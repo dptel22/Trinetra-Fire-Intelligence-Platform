@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Header from './Header';
 import OfflineBanner from './OfflineBanner';
@@ -11,13 +11,15 @@ import {
   parseCaveatFlag,
   confidenceLabel,
   getAvailableClasses,
-  exportPredictionsToCsv
+  exportPredictionsToCsv,
+  fetchLatestAcqDate
 } from '../services/api';
 
 const PAGE_SIZE = 25;
 
 export default function FireAlertsPage() {
-  const today = useMemo(() => new Date().toLocaleDateString('en-CA'), []);
+  const [acqDate, setAcqDate] = useState(null);
+  const acqDateRef = useRef(null);
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,7 +33,11 @@ export default function FireAlertsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchPredictions(INDIA_BOUNDS, today, 5);
+      const latest = acqDateRef.current || await fetchLatestAcqDate();
+      if (!latest) throw new Error('Backend did not provide an available acquisition date');
+      acqDateRef.current = latest;
+      setAcqDate(latest);
+      const data = await fetchPredictions(INDIA_BOUNDS, latest, 5);
       const arr = Array.isArray(data) ? data : (data?.predictions ?? []);
       setAlerts(arr);
     } catch (err) {
@@ -40,7 +46,7 @@ export default function FireAlertsPage() {
     } finally {
       setLoading(false);
     }
-  }, [today]);
+  }, []);
 
   // Single mount trigger — calls loadAlerts once. The refresh button also calls
   // loadAlerts directly. This replaces the previous duplicate useEffect that was
@@ -109,7 +115,7 @@ export default function FireAlertsPage() {
   const handleExportCsv = () => {
     if (filteredAlerts.length === 0) return;
     try {
-      exportPredictionsToCsv(filteredAlerts, `trinetra_alerts_${today}.csv`);
+      exportPredictionsToCsv(filteredAlerts, `trinetra_alerts_${acqDate}.csv`);
     } catch (err) {
       console.error('[FireAlertsPage] CSV export failed:', err);
     }
@@ -130,7 +136,7 @@ export default function FireAlertsPage() {
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>•</span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', fontFamily: 'monospace' }}>
-                Observation Date: {today}
+                Observation Date: {acqDate || 'discovering...'}
               </span>
             </div>
             <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '2.2rem', color: 'var(--text-primary, #eceff4)', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
@@ -303,7 +309,7 @@ export default function FireAlertsPage() {
         {loading && (
           <div style={{ padding: '5rem 2rem', textAlign: 'center', color: 'var(--text-muted, #8b949e)' }}>
             <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary, #eceff4)', marginBottom: '8px' }}>
-              Loading thermal anomaly detections for {today}...
+              Loading thermal anomaly detections for {acqDate || 'the latest available date'}...
             </div>
             <div style={{ fontSize: '0.85rem' }}>
               Querying NASA VIIRS / MODIS satellite passes across India coordinates.
@@ -360,7 +366,7 @@ export default function FireAlertsPage() {
             }}
           >
             <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#eceff4', marginBottom: '8px' }}>
-              Zero Thermal Detections Registered Today ({today})
+              Zero Thermal Detections Registered ({acqDate})
             </div>
             <p style={{ margin: 0, color: 'var(--text-muted, #8b949e)', fontSize: '0.9rem', maxWidth: '580px', marginInline: 'auto', lineHeight: 1.5 }}>
               No high-temperature surface anomalies across monitored Indian infrastructure sectors were detected during recent orbital passes,

@@ -10,6 +10,9 @@ caveats and an analyst audit trail.
 > Full backend API reference: [`BACKEND_DOCUMENTATION.md`](BACKEND_DOCUMENTATION.md) ·
 > Frontend contract: [`FRONTEND_INTEGRATION_GUIDE.md`](FRONTEND_INTEGRATION_GUIDE.md)
 
+Complete Windows clone-and-run guide, AI-agent setup instructions, artifact inventory,
+map/PMTiles setup, demo/live modes, and verification: [`docs/PROJECT_SETUP.md`](docs/PROJECT_SETUP.md).
+
 ---
 
 ## 1. What this is

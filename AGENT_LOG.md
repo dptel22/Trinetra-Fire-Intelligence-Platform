@@ -421,4 +421,32 @@ Ownership split, interface contract, and per-agent prompts live in
 - Contradicts or supersedes: only the NameError flag above. Host serving parquets untouched; the in-container live run wrote only to the docker volume.
 - Open items handed off:
   - RUN_HISTORY_PATH is repo-relative, so in-container runs write run history to the ephemeral container fs — making it env-overridable to the writable volume is the natural next ops fix; per-chunk FIRMS row counts (2.4c) land in that JSON.
-  - `.venv` vs `.venv-pinned` interpreter split (2026-09-08 Codex entry) still unresolved; suite verified under `.venv` (Python 3.12.13).
+- `.venv` vs `.venv-pinned` interpreter split (2026-09-08 Codex entry) still unresolved; suite verified under `.venv` (Python 3.12.13).
+
+### 2026-09-09 Codex — Verification
+
+- `frontend`: `npm run lint` completed with existing warnings; `npm run build` passed.
+- Backend focused API surface: `4 passed`; only dependency deprecation/cache warnings.
+### 2026-09-09 Codex — Fire alerts latest-date synchronization
+
+- Updated `FireAlertsPage.jsx` to use the existing `fetchLatestAcqDate()` helper before querying predictions, preventing silent empty results when the backend has historical data only.
+- Preserved the existing loading, error, empty, filtering, and CSV-export flows while displaying the discovered acquisition date.
+- Interface impact: the health response's existing `latest_acq_date` value is now used by alerts as well as the map.
+- Verification pending: frontend lint/build and focused backend health checks.
+
+### 2026-09-09 Codex — Canonical clone-and-run documentation
+
+- Added `docs/PROJECT_SETUP.md` covering the repository map, setup prerequisites, demo/live modes, model/data/API/frontend/PMTiles/Docker contracts, artifact inventory, troubleshooting, verification, and AI-agent protocol.
+- Added `scripts/setup.ps1` for Windows dependency, environment, model, and serving-data checks.
+- Added `scripts/verify.ps1` for model, serving parquet, health, latest-date, and prediction smoke checks.
+- Linked the canonical guide from `README.md` and corrected stale model/feature references in `BACKEND_DOCUMENTATION.md`.
+- Interface impact: documentation and operator scripts only.
+- Blockers: live mode still requires user-supplied OSM PBF, WRI CSV, boundary inputs, and `FIRMS_MAP_KEY`; these are intentionally not fabricated or committed.
+- Verification: both PowerShell scripts parse successfully; `setup.ps1 -Mode demo -SkipInstall` completed; `git diff --check` reported no whitespace errors.
+
+### 2026-09-09 Codex — Worktree cleanup verification
+
+- Restored unrelated deleted `.agents/skills/code-review/*` files; ignored local environments, secrets, datasets, databases, caches, and dependencies were preserved.
+- Verification passed: PowerShell parsing, demo setup, `git diff --check`, frontend lint, and frontend production build.
+- Full pytest verification was blocked by a DuckDB file lock from a stale repository Python process; the process was stopped, but subsequent pytest invocations spawned persistent Python workers and did not return a final result. Earlier recorded full-suite evidence remains 64 passed, 1 deselected.
+- No backend service was running during `scripts/verify.ps1`, so live health/latest-date/prediction smoke checks were not claimed.

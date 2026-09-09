@@ -166,6 +166,12 @@ class FeatureStoreService:
             columns = [col[0] for col in self._conn.description] if self._conn.description else []
         return [dict(zip(columns, row)) for row in rows]
 
+    def latest_acq_date(self) -> str | None:
+        self.load()
+        with self._lock:
+            row = self._connection().execute("SELECT max(CAST(acq_date AS DATE)) FROM h3_daily").fetchone()
+        return row[0].isoformat() if row and row[0] else None
+
     # Temporary compatibility for old spatial endpoint until Agent B rewires it.
     def get_viewport_hexagons(self, min_lat: float, max_lat: float, min_lon: float, max_lon: float, limit: int = 500):
         self.load()

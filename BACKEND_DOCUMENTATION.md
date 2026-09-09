@@ -4,15 +4,15 @@
 
 The backend serves Dhruv's real H3-day CatBoost classifier, not the older synthetic point-level demo model.
 
-- Model artifact: `models/catboost_hotspot_classifier_v1.cbm` (gitignored; training provenance in `notebooks/experiments/sih-catboost-training.ipynb`)
+- Model artifact: `models/PS26162_catboost_final/inference_bundle/catboost_hotspot_classifier.cbm` with tracked calibration, schema, threshold, and runtime files.
 - Prediction unit: one `(h3_08, acq_date)` cell-day
 - H3 resolution: 8
-- Feature schema: 52 CatBoost features in `app/core/config.py`
+- Feature schema: 55 CatBoost features in `models/PS26162_catboost_final/inference_bundle/feature_schema.json` and `app/core/config.py`
 - Categorical features: `h3_08`, `daynight`
 - Classes: `industrial`, `mining`, `agricultural_burn`, `wildfire`
 - Optional abstention: `UNCLASSIFIED_THRESHOLD`, disabled unless set in the environment
 
-Startup fails loudly if the configured model artifact does not match the 52-feature contract.
+Startup fails loudly if the configured model artifact does not match the 55-feature contract.
 
 ## Data Sources
 
@@ -89,4 +89,3 @@ python -c "from app.main import app; print(app.title)"
 python -m pytest tests/test_backend.py
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-
