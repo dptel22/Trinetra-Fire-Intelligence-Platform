@@ -72,11 +72,20 @@ def test_cors_from_environment(monkeypatch):
     ]
 
 
+def _a_real_store_cell() -> tuple[str, str]:
+    """A (h3_08, acq_date) pair that actually exists in the serving store."""
+    import pandas as pd
+
+    df = pd.read_parquet(settings.H3_DAILY_PARQUET, columns=["h3_08", "acq_date"])
+    row = df.iloc[0]
+    return str(row["h3_08"]), str(pd.to_datetime(row["acq_date"]).date())
+
+
 def test_audit_override_records_real_prediction(client):
     """BACK-1.3: Verify audit override resolves and stores real prediction + confidence."""
-    # Real cell from the serving parquets (Maharashtra / 10-state serving data)
-    test_h3 = "883c124ce1fffff"
-    test_date = "2026-02-08"
+    # Real cell from the serving store (cell cases are picked from live data —
+    # hard-coded (h3, date) pairs went stale when serving coverage changed).
+    test_h3, test_date = _a_real_store_cell()
     hotspot_id = f"{test_h3}_{test_date}"
 
     # Query expected detail via model service directly
@@ -111,17 +120,21 @@ def test_audit_override_records_real_prediction(client):
 
 def test_vectorization_numerical_parity_vs_reference_loop():
     """BACK-1.4: Parity test asserting vectorized batch produces identical results to loop path (~1e-9)."""
-    # Fetch real rows from serving parquet for testing
+    # Fetch real rows from the serving store on its newest ingested date
     model_service.load_model()
-    # Query a test bounding box containing multiple H3 cells
+    acq_date = feature_store.latest_acq_date()
+    assert acq_date, "serving store has no ingested dates"
+    # Query nationwide for the date, then bound the loop-reference cost;
+    # parity is asserted per-row.
     rows = feature_store.query_bbox(
-        min_lat=18.0,
-        max_lat=22.0,
-        min_lon=73.0,
-        max_lon=78.0,
-        acq_date="2026-02-08",
+        min_lat=6.75,
+        max_lat=37.10,
+        min_lon=68.03,
+        max_lon=97.42,
+        acq_date=acq_date,
     )
     assert len(rows) >= 5, f"Expected at least 5 test rows for parity check, got {len(rows)}"
+    rows = rows[:20]
 
     # Reference implementation: single-row predict in a loop
     loop_results = [model_service.predict(row) for row in rows]

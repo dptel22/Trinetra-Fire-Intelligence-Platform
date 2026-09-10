@@ -1,5 +1,5 @@
 import React from 'react';
-import { CLASS_COLORS, CLASS_LABELS } from '../services/api';
+import { CLASS_COLORS, CLASS_LABELS, PRIMARY_CLASSES } from '../services/api';
 
 /**
  * ClassificationFilters component
@@ -25,9 +25,9 @@ export default function ClassificationFilters({
     return true;
   };
 
-  if (!availableClasses || availableClasses.length === 0) {
-    return null;
-  }
+  const present = new Set(availableClasses || []);
+  const classes = [...PRIMARY_CLASSES];
+  if (present.has('unclassified')) classes.push('unclassified');
 
   return (
     <div
@@ -55,7 +55,7 @@ export default function ClassificationFilters({
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-        {availableClasses.map((cls) => {
+        {classes.map((cls) => {
           const active = isClassActive(cls);
           const color = CLASS_COLORS[cls] || '#787878';
           const label = CLASS_LABELS[cls] || cls;
@@ -65,6 +65,7 @@ export default function ClassificationFilters({
               key={cls}
               type="button"
               onClick={() => onToggle(cls)}
+              aria-pressed={active}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -75,7 +76,7 @@ export default function ClassificationFilters({
                 fontWeight: active ? 600 : 400,
                 border: `1px solid ${active ? color : 'var(--hairline-border, #3b4252)'}`,
                 backgroundColor: active ? `${color}22` : 'transparent',
-                color: active ? '#eceff4' : 'var(--text-muted, #8b949e)',
+                color: active ? 'var(--text-primary, #eceff4)' : 'var(--text-muted, #8b949e)',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
@@ -90,7 +91,7 @@ export default function ClassificationFilters({
                   opacity: active ? 1 : 0.4
                 }}
               />
-              <span>{label}</span>
+              <span>{active ? '✓ ' : ''}{label}</span>
             </button>
           );
         })}

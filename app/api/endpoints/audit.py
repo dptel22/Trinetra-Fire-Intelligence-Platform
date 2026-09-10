@@ -34,7 +34,7 @@ def record_analyst_override(request: AnalystOverrideRequest):
                 model_prediction = f"{detail.predicted_class} (confidence: {detail.confidence:.4f})"
             except Exception as exc:
                 logger.warning("Could not resolve model prediction for hotspot %s: %s", request.hotspot_id, exc)
-                model_prediction = f"unresolved ({exc})"
+                model_prediction = "unresolved"
 
         return audit_service.log_override(
             req=request,

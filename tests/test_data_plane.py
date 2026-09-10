@@ -47,8 +47,9 @@ REAL_STATIC_PARQUET = Path(settings.OSMWRI_PARQUET)
 REAL_ARTIFACTS = REAL_DAILY_PARQUET.exists() and REAL_STATIC_PARQUET.exists()
 
 # The locked 61-column contract: the shipped with_osm_wri serving file's exact
-# column order (28 daily + 5 static-id + 16 WRI + 12 OSM). WRI columns are
-# dist/count-interleaved per fuel; OSM groups dist/count pairs per category.
+# column order (28 daily + 5 static-id + 16 WRI + 12 OSM). The WRI/OSM groups
+# are dist_*-all-fuels then n_*-all-fuels (the ingestion writer's
+# STATIC_FILE_COLUMNS order, preserved byte-stable by every atomic rewrite).
 LOCKED_STATIC_COLUMN_ORDER = [
     "h3_08", "acq_date", "frp_max", "frp_mean", "n_detections", "ti4_max",
     "is_saturated_max", "scan_mean", "track_mean", "confidence_high_any",
@@ -58,14 +59,14 @@ LOCKED_STATIC_COLUMN_ORDER = [
     "frp_max_lag30", "active_days_30d", "active_days_90d", "is_first_observation",
     "is_labeled", "h3_lat", "h3_lon", "state", "state_assignment_method",
     "_state_distance_km",
-    "dist_wri_solar_km", "n_wri_solar_10km", "dist_wri_coal_km", "n_wri_coal_10km",
-    "dist_wri_wind_km", "n_wri_wind_10km", "dist_wri_gas_km", "n_wri_gas_10km",
-    "dist_wri_hydro_km", "n_wri_hydro_10km", "dist_wri_biomass_km", "n_wri_biomass_10km",
-    "dist_wri_oil_km", "n_wri_oil_10km", "dist_wri_nuclear_km", "n_wri_nuclear_10km",
-    "dist_osm_industrial_km", "n_osm_industrial_5km", "dist_osm_quarry_km",
-    "n_osm_quarry_5km", "dist_osm_farmland_km", "n_osm_farmland_5km",
-    "dist_osm_mineshaft_km", "n_osm_mineshaft_5km", "dist_osm_adit_km",
-    "n_osm_adit_5km", "dist_osm_power_infra_km", "n_osm_power_infra_5km",
+    "dist_wri_solar_km", "dist_wri_coal_km", "dist_wri_wind_km", "dist_wri_gas_km",
+    "dist_wri_hydro_km", "dist_wri_biomass_km", "dist_wri_oil_km", "dist_wri_nuclear_km",
+    "n_wri_solar_10km", "n_wri_coal_10km", "n_wri_wind_10km", "n_wri_gas_10km",
+    "n_wri_hydro_10km", "n_wri_biomass_10km", "n_wri_oil_10km", "n_wri_nuclear_10km",
+    "dist_osm_industrial_km", "dist_osm_quarry_km", "dist_osm_farmland_km",
+    "dist_osm_mineshaft_km", "dist_osm_adit_km", "dist_osm_power_infra_km",
+    "n_osm_industrial_5km", "n_osm_quarry_5km", "n_osm_farmland_5km",
+    "n_osm_mineshaft_5km", "n_osm_adit_5km", "n_osm_power_infra_5km",
 ]
 
 
@@ -153,10 +154,10 @@ def test_static_parquet_matches_locked_61_column_contract():
     schema = pq.read_schema(REAL_STATIC_PARQUET).remove_metadata()
     names = schema.names
     assert len(names) == 61, f"static contract is locked at 61 columns, got {len(names)}"
-    # The locked contract IS the shipped serving file's column order. Note:
-    # ingestion.run_ingestion.STATIC_FILE_COLUMNS has the same 61 names but a
-    # different dist/count interleaving — the writer preserves the real file's
-    # order via its target-schema select, and this test pins it here.
+    # The locked order IS the shipped serving file's order — which is the
+    # ingestion writer's STATIC_FILE_COLUMNS order (dist_* then n_* groups,
+    # not interleaved). The writer preserves this order via its target-schema
+    # select on every atomic rewrite, so pinning it here is byte-stable.
     assert names == LOCKED_STATIC_COLUMN_ORDER, (
         "static schema drift: "
         f"missing={sorted(set(LOCKED_STATIC_COLUMN_ORDER) - set(names))} "
@@ -180,30 +181,44 @@ def test_static_parquet_matches_locked_61_column_contract():
 
 
 # ---------------------------------------------------------------------------
-# 10-state serving filter on the real parquets
+# All-India serving gate on the real parquets
 # ---------------------------------------------------------------------------
 
+# The original 10-state training/evaluation partition (documentation only —
+# runtime serving must NOT be restricted to it).
 SERVING_STATES = {
     "Maharashtra", "Karnataka", "Madhya Pradesh", "Punjab", "Andhra Pradesh",
     "Telangana", "Gujarat", "Tamil Nadu", "Jharkhand", "Rajasthan",
 }
 
+OUTSIDE_INDIA_STATE = "Outside India"  # ingestion.osm_wri_load.OUTSIDE_INDIA_STATE
+
 
 @pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")
-def test_serving_parquets_are_10_state_only():
+def test_serving_parquets_contain_no_outside_india_cells():
     for path in (REAL_DAILY_PARQUET, REAL_STATIC_PARQUET):
-        # The daily parquet has no state column by contract — the filter is
+        # The daily parquet has no state column by contract — the mask is
         # enforced via the static file's cells, so check whichever carries it.
         if "state" not in pd.read_parquet(path, columns=[]).columns:
             continue
         states = set(pd.read_parquet(path, columns=["state"])["state"].dropna().unique())
-        assert states <= SERVING_STATES, f"{path.name} leaked non-serving states: {sorted(states - SERVING_STATES)}"
+        assert OUTSIDE_INDIA_STATE not in states, (
+            f"{path.name} leaked outside-India cells (Sri Lanka / open water): {sorted(states)}"
+        )
 
 
 @pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")
-def test_static_parquet_states_are_exactly_the_serving_ten():
+def test_serving_parquets_are_nationwide_not_10_state_only():
+    """The 10-state serving restriction is retired: real parquets must cover
+    states outside the original training partition whenever FIRMS data exists."""
     states = set(pd.read_parquet(REAL_STATIC_PARQUET, columns=["state"])["state"].dropna().unique())
-    assert states == SERVING_STATES, f"expected exactly the 10 serving states, got {sorted(states)}"
+    assert OUTSIDE_INDIA_STATE not in states
+    assert len(states) > 10, (
+        f"serving parquets still look 10-state restricted; expected nationwide coverage, "
+        f"got {sorted(states)}"
+    )
+    beyond_training = states - SERVING_STATES
+    assert beyond_training, f"no states beyond the training partition found: {sorted(states)}"
 
 
 # ---------------------------------------------------------------------------

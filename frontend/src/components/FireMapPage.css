@@ -5,7 +5,7 @@
 
 /* ─── Top-level page shell ─────────────────────────────────────────────────── */
 .firemap-page {
-  background-color: #0a0e12;
+  background-color: var(--bg-dark, #0a0e12);
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -20,6 +20,17 @@
   width: 100%;
   height: calc(100vh - 65px);
   overflow: hidden;
+  isolation: isolate;
+}
+
+.firemap-body::before {
+  content: '';
+  position: absolute;
+  inset: 10% 24% 8% 8%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 107, 53, 0.1), transparent 68%);
+  filter: blur(36px);
 }
 
 /* ─── Map pane (left) ──────────────────────────────────────────────────────── */
@@ -48,6 +59,17 @@
   gap: 1.25rem;
   text-align: left;
   box-sizing: border-box;
+  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.14);
+  animation: firemapSidebarIn 420ms var(--ease-cinematic, ease-out) both;
+}
+
+@keyframes firemapSidebarIn {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .firemap-sidebar { animation: none; }
 }
 
 /* ─── Sidebar section heading label ───────────────────────────────────────── */
@@ -112,6 +134,45 @@
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--text-primary, #eceff4);
+}
+
+/* Inspector explanation: readable in both dark and light themes. */
+.classification-assessment {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--hairline-border, #2e3440);
+  border-radius: 6px;
+  background: var(--panel-surface, #12161c);
+  color: var(--text-primary, #eceff4);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.classification-assessment-title {
+  color: var(--text-primary, #eceff4);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.assessment-yes { color: #21c66d; font-weight: 700; }
+.assessment-no { color: var(--text-primary, #eceff4); font-weight: 600; }
+.assessment-insufficient-evidence { color: #d99a22; font-weight: 700; }
+
+.classification-assessment-note,
+.feature-audit {
+  color: var(--text-muted, #8b949e);
+  font-size: 11px;
+}
+
+.feature-audit {
+  display: block;
+  margin-top: 3px;
+  font-family: monospace;
+  overflow-wrap: anywhere;
 }
 
 /* ─── Hover / tooltip card ─────────────────────────────────────────────────── */

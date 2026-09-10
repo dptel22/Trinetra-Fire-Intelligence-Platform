@@ -127,11 +127,28 @@ class Settings:
         "OSMWRI_PARQUET",
         str(_DATA_DIR / "processed" / "sih2026_h3_daily_features_with_osm_wri.parquet"),
     )
+    RAW_ARCHIVE_DIR = os.environ.get("RAW_ARCHIVE_DIR", str(_DATA_DIR / "archive" / "firms"))
     CAVEAT_MANIFEST: ClassVar[dict[str, str]] = {
         "pseudo_label_circularity": "Labels derive partly from FIRMS/OSM/WRI features, so metrics are not independent ground truth.",
         "satellite_nunique_only": "Only satellite count is modeled, not satellite identity.",
         "mining_low_support": "Mining has lower labeled support and should be read cautiously.",
         "low_confidence_review": "Calibrated confidence is below the per-class review threshold; treat as provisional.",
+        "outside_training_geography": "Outside validated training geography — analyst review required.",
+    }
+    # States the model was trained/evaluated on (bundle model_metadata.json
+    # overrides at load time). Used only for provenance labeling — never to
+    # exclude rows from serving.
+    TRAINING_GEOGRAPHY_STATES: ClassVar[set[str]] = {
+        "Maharashtra",
+        "Karnataka",
+        "Madhya Pradesh",
+        "Punjab",
+        "Andhra Pradesh",
+        "Telangana",
+        "Gujarat",
+        "Tamil Nadu",
+        "Jharkhand",
+        "Rajasthan",
     }
     H3_RESOLUTION = int(os.environ.get("H3_RESOLUTION", "8"))
     UNCLASSIFIED_THRESHOLD: float | None = (

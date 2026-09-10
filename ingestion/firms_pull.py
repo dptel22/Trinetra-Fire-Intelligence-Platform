@@ -329,7 +329,8 @@ def fetch_firms_both(
     day_range: int = 1,
     date: str | None = None,
     map_key: str | None = None,
-) -> tuple[pd.DataFrame, dict]:
+    return_raw: bool = False,
+) -> tuple[pd.DataFrame, dict] | tuple[pd.DataFrame, dict, dict[str, pd.DataFrame]]:
     """Pull both locked NRT sources in parallel, tag provenance, concat, harmonize.
 
     The two source requests are independent HTTP calls, so they run
@@ -338,11 +339,17 @@ def fetch_firms_both(
     fraction of the budget, so parallelism here is safe.
 
     Returns (points_df, stats) where stats carries per-source raw row counts.
+    With return_raw=True, additionally returns the untouched per-source
+    `_parse_csv` output (full column superset FIRMS returned, provenance tags
+    included) keyed by source — the raw evidence the immutable raw archive
+    persists before harmonization can drop rows. Zero-detection days yield the
+    schema-carrying empty frame so the archive can still prove the day.
     """
     bbox = validate_bbox(bbox)
     date = validate_date(date)
     stats: dict = {"raw_rows": {}, "source": list(SOURCES)}
     parts: list[pd.DataFrame] = []
+    raw_by_source: dict[str, pd.DataFrame] = {}
 
     from concurrent.futures import ThreadPoolExecutor
 
@@ -352,6 +359,8 @@ def fetch_firms_both(
     with ThreadPoolExecutor(max_workers=len(SOURCES)) as pool:
         for src, raw in pool.map(_pull, SOURCES):
             stats["raw_rows"][src] = int(len(raw))
+            if return_raw:
+                raw_by_source[src] = raw
             if raw.empty:
                 logger.warning("Zero detections from %s for %s (+%dd) — valid empty day.", src, date, day_range)
                 continue
@@ -364,9 +373,13 @@ def fetch_firms_both(
         empty = _empty_frame()
         empty["is_static_land"] = pd.Series(dtype="int8")
         empty["is_offshore"] = pd.Series(dtype="int8")
+        if return_raw:
+            return empty, stats, raw_by_source
         return empty, stats
 
     df = pd.concat(parts, ignore_index=True)
     df = harmonize_points(df)
     stats["rows_after_harmonize"] = int(len(df))
+    if return_raw:
+        return df, stats, raw_by_source
     return df, stats

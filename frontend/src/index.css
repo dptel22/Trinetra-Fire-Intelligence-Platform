@@ -83,6 +83,17 @@
   /* Typography */
   --font-heading: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-bold: 700;
+  --weight-black: 800;
+  --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-fast: 150ms;
+  --motion-base: 450ms;
+  --hero-title: #FFFFFF;
+  --hero-copy: rgba(255, 255, 255, 0.78);
+  --control-subtle: rgba(255, 255, 255, 0.06);
 }
 
 /* Light Theme Overrides */
@@ -92,6 +103,9 @@
   --hairline-border: rgba(0, 0, 0, 0.08);
   --text-primary: #1B1E21;
   --text-muted: #55595E;
+  --hero-title: #1B1E21;
+  --hero-copy: rgba(27, 30, 33, 0.78);
+  --control-subtle: rgba(0, 0, 0, 0.06);
 }
 
 /* Dark Theme Overrides */
@@ -101,6 +115,9 @@
   --hairline-border: rgba(234, 237, 240, 0.08);
   --text-primary: #EAEDF0;
   --text-muted: #8B95A1;
+  --hero-title: #FFFFFF;
+  --hero-copy: rgba(255, 255, 255, 0.78);
+  --control-subtle: rgba(255, 255, 255, 0.06);
 }
 
 header {
@@ -139,6 +156,11 @@ header {
 
 [data-theme='light'] .floating-3d-card .card-title {
   color: #1B1E21;
+}
+
+[data-theme='light'] .hero-action-secondary {
+  color: #1B1E21;
+  border-color: rgba(27, 30, 33, 0.28);
 }
 
 [data-theme='light'] .tri-btn-ember {
@@ -199,6 +221,20 @@ h1, h2, h3, h4, h5, h6 {
 
 p, span, label, div {
   text-align: left;
+}
+
+/* Visible keyboard focus for every interactive control, in both themes.
+   Uses :focus (not just :focus-visible) because some embedded browsers never
+   match :focus-visible even for real Tab presses; a ring after mouse click is
+   an accepted cosmetic cost for guaranteed keyboard visibility. */
+button:focus,
+select:focus,
+input:focus,
+a:focus,
+[role='link']:focus,
+[tabindex]:focus {
+  outline: 2px solid var(--accent-blue, #3D9DE8);
+  outline-offset: 2px;
 }
 
 /* Custom Scrollbars */
@@ -349,17 +385,87 @@ p, span, label, div {
   font-size: 2.85rem;
   font-weight: 800;
   line-height: 1.15;
-  color: #FFFFFF;
+  color: var(--hero-title, #FFFFFF);
   margin-bottom: 1.25rem;
   letter-spacing: -0.02em;
 }
 
 .hero-main-subtext {
-  color: var(--text-muted);
+  color: var(--hero-copy, rgba(255, 255, 255, 0.78));
   font-size: 1.05rem;
   line-height: 1.6;
   margin-bottom: 2rem;
 }
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.hero-action-primary {
+  text-decoration: none;
+}
+
+.hero-action-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  color: var(--hero-title, #FFFFFF);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+  transition: transform var(--motion-fast) ease, border-color var(--motion-fast) ease, background-color var(--motion-fast) ease;
+}
+
+.hero-action-secondary:hover,
+.hero-action-secondary:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent-blue);
+  background: rgba(61, 157, 232, 0.16);
+}
+
+.hero-taxonomy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem 0.9rem;
+  color: var(--hero-copy, rgba(255, 255, 255, 0.78));
+  font-size: 0.76rem;
+}
+
+.hero-taxonomy-label {
+  color: var(--accent-ember);
+  font-family: var(--font-heading);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-taxonomy-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.taxonomy-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.taxonomy-industrial { background: var(--color-industrial); color: var(--color-industrial); }
+.taxonomy-mining { background: var(--color-mining); color: var(--color-mining); }
+.taxonomy-agri { background: var(--color-agri-burn); color: var(--color-agri-burn); }
+.taxonomy-wildfire { background: var(--color-wildfire); color: var(--color-wildfire); }
 
 /* Floating 3D News/Intelligence Cards Grid (Overlapping Lower Right) */
 .hero-floating-cards {
@@ -414,6 +520,9 @@ p, span, label, div {
   border-radius: 3px;
   text-transform: uppercase;
 }
+
+.card-badge-wildfire { background: var(--color-wildfire); color: #fff; }
+.card-badge-mining { background: var(--color-mining); color: #0A0E12; }
 
 .card-body-text {
   padding: 10px;
@@ -545,14 +654,14 @@ p, span, label, div {
   box-shadow: 0 16px 36px rgba(231, 76, 60, 0.38);
 }
 
-.floating-3d-card.glow-logistics {
-  border: 1px solid rgba(61, 157, 232, 0.45);
-  box-shadow: 0 8px 24px rgba(61, 157, 232, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+.floating-3d-card.glow-mining {
+  border: 1px solid color-mix(in srgb, var(--color-mining) 65%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-mining) 28%, transparent), 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.floating-3d-card.glow-logistics:hover {
-  border-color: rgba(61, 157, 232, 0.85);
-  box-shadow: 0 16px 36px rgba(61, 157, 232, 0.38);
+.floating-3d-card.glow-mining:hover {
+  border-color: var(--color-mining);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--color-mining) 42%, transparent);
 }
 
 /* 6. Fire Map and Fire Alerts Panels Hover Effects */
@@ -686,5 +795,34 @@ p, span, label, div {
   }
   .hero-main-title {
     font-size: 2.15rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-3d-canvas { padding: 1rem 0.75rem 2.5rem; }
+  .hero-3d-frame { border-radius: 12px; }
+  .hero-content-grid { padding: 2.5rem 1.25rem; }
+  .hero-main-title { font-size: 2rem; }
+  .hero-main-subtext { font-size: 0.95rem; }
+  .hero-floating-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+  .floating-3d-card { width: 100%; }
+  .card-thumbnail-container { height: 80px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+
+  .eyebrow-tag,
+  .hero-main-title,
+  .hero-main-subtext,
+  .hero-floating-cards .floating-3d-card,
+  .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

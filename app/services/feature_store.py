@@ -29,6 +29,11 @@ class FeatureStoreService:
         self.loaded = False
         self._lock = Lock()
         self._conn = None
+        # Provenance side-map: h3_08 -> (state, state_assignment_method).
+        # Built with pandas at seed time (the DuckDB static table intentionally
+        # holds only model features). Used for geographic-generalization
+        # labeling on prediction responses.
+        self._state_by_cell: dict[str, tuple[str | None, str | None]] = {}
 
     def _connection(self):
         if self._conn is None:
@@ -99,6 +104,17 @@ class FeatureStoreService:
         except Exception:
             conn.execute("ROLLBACK")
             raise
+        # Refresh the provenance side-map from the same static parquet.
+        import pandas as pd
+
+        prov = pd.read_parquet(static_path, columns=["h3_08", "state", "state_assignment_method"])
+        self._state_by_cell = {
+            str(row.h3_08): (
+                row.state if isinstance(row.state, str) else None,
+                row.state_assignment_method if isinstance(row.state_assignment_method, str) else None,
+            )
+            for row in prov.itertuples(index=False)
+        }
         self.loaded = True
 
     def load(self) -> None:
@@ -124,6 +140,43 @@ class FeatureStoreService:
                 "SELECT max(CAST(acq_date AS DATE)) FROM h3_daily"
             ).fetchone()
         return row[0].isoformat() if row and row[0] is not None else None
+
+    def available_dates(self) -> list[str]:
+        """All distinct acq_dates in the daily table, sorted ascending."""
+        self.load()
+        with self._lock:
+            rows = self._connection().execute(
+                "SELECT DISTINCT CAST(acq_date AS DATE) AS d FROM h3_daily ORDER BY d"
+            ).fetchall()
+        return [row[0].isoformat() for row in rows if row[0] is not None]
+
+    def rows_for_date(self, acq_date: str) -> list[dict[str, Any]]:
+        """All H3-day feature rows for one acq_date (static OSM/WRI columns joined).
+
+        Ordered by h3_08 so downstream pagination is deterministic. Note: the
+        DuckDB static table intentionally holds only model features — `state`
+        is NOT a column here; attach it from the provenance side-map (get_state).
+        """
+        self.load()
+        with self._lock:
+            rows = self._connection().execute(
+                """
+                SELECT d.*, s.* EXCLUDE (h3_08)
+                FROM h3_daily d
+                LEFT JOIN osm_wri_static s USING (h3_08)
+                WHERE CAST(d.acq_date AS DATE) = CAST(? AS DATE)
+                ORDER BY d.h3_08
+                """,
+                [acq_date],
+            ).fetchall()
+            columns = [col[0] for col in self._conn.description] if self._conn.description else []
+        return [dict(zip(columns, row)) for row in rows]
+
+    def get_state(self, h3_index: str) -> tuple[str | None, str | None] | None:
+        """(state, state_assignment_method) provenance for a cell, or None."""
+        self.load()
+        with self._lock:
+            return self._state_by_cell.get(str(h3_index))
 
     def get_cell(self, h3_index: str, acq_date: str) -> dict[str, Any] | None:
         self.load()
@@ -165,12 +218,6 @@ class FeatureStoreService:
             ).fetchall()
             columns = [col[0] for col in self._conn.description] if self._conn.description else []
         return [dict(zip(columns, row)) for row in rows]
-
-    def latest_acq_date(self) -> str | None:
-        self.load()
-        with self._lock:
-            row = self._connection().execute("SELECT max(CAST(acq_date AS DATE)) FROM h3_daily").fetchone()
-        return row[0].isoformat() if row and row[0] else None
 
     # Temporary compatibility for old spatial endpoint until Agent B rewires it.
     def get_viewport_hexagons(self, min_lat: float, max_lat: float, min_lon: float, max_lon: float, limit: int = 500):

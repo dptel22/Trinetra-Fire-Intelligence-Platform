@@ -7,11 +7,14 @@ Targets (byte-for-byte, from app/core/config.py defaults, env-overridable):
   the daily frame + h3_lat/h3_lon/state/state_assignment_method/
   _state_distance_km + 16 WRI + 12 OSM static columns)
 
-The 10-state serving filter (MH/KA/MP/PB/AP/TS/GJ/TN/JH/RJ — the locked
-TRAIN/TEST_A/TEST_B partition from osi-wri-data.ipynb cell 3) is applied HERE,
-before anything is written to the serving parquets. Historical nationwide rows
-are filtered out on the first run as well (approved decision); a one-time
-backup of the original nationwide parquets is taken before the first overwrite.
+The 10-state serving filter (MH/KA/MP/PB/AP/TS/GJ/TN/JH/RJ) is RETIRED:
+runtime serving is all-India. The only geographic gate before writing is the
+India polygon land mask from osm_wri_load.assign_states — points outside the
+union of Indian state/UT polygons (Sri Lanka, open water, ...) are rejected
+with state = "Outside India" and never reach the serving parquets. States
+outside the original 10-state training/evaluation partition are served with a
+geographic-generalization review flag added by the backend; SERVING_STATES
+survives for training/evaluation documentation and run-history statistics.
 
 Idempotency: rows are upserted on (h3_08, acq_date) — re-running the same day
 overwrites, never duplicates. Temporal lag features are recomputed for every
@@ -29,11 +32,13 @@ runs. This keeps demo restarts zero-latency.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
 import shutil
 import time
+import uuid
 from datetime import date as date_cls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -41,6 +46,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.core.config import settings
+from ingestion import raw_archive
 from ingestion.aggregate import DAILY_COLUMNS, build_daily_frame
 from ingestion.firms_pull import (
     MAX_DAY_RANGE,
@@ -51,6 +57,7 @@ from ingestion.firms_pull import (
 )
 from ingestion.osm_wri_load import (
     OSM_COLUMNS,
+    OUTSIDE_INDIA_STATE,
     RawInputError,
     SERVING_STATES,
     WRI_COLUMNS,
@@ -67,6 +74,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INDIA_BBOX = "68.03,6.75,97.42,37.10"  # verified west,south,east,north for full India
 RUN_HISTORY_PATH = REPO_ROOT / "data" / "processed" / "ingestion_run_history.json"
 BACKUP_DIR = REPO_ROOT / "data" / "processed" / "backup_nationwide_pre_10state"
+# Captured at import: tests monkeypatch settings.OSMWRI_PARQUET onto temp paths,
+# so the canonical-vs-test decision must never read the mutable attribute.
+_CANONICAL_OSMWRI_PARQUET = Path(settings.OSMWRI_PARQUET).resolve()
 
 STATIC_ID_COLUMNS = ["h3_lat", "h3_lon", "state", "state_assignment_method", "_state_distance_km"]
 STATIC_FILE_COLUMNS = DAILY_COLUMNS + STATIC_ID_COLUMNS + WRI_COLUMNS + OSM_COLUMNS  # 61
@@ -97,6 +107,34 @@ def is_ingestion_current(target_date: str, bbox: str = INDIA_BBOX) -> bool:
         last.get("target_date") == target_date
         and last.get("bbox") == bbox
     )
+
+
+def ingestion_provenance() -> dict:
+    """Data-quality block for /health: what the last run served and rejected.
+
+    Surfaces nationwide coverage provenance (states served, outside-India
+    rejections, rows outside the original 10-state training geography) so the
+    UI can label coverage honestly instead of implying validated nationwide
+    historical data.
+    """
+    last = read_last_run()
+    if not last or not last.get("ok"):
+        return {"available": False, "last_run_ok": bool(last and last.get("ok"))}
+    sf = last.get("state_filter", {})
+    return {
+        "available": True,
+        "last_run_ok": True,
+        "target_date": last.get("target_date"),
+        "finished_at": last.get("finished_at"),
+        "gap_filled": last.get("gap_filled"),
+        "fetch_mode": (last.get("fetch") or {}).get("mode"),
+        "states_served": sf.get("states_served"),
+        "india_rows_retained": sf.get("india_rows_retained"),
+        "outside_india_rejected": sf.get("outside_india_rejected"),
+        "outside_training_geography_rows": sf.get("outside_training_geography_rows"),
+        "final_daily_rows": last.get("final_daily_rows"),
+        "serving_scope": "all-india (10-state training partition retired from serving)",
+    }
 
 
 def _append_run_history(entry: dict) -> None:
@@ -167,8 +205,7 @@ def _backup_originals_once(paths: list[Path]) -> bool:
         if p.exists():
             shutil.copy2(p, BACKUP_DIR / p.name)
     logger.warning(
-        "Original nationwide parquets backed up to %s (one-time; the 10-state "
-        "filter now governs the serving parquets).",
+        "Original serving parquets backed up to %s (one-time).",
         BACKUP_DIR,
     )
     return True
@@ -236,8 +273,11 @@ def run_ingestion(
     target_date = validate_date(date) or datetime.now(timezone.utc).date().isoformat()
     daily_path = Path(daily_path or settings.H3_DAILY_PARQUET)
     static_path = Path(static_path or settings.OSMWRI_PARQUET)
+    run_id = f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
     stats: dict = {
+        "run_id": run_id,
+        "model_version": settings.VERSION,
         "target_date": target_date,
         "bbox": bbox,
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -247,16 +287,23 @@ def run_ingestion(
     # 1. Fail loud on missing raw inputs (OSM PBF / WRI CSV / shapefile).
     validate_raw_inputs()
 
-    # 2. Fetch FIRMS points for the planned day chunks.
+    # 2. Fetch FIRMS points for the planned day chunks, capturing the raw
+    # per-source frames so the immutable raw archive can persist the exact
+    # API evidence before any harmonization/filtering drops rows.
+    raw_parts: list[dict] = []
     if points_override is not None:
         points = points_override.copy()
         stats["fetch"] = {"mode": "override", "raw_rows": {"override": int(len(points))}}
+        stats["raw_archive"] = {"skipped": "override", "reason": "no live FIRMS fetch to preserve"}
     else:
         chunks = _plan_day_chunks(target_date, daily_path, day_range, gap_fill)
-        stats["fetch"] = {"chunks": chunks, "per_chunk": {}}
+        stats["fetch"] = {"mode": "live_firms", "chunks": chunks, "per_chunk": {}}
         frames: list[pd.DataFrame] = []
+        raw_by_source: dict[str, list[pd.DataFrame]] = {}
         for chunk_date, span in chunks:
-            pts, chunk_stats = fetch_firms_both(bbox, day_range=span, date=chunk_date)
+            pts, chunk_stats, chunk_raw = fetch_firms_both(bbox, day_range=span, date=chunk_date, return_raw=True)
+            for src, frame in chunk_raw.items():
+                raw_by_source.setdefault(src, []).append(frame)
             # Per-chunk FIRMS row counts make day-over-day plausibility
             # comparisons possible straight from the run-history JSON.
             stats["fetch"]["per_chunk"][chunk_date] = {
@@ -272,6 +319,16 @@ def run_ingestion(
         points = pd.concat(frames, ignore_index=True) if frames else points_override
         if points is None or points.empty:
             points = pd.DataFrame()
+        # Immutable raw evidence is written BEFORE aggregation: a crash in any
+        # later step must not lose what the satellite actually reported.
+        raw_parts = raw_archive.write_raw_observations(
+            {src: pd.concat(parts, ignore_index=True) for src, parts in raw_by_source.items()},
+            run_id=run_id,
+            requested_date=target_date,
+            bbox=bbox,
+            ingested_at=datetime.now(timezone.utc).isoformat(),
+        )
+        stats["raw_archive"] = {"parts": raw_parts, "total_raw_rows": sum(p["rows"] for p in raw_parts)}
     stats["points_total"] = int(len(points))
 
     # 3. Aggregate to the typed daily frame.
@@ -350,6 +407,25 @@ def run_ingestion(
         stats["new_cells_by_state"] = (
             new_cell_df["state"].value_counts().to_dict() if not new_cell_df.empty else {}
         )
+
+    # 7b. Re-validate the India land mask on carried-over cells whose state
+    # assignment is not a clean within-polygon hit. Cells enriched under the
+    # retired nearest-state fallback can carry a mislabeled Indian state —
+    # e.g. Sri Lankan cells labeled Tamil Nadu — and would otherwise survive
+    # the upsert forever because they are already "known" to the static file.
+    if per_cell_static is not None and not per_cell_static.empty:
+        suspect_mask = per_cell_static["state_assignment_method"] != "within"
+        n_suspect = int(suspect_mask.sum())
+        if n_suspect:
+            suspect = per_cell_static[suspect_mask]
+            reassigned = assign_states(
+                suspect[["h3_lat", "h3_lon"]].rename(columns={"h3_lat": "latitude", "h3_lon": "longitude"})
+            )
+            per_cell_static.loc[suspect_mask, ["state", "state_assignment_method", "_state_distance_km"]] = (
+                reassigned.to_numpy()
+            )
+            stats["revalidated_state_cells"] = n_suspect
+            logger.info("Re-validated India mask on %d carried-over non-within cells", n_suspect)
     if per_cell_static is None or per_cell_static.empty:
         raise IngestionError("No static feature table available to join — cannot build the serving static parquet")
     if combined_daily is None or combined_daily.empty:
@@ -365,22 +441,30 @@ def run_ingestion(
         missing = int(static_frame["state"].isna().sum())
         raise IngestionError(f"{missing} daily rows have no state assignment — investigate before writing")
 
-    # 9. The locked 10-state serving filter (closes the backend-trace bug).
+    # 9. India polygon land-mask gate: every Indian state/UT is served; only
+    # points the mask marked outside India are rejected. Inference is
+    # all-India — SERVING_STATES is used below for training-geography
+    # statistics only, never as an exclusion filter.
     n_before = len(static_frame)
-    in_serving = static_frame["state"].isin(SERVING_STATES)
-    dropped = static_frame[~in_serving]
-    static_out = static_frame[in_serving].copy()
+    in_india = static_frame["state"] != OUTSIDE_INDIA_STATE
+    rejected = static_frame[~in_india]
+    static_out = static_frame[in_india].copy()
+    in_training = static_out["state"].isin(SERVING_STATES)
     stats["state_filter"] = {
-        "kept_rows": int(len(static_out)),
-        "dropped_rows": int(len(dropped)),
-        "dropped_by_state": dropped["state"].value_counts().to_dict(),
-        "kept_by_state": static_out["state"].value_counts().to_dict(),
+        "india_rows_retained": int(len(static_out)),
+        "outside_india_rejected": int(len(rejected)),
+        "rejected_by_state": rejected["state"].value_counts().to_dict(),
+        "rows_by_state": static_out["state"].value_counts().to_dict(),
+        "states_served": int(static_out["state"].nunique()),
+        "outside_training_geography_rows": int((~in_training).sum()),
+        "training_geography_rows": int(in_training.sum()),
     }
     kept_cells = set(static_out["h3_08"].astype(str))
     daily_out = combined_daily[combined_daily["h3_08"].isin(kept_cells)].copy()
     logger.info(
-        "10-state filter: kept %d/%d rows across %d cells (dropped %d)",
-        len(static_out), n_before, len(kept_cells), len(dropped),
+        "India land-mask gate: kept %d/%d rows across %d states/UTs "
+        "(rejected %d outside-India rows)",
+        len(static_out), n_before, stats["state_filter"]["states_served"], len(rejected),
     )
 
     # 10. Atomic writes with exact schema parity against the existing files.
@@ -399,7 +483,19 @@ def run_ingestion(
     stats["plausibility_violations"] = violations
     if violations:
         logger.warning("Plausibility gates flagged this run: %s", violations)
-    _append_run_history(stats)
+    # Run history is the serving-provenance record: only runs that wrote the
+    # canonical serving parquets belong in it. Test runs with temp-path
+    # overrides must never pollute it — a stale override entry as "last run"
+    # flips is_ingestion_current() and both misreports /health provenance and
+    # can trigger a pointless live pull at boot.
+    stats["schema_hash"] = _schema_hash(target_daily_schema)
+    if Path(static_path).resolve() == _CANONICAL_OSMWRI_PARQUET:
+        _append_run_history(stats)
+        from ingestion.manifest import record_run
+
+        record_run(stats)  # best-effort; never fails the run (see manifest.py)
+    else:
+        stats["run_history_recorded"] = False
     logger.info(
         "Ingestion complete: daily=%d rows, static=%d rows (%.1fs)",
         len(daily_out), len(static_out), stats["wall_seconds"],
@@ -431,6 +527,13 @@ def ensure_fresh_for_backend() -> dict | None:
 # ---------------------------------------------------------------------------
 
 
+def _schema_hash(schema) -> str | None:
+    """Stable content hash of an arrow schema (manifest integrity anchor)."""
+    if schema is None:
+        return None
+    return hashlib.sha256(str(schema).encode("utf-8")).hexdigest()
+
+
 def plausibility_violations(stats: dict) -> list[str]:
     """Order-of-magnitude sanity gates for a single-day live pull.
 
@@ -455,10 +558,11 @@ def plausibility_violations(stats: dict) -> list[str]:
     hist_rows = int(stats.get("hist_daily_rows") or 0)
     if hist_rows and final_rows > hist_rows * 3:
         violations.append(f"final_daily_rows={final_rows} tripled vs history ({hist_rows})")
-    kept = int(stats.get("state_filter", {}).get("kept_rows") or 0)
-    dropped = int(stats.get("state_filter", {}).get("dropped_rows") or 0)
-    if kept + dropped == 0:
-        violations.append("state filter kept and dropped nothing")
+    state_filter = stats.get("state_filter", {})
+    kept = int(state_filter.get("india_rows_retained") or 0)
+    dropped = int(state_filter.get("outside_india_rejected") or 0)
+    if kept == 0:
+        violations.append("India land-mask gate retained no rows")
     return violations
 
 
@@ -486,7 +590,14 @@ def main() -> int:
         )
     except (IngestionError, RawInputError) as err:
         logger.error("Ingestion failed: %s", err)
-        _append_run_history({"ok": False, "error": str(err), "at": datetime.now(timezone.utc).isoformat()})
+        _append_run_history(
+            {
+                "run_id": f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:6]}",
+                "ok": False,
+                "error": str(err),
+                "at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         return 1
     print(json.dumps({k: v for k, v in stats.items() if k != "fetch"}, indent=2, default=str))
     return 0

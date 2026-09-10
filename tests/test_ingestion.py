@@ -47,7 +47,9 @@ from ingestion.firms_pull import (
     validate_date,
 )
 from ingestion.osm_wri_load import (
+    OFFSHORE_TOLERANCE_KM,
     OSM_COLUMNS,
+    OUTSIDE_INDIA_STATE,
     RawInputError,
     SERVING_STATES,
     WRI_COLUMNS,
@@ -332,7 +334,7 @@ def test_compute_osm_features_synthetic():
 def test_assign_states_pip_on_pinned_shapefile():
     cells = pd.DataFrame(
         {
-            "latitude": [19.0760, 19.0760, 8.0],  # Mumbai (MH), duplicate, ocean
+            "latitude": [19.0760, 19.0760, 8.0],  # Mumbai (MH), duplicate, Arabian Sea
             "longitude": [72.8777, 72.8777, 76.0],
         }
     )
@@ -340,7 +342,74 @@ def test_assign_states_pip_on_pinned_shapefile():
     assert list(states.columns) == ["state", "state_assignment_method", "_state_distance_km"]
     assert states["state"].iloc[0] == "Maharashtra"
     assert states["state"].iloc[0] == states["state"].iloc[1]  # deterministic tie-break
-    assert states["state"].iloc[2] in SERVING_STATES or states["state_assignment_method"].iloc[2] == "nearest_unmatched"
+    assert states["state"].iloc[2] == OUTSIDE_INDIA_STATE
+    assert states["state_assignment_method"].iloc[2] == "outside_india"
+    assert states["_state_distance_km"].iloc[2] > OFFSHORE_TOLERANCE_KM
+
+
+def test_assign_states_retains_states_outside_training_partition():
+    """All-India serving: TN, Odisha, J&K and Kerala must all be retained."""
+    cells = pd.DataFrame(
+        {
+            "latitude": [11.0168, 20.2961, 34.0837, 9.9312],
+            "longitude": [76.9558, 85.8245, 74.7973, 76.2673],
+        }
+    )
+    states = assign_states(cells)
+    assert list(states["state"]) == ["Tamil Nadu", "Odisha", "Jammu and Kashmir", "Kerala"]
+    assert (states["state_assignment_method"] == "within").all()
+
+
+def test_assign_states_retains_island_territories():
+    """Andaman & Nicobar and Lakshadweep are Indian territory geometry."""
+    cells = pd.DataFrame(
+        {
+            "latitude": [11.6234, 10.5663],
+            "longitude": [92.7265, 72.6420],
+        }
+    )
+    states = assign_states(cells)
+    assert list(states["state"]) == ["Andaman & Nicobar", "Lakshadweep"]
+
+
+def test_assign_states_rejects_sri_lanka_and_open_water():
+    """Sri Lanka and Bay of Bengal open water must never get an Indian state —
+    this is the regression test for the old nearest-state fallback."""
+    cells = pd.DataFrame(
+        {
+            "latitude": [6.9271, 9.6615, 15.0, 7.0],  # Colombo, Jaffna, Bay of Bengal, Gulf of Mannar
+            "longitude": [79.8612, 80.0255, 88.0, 82.0],
+        }
+    )
+    states = assign_states(cells)
+    assert (states["state"] == OUTSIDE_INDIA_STATE).all()
+    assert (states["state_assignment_method"] == "outside_india").all()
+
+
+def test_no_runtime_serving_filter_on_serving_states():
+    """SERVING_STATES must never decide the serving output — the only
+    pre-write geographic gate is the India polygon land mask. The one allowed
+    use is the training-geography STATISTICS count on the already-retained
+    frame."""
+    import inspect
+
+    from ingestion import run_ingestion as ri
+
+    source = inspect.getsource(ri)
+    assert "static_frame[~in_serving]" not in source and 'static_frame["state"].isin(SERVING_STATES)' not in source, (
+        "run_ingestion still filters the serving output by SERVING_STATES — "
+        "runtime coverage must be all-India"
+    )
+    assert "OUTSIDE_INDIA_STATE" in source, (
+        "run_ingestion must gate serving output on the India polygon mask"
+    )
+    # The serving output is built from the land-mask gate, not the partition.
+    assert 'in_india = static_frame["state"] != OUTSIDE_INDIA_STATE' in source
+    assert "static_out = static_frame[in_india].copy()" in source
+    # The only remaining SERVING_STATES use is the training-geography
+    # statistics count on the already-retained frame.
+    assert 'in_training = static_out["state"].isin(SERVING_STATES)' in source
+    assert source.count("isin(SERVING_STATES)") == 1
 
 
 def test_serving_states_is_the_locked_ten():
@@ -398,12 +467,14 @@ def test_run_ingestion_end_to_end_schema_and_store_contract(tmp_path, monkeypatc
     )
     assert out_static.equals(real_static)
 
-    # The 10-state filter stats must be consistent. (The real serving parquets
-    # are now 10-state-only after the migration run, so the slice may have
-    # dropped 0 rows; before the migration it dropped the non-serving states.)
+    # The India land-mask gate stats must be consistent, and the run history
+    # contract must report state counts + outside-India rejections.
     sf = stats["state_filter"]
-    assert sf["kept_rows"] == stats["final_static_rows"]
-    assert set(sf["kept_by_state"]) <= set(SERVING_STATES)
+    assert sf["india_rows_retained"] == stats["final_static_rows"]
+    assert sf["india_rows_retained"] + sf["outside_india_rejected"] > 0
+    assert OUTSIDE_INDIA_STATE not in sf["rows_by_state"]
+    assert sf["states_served"] >= 1
+    assert "outside_training_geography_rows" in sf and "training_geography_rows" in sf
 
     # FeatureStoreService contract: load, reload, and query the new date.
     from app.core.config import settings as cfg
@@ -483,7 +554,7 @@ def test_plausibility_gates_accept_sane_single_day_stats():
     from ingestion.run_ingestion import plausibility_violations
 
     stats = {"points_total": 40_000, "new_cells": 5_000, "final_daily_rows": 900_000,
-             "state_filter": {"kept_rows": 500_000, "dropped_rows": 400_000}}
+             "state_filter": {"india_rows_retained": 500_000, "outside_india_rejected": 400_000}}
     assert plausibility_violations(stats) == []
 
 
@@ -491,7 +562,7 @@ def test_plausibility_gates_flag_insane_stats():
     from ingestion.run_ingestion import plausibility_violations
 
     stats = {"points_total": 5, "new_cells": 99_000, "final_daily_rows": -1,
-             "state_filter": {"kept_rows": 0, "dropped_rows": 0}}
+             "state_filter": {"india_rows_retained": 0, "outside_india_rejected": 0}}
     violations = plausibility_violations(stats)
     assert violations, "implausible run stats must be flagged"
     assert any("points_total" in v for v in violations)

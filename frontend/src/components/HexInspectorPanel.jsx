@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { CLASS_COLORS, CLASS_LABELS, parseCaveatFlag, confidenceLabel } from '../services/api';
+import {
+  CLASS_COLORS,
+  CLASS_LABELS,
+  parseCaveatFlag,
+  confidenceLabel,
+  deriveClassificationAssessment,
+  humanizeAttribution
+} from '../services/api';
 
 /**
  * HexInspectorPanel component
@@ -50,7 +57,7 @@ export default function HexInspectorPanel({
           textAlign: 'left'
         }}
       >
-        <h4 style={{ color: '#eceff4', margin: '0 0 6px 0', fontSize: '1rem', fontFamily: 'var(--font-heading)' }}>
+        <h4 style={{ color: 'var(--text-primary)', margin: '0 0 6px 0', fontSize: '1rem', fontFamily: 'var(--font-heading)' }}>
           {cell.name || 'Location Inspected'}
         </h4>
         {cell.latitude != null && cell.longitude != null && (
@@ -84,6 +91,7 @@ export default function HexInspectorPanel({
   const classLabel = CLASS_LABELS[predictedClass] || predictedClass;
   const labelQuality = confidenceLabel(cell);
   const caveats = parseCaveatFlag(cell.caveat_flag);
+  const assessment = deriveClassificationAssessment(cell, explanation || {});
 
   // Sort probabilities descending
   const sortedProbabilities = Array.isArray(cell.probabilities)
@@ -136,7 +144,7 @@ export default function HexInspectorPanel({
         border: '1px solid var(--hairline-border, #2e3440)',
         borderRadius: '8px',
         textAlign: 'left',
-        color: '#eceff4'
+        color: 'var(--text-primary)'
       }}
     >
       {/* Header with Class Swatch & Primary Qualitative Badge */}
@@ -152,7 +160,7 @@ export default function HexInspectorPanel({
             }}
           />
           <div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f8f9fa' }}>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {classLabel}
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', fontFamily: 'monospace' }}>
@@ -240,7 +248,7 @@ export default function HexInspectorPanel({
               return (
                 <div key={prob.class_name} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                    <span style={{ color: prob.class_name === predictedClass ? '#f8f9fa' : 'var(--text-muted, #8b949e)' }}>
+                    <span style={{ color: prob.class_name === predictedClass ? 'var(--text-primary)' : 'var(--text-muted, #8b949e)' }}>
                       {pLabel}
                     </span>
                     <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{pct}%</span>
@@ -310,8 +318,15 @@ export default function HexInspectorPanel({
 
             {!loadingExplanation && explanation && explanation.feature_attributions && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div className="classification-assessment">
+                  <div className="classification-assessment-title">Classification assessment</div>
+                  <div><strong>Primary class:</strong> {assessment.primaryClass}</div>
+                  <div><strong>Likely gas flare:</strong> <span className={`assessment-${assessment.gasFlare.toLowerCase().replace(/\s+/g, '-')}`}>{assessment.gasFlare}</span></div>
+                  <div><strong>Likely wildfire:</strong> <span className={`assessment-${assessment.wildfire.toLowerCase().replace(/\s+/g, '-')}`}>{assessment.wildfire}</span></div>
+                  <div className="classification-assessment-note">{assessment.note}</div>
+                </div>
                 {explanation.summary_statement && (
-                  <div style={{ fontSize: '0.75rem', color: '#abb2bf', fontStyle: 'italic', marginBottom: '2px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '2px' }}>
                     {explanation.summary_statement}
                   </div>
                 )}
@@ -326,11 +341,11 @@ export default function HexInspectorPanel({
                       fontSize: '0.75rem'
                     }}
                   >
-                    <div style={{ color: '#d19a66', fontWeight: 600, fontSize: '0.72rem' }}>
-                      {attr.feature_name} = {attr.feature_value} ({attr.contribution})
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.72rem' }}>
+                      {humanizeAttribution(attr).name} — {humanizeAttribution(attr).direction} ({attr.contribution})
                     </div>
-                    <div style={{ color: '#abb2bf', marginTop: '2px', lineHeight: 1.3 }}>
-                      {attr.description || `${attr.feature_name} influenced prediction with weight ${attr.contribution}`}
+                    <div style={{ color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.3 }}>
+                      {humanizeAttribution(attr).detail} <span className="feature-audit">Raw: {attr.feature_name} = {attr.feature_value}</span>
                     </div>
                   </div>
                 ))}

@@ -43,8 +43,12 @@ export function useMapLocation(mapRef, onSelectLocation) {
       const key = `${lat},${lon},${h3}`;
       if (lastTargetRef.current !== key) {
         lastTargetRef.current = key;
-        const targetLat = parseFloat(lat);
-        const targetLon = parseFloat(lon);
+        const targetLat = Number.parseFloat(lat);
+        const targetLon = Number.parseFloat(lon);
+        if (!Number.isFinite(targetLat) || !Number.isFinite(targetLon)
+          || targetLat < -90 || targetLat > 90 || targetLon < -180 || targetLon > 180) {
+          return;
+        }
 
         // MapLibre flyTo: center is [lon, lat]
         map.flyTo({ center: [targetLon, targetLat], zoom: 9, duration: 1500 });
@@ -61,9 +65,12 @@ export function useMapLocation(mapRef, onSelectLocation) {
       const map = mapRef?.current?.getMap?.() ?? mapRef?.current;
       if (!map) return;
       const { lat, lon, h3, name } = e.detail ?? {};
-      if (lat != null && lon != null) {
-        map.flyTo({ center: [lon, lat], zoom: 9, duration: 1500 });
-        onSelectLocationRef.current?.({ lat, lon, h3, name });
+      const targetLat = Number(lat);
+      const targetLon = Number(lon);
+      if (Number.isFinite(targetLat) && Number.isFinite(targetLon)
+        && targetLat >= -90 && targetLat <= 90 && targetLon >= -180 && targetLon <= 180) {
+        map.flyTo({ center: [targetLon, targetLat], zoom: 9, duration: 1500 });
+        onSelectLocationRef.current?.({ lat: targetLat, lon: targetLon, h3, name });
       }
     };
 

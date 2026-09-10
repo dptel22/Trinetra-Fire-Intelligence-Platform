@@ -456,3 +456,63 @@ Ownership split, interface contract, and per-agent prompts live in
 - Published GitHub release `serving-data-2026-09-09` for `dptel22/SIH_2026`.
 - Assets include `sih2026-serving-data-v1.zip`, `SHA256SUMS.json`, and the FIRMS serving parquet; the ZIP contains both serving parquets.
 - Updated `scripts/setup.ps1` with `-DownloadServingData` and documented the release URL in `docs/PROJECT_SETUP.md`.
+
+### 2026-09-09T21:36:09+05:30 Codex — UI, Blue Marble, and reproducibility cleanup
+
+- Updated the frontend classification filters, legend, reliability copy, hotspot inspector, evidence-based explanation text, and class-specific map markers.
+- Replaced the stretched single-image Blue Marble source with locally generated Web-Mercator tiles under `frontend/public/tiles/bluemarble/`; added `frontend/scripts/build_bluemarble_tiles.py` for regeneration.
+- Added direct serving-data release download instructions and explicit regeneration paths for ignored PMTiles, raw FIRMS data, and runtime databases in `docs/PROJECT_SETUP.md`.
+- Interface impact: visual-only frontend changes and operator documentation; no backend API/schema changes.
+- Verification: frontend test suite 9/9 groups passed; `npm run build` passed; `git diff --check` passed; local map preview visually verified the tiled Blue Marble layer and class markers.
+
+### 2026-09-10 Agent 3 — Alerts/archive visual QA and accessibility verification
+
+- Verified Agent 2's alerts/archive frontend in a real browser (ZCode IAB, Chromium) against a fresh archive-compatible backend on port 8001 (`/api/v1/archive/*` confirmed live; the long-running port-8000 backend predates the archive router and was left untouched) and a dedicated vite dev server on port 5199 (`VITE_API_URL=http://127.0.0.1:8001`).
+- Routes verified visually: `/` (splash + map), `/fire-map` (also with the new `&date=` deep-link param — tolerated, ignored, no crash), `/fire-alerts`, `/archive` (deep link works in vite dev; Agent 2's noted SPA-fallback limitation did not reproduce).
+- Alerts states verified: LIVE (newest date), HISTORICAL + per-date "No ingestion run record" warning (older dates), DEMO (client-side nav from a mock-flipped map; SIMULATED badges per row), OFFLINE (dead backend; explicit no-mock-substitution message, disabled export/date controls, Retry), filter chips with counts, pagination, CSV download event, View on Map links carrying `&date=`. Sort comparator code-reviewed (uniform 100% confidence in this seeded dataset makes orders visually indistinguishable). Loading, no-detections-for-valid-date, and unavailable-date states are not reachable with the current 8-date store in the live UI; they remain covered by unit tests (22/22).
+- Archive verified: always HISTORICAL (including newest day), Older/Newer navigation both directions, class/state/needs-review/confidence filters (server-side), needs-review filter matches API `needs_review_total` exactly (09-02: 137→12), zero-match state with disabled Export CSV, summary cards, CSV download event, archive→map link carrying the selected date.
+- FIX 1 (`frontend/src/components/FireAlertsPage.jsx`): returning to the newest date after viewing an archived day kept the HISTORICAL badge, because the live-feed branch of `loadAlerts` never restored `backendDataMode` after an archive response set it to `'historical'`. Added `datesDataModeRef` (set at bootstrap from the dates endpoint, restored in the live branch). Verified LIVE→HISTORICAL→LIVE via both the select and Older/Newer paths.
+- FIX 2 (`frontend/src/components/ArchivePage.jsx`): the archive-wide "Need analyst review" card always showed 0 — `archiveTotals` summed `d.needs_review_total` from days already normalized to camelCase (`needsReviewTotal`) by `fetchArchiveSummary`. Now sums `needsReviewTotal` (snake_case kept as fallback). Verified: card shows 608, matching the `/api/v1/archive/summary` total.
+- Keyboard/focus: honest failure — the IAB guest window never holds OS focus, so real Tab presses never move DOM focus and programmatic `.focus()` never matches `:focus` (`matches(':focus') === false` with `activeElement` set). The focus-ring rule (`index.css` `button:focus, select:focus, …`) IS loaded and correct in the live CSSOM (verified `outline: 2px solid #3D9DE8`); the painted ring still needs one manual Tab test in a focused browser. Same limitation Agent 2 documented.
+- Responsive: 820px tablet renders cleanly; 390px layout stacks correctly with one pre-existing ~6px header-wrapper horizontal scroll (not from the alerts/archive work; phone check skipped per user instruction after capture).
+- Verification: `node test_agent_alerts.mjs` 22/22, `node test_agent_b.mjs` 10/10, `npm run lint` 0 errors / 3 pre-existing warnings, `npm run build` passes, `git diff --check` clean.
+- Interface impact: two small frontend fixes only; no API, schema, backend, map-architecture, or dependency changes.
+
+### 2026-09-10 Agent 4 — Adversarial review of alerts/archive + frontend fixes
+
+- Reviewed Agents 1–3's work against the code (Agent 3's report lives in the AGENT_LOG entry above, not a separate file): verified both Agent 3 fixes in code, exercised all 9 API endpoints over HTTP against the archive-capable backend on port 8001 (port 8000 predates the archive router and 404s /api/v1/archive/* — restart before demoing), and browser-verified /fire-alerts (LIVE↔HISTORICAL navigation, sorting, caveats, pagination), /archive (always HISTORICAL, cards 1796/608, zero-result state with disabled export), light/dark themes, 390px layout, and archive→map &date= deep links.
+- Endpoint verification: 404 structured archive_date_not_available; 400 malformed date/unknown class/min>max; limit>1000 rejected; newest date live/ok, 2026-09-02 historical/no_run_record with needs_review=true → 12; summary 8 days / 1796 / 608 (matches ingestion final_daily_rows); state+geography present on archived rows; no outside-India keys.
+- FIX A (frontend/src/components/ArchivePage.jsx): bounded /archive/summary to the most recent 31 archived days (backend caps the span; an unbounded request would 400 once the archive grows) and added an explicit role="alert" "summary unavailable" state instead of silent zero cards; first card reads "latest 31 days" when bounded.
+- FIX B (frontend/src/components/ArchivePage.jsx + FireAlertsPage.jsx): archive status pill now reuses the exported StatusBadge (new optional labelPrefix prop) instead of duplicated markup; removed the dead firstRenderRef branch in the reload effect.
+- FIX C: deleted untracked dead file frontend/test_jsx_loader.mjs (self-referenced only).
+- Deliberately NOT changed (documented in docs/coordination/alerts-archive/agent-4-adversarial-review.md): LIVE label on unknown provenance in the /health-fallback path (test-asserted design, disclosed inline), ingestionStatusWarning('failed') wording nuance (backend shape makes no-run and failed indistinguishable), CSV formula-prefix escaping (backend-controlled values only).
+- Verification: npm run build passes; npm run lint 0 errors; node test_agent_alerts.mjs 22/22; node test_agent_b.mjs 11/11; pytest tests/test_archive.py 26 passed; git diff --check clean. Full report: docs/coordination/alerts-archive/agent-4-adversarial-review.md.
+- Interface impact: StatusBadge gains an optional labelPrefix prop (default 'Feed status' — existing call sites unchanged); ArchivePage bootstrap now fetches the summary sequentially after dates (bounded window). No backend, schema, or dependency changes.
+
+## [2026-09-10T05:10+05:30] Agent: ZCode — Phase 3+4 complete: raw FIRMS evidence archive, run manifests, alert lifecycle
+
+**Scope:** Closed the three remaining gaps from the code-verified review. No new database engine; reuses the audit DuckDB, atomic-parquet, and run-history patterns.
+
+**Backend:**
+- `ingestion/firms_pull.py` — `fetch_firms_both(return_raw=True)` now also returns the untouched per-source `_parse_csv` frames (column superset preserved).
+- `ingestion/raw_archive.py` (new) — immutable raw archive at `data/archive/firms/source=<SRC>/acq_date=<DATE>/part-<run_id>.parquet`; run_id in the filename makes parts immutable by construction; zero-detection days still write schema-carrying partitions; `has_parts()` / `read_raw_observations()` for serving; sha256 per part; no filesystem paths in returned descriptors.
+- `ingestion/manifest.py` (new) — best-effort INSERT-only `ingestion_runs` DuckDB manifest (`INGESTION_DB_PATH`); a manifest failure never fails a run; JSON run history stays authoritative.
+- `ingestion/run_ingestion.py` — real `run_id` (`RUN-<UTC>-<hex6>`), raw parts written BEFORE aggregation (evidence survives mid-run crashes), `schema_hash` (sha256 of the daily arrow schema) + `model_version` + `raw_archive` in run stats and history; override runs record `raw_archive.skipped`; failure-path history entries carry run ids.
+- `app/services/audit_service.py` — single persistent read-write connection under a Lock (removes the latent read_only/read-write mixed-config failure under the FastAPI threadpool); new append-only `alert_lifecycle_events` table; `log_action` (server-side resolution of model output + run provenance), `get_state_for_date` (replay: latest state-changing event wins, `note` never moves state, `reopened` → new), `get_history`.
+- `app/api/endpoints/alerts.py` + `app/schemas/alerts.py` (new) — `POST /alerts/{hotspot_id}/actions` (DEMO_ANALYST default applied server-side; dismissals require a >=10-char note), `GET /alerts/states?acq_date=`, `GET /alerts/{hotspot_id}/history`.
+- `app/api/endpoints/evidence.py` + `app/schemas/evidence.py` (new) — `GET /archive/runs` (whitelisted manifest fields, path-free, acq_date matches targets, @date chunk keys and raw parts) and `GET /archive/evidence` (raw rows behind a prediction date; run_id defaults to the decisive run; 404 "raw_evidence_not_available" only when no partition exists — a zero-row partition is a valid empty day, 200).
+- `app/services/archive_service.py` — `_run_id()` promotes real run ids, falls back to the synthetic `date:started_at` key for pre-manifest history.
+- `app/core/config.py` — `RAW_ARCHIVE_DIR` (env-overridable).
+
+**Frontend (`backend/frontend`):**
+- `src/services/api.js` — strict-path `submitAlertAction` / `fetchAlertStates` / `fetchAlertHistory` / `fetchArchiveRuns` / `fetchRawEvidence`; CSV export gains `alert_state`, `analyst_note`, `ingestion_run_id`.
+- `AlertCard` (shared) — lifecycle state chip (distinct from the model's needs-review badge), analyst action bar with reviewer identity persisted in localStorage (default DEMO_ANALYST + visible demo tag; disabled in mock mode — no backend to persist to), append-only review-history toggle, raw-FIRMS-evidence panel with an honest "predates the raw archive" state.
+- `FireAlertsPage` + `ArchivePage` — replay-derived states fetched per date and joined by `{h3_08}_{acq_date}` (prediction `cell_id` carries only the h3 index, so ids are composed with the acquisition date), REVIEW STATE filter chips with counts, reviewed/unreviewed-lifecycle totals, run-manifest block on the archive page.
+- Fixed mid-verification: hotspot id composition (browser POSTs were 400ing on bare h3 ids) and empty-day evidence 404 conflation.
+
+**Verification:**
+- Backend pytest: **131 passed, 1 deselected** (28 new tests: raw archive, ingestion hook, manifest, lifecycle, evidence).
+- `npm run lint` → 0 errors; `npm run build` → pass.
+- Browser (live backend + live FIRMS run): acknowledge → confirm flows update chips/counts; history shows append-only events with analyst ids and notes; evidence panel shows the honest not-captured/empty-day states; archive run-manifest block shows run id, raw parts, and plausibility warnings; a real `RUN-20260909T235222-6cef34` run (0 points, flagged) wrote zero-row parts for 2026-09-10 and served evidence with `ingestion_status=plausibility_warning`.
+
+**Known honest limitations:** dates ingested before this change have no raw parts (UI says so explicitly); FIRMS NRT's rolling window means gap-fill re-queries of older days legitimately return 0 rows and the newest-run provenance rule then flags those days as `plausibility_warning` — intended, truthful behavior.

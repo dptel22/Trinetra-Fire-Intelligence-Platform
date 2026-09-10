@@ -35,6 +35,11 @@ from pipeline.feature_engineering import latlng_to_h3
 logger = logging.getLogger(__name__)
 
 _BUNDLE_FILES = ("feature_schema.json", "calibrators.joblib", "review_thresholds.json")
+# Values for PredictionResponse.geography (app.schemas.prediction.Geography).
+GEO_TRAINING = "training_geography"
+GEO_OUTSIDE_TRAINING = "india_outside_training"
+GEO_OUTSIDE_INDIA = "outside_india"
+_OUTSIDE_INDIA_STATE = "Outside India"  # matches ingestion.osm_wri_load.OUTSIDE_INDIA_STATE
 
 
 class CatBoostModelService:
@@ -50,6 +55,10 @@ class CatBoostModelService:
         self.model_classes: list[str] = []
         self.calibrators: dict[str, IsotonicRegression] | None = None
         self.review_thresholds: dict[str, float] = {}
+        # States the bundle was trained/evaluated on (defaults to the config
+        # constant; overridden from model_metadata.json at load time). Used
+        # ONLY for provenance labeling — never to exclude rows from serving.
+        self.training_geography_states: set[str] = set(settings.TRAINING_GEOGRAPHY_STATES)
         self._lock = Lock()
 
     def load_model(self) -> None:
@@ -106,6 +115,7 @@ class CatBoostModelService:
                 raise ValueError("review_thresholds.json values must be numeric")
 
             self._check_runtime_versions(bundle)
+            self._load_training_geography(bundle)
 
             self.model = model
             self.model_classes = [str(cls) for cls in model.classes_]
@@ -113,6 +123,35 @@ class CatBoostModelService:
             self.review_thresholds = {k: float(v) for k, v in thresholds.items()}
             self.is_loaded = True
             self.startup_latency_ms = round((time.time() - started) * 1000, 2)
+
+    def _load_training_geography(self, bundle: Path) -> None:
+        """Read the train/eval state partition from the bundle metadata.
+
+        The union of train/test_a/test_b states defines the geography the
+        model's reported metrics actually cover. Missing metadata is warn-only:
+        the config constant stays in force.
+        """
+        meta_path = bundle.parent / "model_metadata.json"
+        if not meta_path.exists():
+            logger.warning("model_metadata.json not found next to bundle %s — using config training states", bundle)
+            return
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            states = {
+                s for key in ("train_states", "test_a_states", "test_b_states") for s in meta.get(key, [])
+            }
+            if states:
+                self.training_geography_states = states
+        except (OSError, json.JSONDecodeError):
+            logger.warning("Could not parse %s — using config training states", meta_path, exc_info=True)
+
+    def _geography(self, cell_features: dict[str, Any]) -> str | None:
+        state = cell_features.get("state")
+        if not isinstance(state, str) or not state:
+            return None
+        if state == _OUTSIDE_INDIA_STATE:
+            return GEO_OUTSIDE_INDIA
+        return GEO_TRAINING if state in self.training_geography_states else GEO_OUTSIDE_TRAINING
 
     def _check_runtime_versions(self, bundle: Path) -> None:
         """Warn (never fail) when serving versions drift from the training runtime."""
@@ -227,8 +266,12 @@ class CatBoostModelService:
         threshold = self.review_thresholds.get(raw_class)
         return threshold is not None and confidence < threshold
 
-    def _compose_caveats(self, policy_caveat: str | None, needs_review: bool) -> str | None:
+    def _compose_caveats(
+        self, policy_caveat: str | None, needs_review: bool, outside_training: bool = False
+    ) -> str | None:
         parts = []
+        if outside_training:
+            parts.append(settings.CAVEAT_MANIFEST["outside_training_geography"])
         if policy_caveat:
             parts.append(policy_caveat)
         if needs_review:
@@ -251,8 +294,10 @@ class CatBoostModelService:
         raw_class = self.model_classes[predicted_idx]
         confidence = float(prob_row[predicted_idx])
         predicted_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
-        needs_review = self._needs_review(raw_class, confidence, predicted_class)
-        caveat = self._compose_caveats(policy_caveat, needs_review)
+        geography = self._geography(cell_features)
+        outside_training = geography == GEO_OUTSIDE_TRAINING
+        needs_review = self._needs_review(raw_class, confidence, predicted_class) or outside_training
+        caveat = self._compose_caveats(policy_caveat, needs_review, outside_training)
         lat, lon = self._coordinates(cell_features)
 
         return PredictionResponse(
@@ -266,6 +311,8 @@ class CatBoostModelService:
             calibrated=calibrated,
             needs_review=needs_review,
             caveat_flag=caveat,
+            state=cell_features.get("state") if isinstance(cell_features.get("state"), str) else None,
+            geography=geography,
             latency_ms=round((time.time() - started) * 1000, 2),
         )
 
@@ -287,10 +334,18 @@ class CatBoostModelService:
             raw_class = predicted_class
         confidence = float(prob_row[predicted_idx])
         final_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
-        needs_review = self._needs_review(raw_class, confidence, final_class)
+        geography = self._geography(cell_features)
+        outside_training = geography == GEO_OUTSIDE_TRAINING
+        needs_review = self._needs_review(raw_class, confidence, final_class) or outside_training
+        geo_caveat = settings.CAVEAT_MANIFEST["outside_training_geography"] if outside_training else None
         active_list = active_caveats(final_class)
         caveat_list = []
-        for caveat in (policy_caveat, settings.CAVEAT_MANIFEST["low_confidence_review"] if needs_review else None, *active_list):
+        for caveat in (
+            geo_caveat,
+            policy_caveat,
+            settings.CAVEAT_MANIFEST["low_confidence_review"] if needs_review else None,
+            *active_list,
+        ):
             if caveat and caveat not in caveat_list:
                 caveat_list.append(caveat)
         caveat_str = " | ".join(caveat_list) if caveat_list else None
@@ -353,6 +408,19 @@ class CatBoostModelService:
             "latest_acq_date": latest_acq_date,
         }
 
+    def _with_state(self, cell_features: dict[str, Any]) -> dict[str, Any]:
+        """Attach state provenance from the feature store side-map.
+
+        query_bbox/get_cell rows carry only model features + coordinates; the
+        (state, state_assignment_method) provenance lives in the store's
+        side-map built from the same static parquet.
+        """
+        info = feature_store.get_state(str(cell_features.get("h3_08", "")))
+        if info:
+            cell_features.setdefault("state", info[0])
+            cell_features.setdefault("state_assignment_method", info[1])
+        return cell_features
+
     def predict_single(self, record_dict: dict[str, Any]) -> PredictionResponse:
         h3_index = record_dict.get("h3_08") or record_dict.get("h3_index")
         if not h3_index and "latitude" in record_dict and "longitude" in record_dict:
@@ -361,7 +429,7 @@ class CatBoostModelService:
         cell = feature_store.get_cell(str(h3_index), acq_date) if h3_index and acq_date else None
         if not cell:
             raise ValueError(f"No H3-day features found for h3_08={h3_index}, acq_date={acq_date}")
-        return self.predict(cell)
+        return self.predict(self._with_state(cell))
 
     def explain_single(self, record_dict: dict[str, Any]) -> ExplanationResponse:
         h3_index = record_dict.get("h3_08") or record_dict.get("h3_index")
@@ -371,12 +439,13 @@ class CatBoostModelService:
         cell = feature_store.get_cell(str(h3_index), acq_date) if h3_index and acq_date else None
         if not cell:
             raise ValueError(f"No H3-day features found for h3_08={h3_index}, acq_date={acq_date}")
-        return self.explain(cell)
+        return self.explain(self._with_state(cell))
 
     def get_cell_detail(self, cell_id: str, acq_date: str) -> CellPredictionDetailResponse:
         cell = feature_store.get_cell(cell_id, acq_date)
         if not cell:
             raise ValueError(f"No H3-day features found for h3_08={cell_id}, acq_date={acq_date}")
+        cell = self._with_state(cell)
         prediction = self.predict(cell)
         explanation = self.explain(cell, predicted_class=prediction.predicted_class)
         pred_dict = prediction.model_dump()
@@ -475,8 +544,10 @@ class CatBoostModelService:
             raw_class = self.model_classes[predicted_idx]
             confidence = float(prob_row[predicted_idx])
             predicted_class, policy_caveat = self._apply_confidence_policy(raw_class, confidence)
-            needs_review = self._needs_review(raw_class, confidence, predicted_class)
-            caveat = self._compose_caveats(policy_caveat, needs_review)
+            geography = self._geography(cell_features)
+            outside_training = geography == GEO_OUTSIDE_TRAINING
+            needs_review = self._needs_review(raw_class, confidence, predicted_class) or outside_training
+            caveat = self._compose_caveats(policy_caveat, needs_review, outside_training)
             lat, lon = self._coordinates(cell_features)
 
             predictions.append(
@@ -491,6 +562,8 @@ class CatBoostModelService:
                     calibrated=bool(is_cal),
                     needs_review=needs_review,
                     caveat_flag=caveat,
+                    state=cell_features.get("state") if isinstance(cell_features.get("state"), str) else None,
+                    geography=geography,
                     latency_ms=row_latency,
                 )
             )
@@ -508,6 +581,7 @@ class CatBoostModelService:
     ) -> ViewportPredictionsResponse:
         mode = "aggregated_macro" if (max_lat - min_lat > 20.0 or max_lon - min_lon > 20.0) else "detailed_hexagons"
         rows = feature_store.query_bbox(min_lat, max_lat, min_lon, max_lon, acq_date)
+        rows = [self._with_state(row) for row in rows]
         predictions = self.predict_batch(rows)
         return ViewportPredictionsResponse(
             mode=mode,

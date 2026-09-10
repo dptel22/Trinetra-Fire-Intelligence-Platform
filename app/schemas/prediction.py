@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+# Geographic provenance of a scored cell relative to the model's original
+# 10-state training/evaluation partition:
+# - training_geography: state was part of the model's train/eval states.
+# - india_outside_training: valid Indian state/UT the model was never
+#   evaluated on — prediction is served but flagged for analyst review.
+# - outside_india: cell failed the India polygon mask (never served by
+#   ingestion; kept for schema completeness).
+Geography = Literal["training_geography", "india_outside_training", "outside_india"]
 
 
 class ClassProbability(BaseModel):
@@ -31,6 +40,8 @@ class PredictionResponse(BaseModel):
     calibrated: bool = True
     needs_review: bool = False
     caveat_flag: str | None = None
+    state: str | None = None
+    geography: Geography | None = None
     latency_ms: float
 
 
@@ -95,4 +106,5 @@ class HealthResponse(BaseModel):
     startup_latency_ms: float | None = None
     target_classes: list[str]
     latest_acq_date: str | None = None
+    ingestion: dict[str, Any] | None = None
 

@@ -12,9 +12,9 @@
  * H3 hexagons — one distinct glyph per predicted class. needs_review cells
  * get a dashed ring under the pin; selection gets a solid halo.
  *
- * Map interaction: no maxBounds clamp — free pan/zoom around India and its
- * neighbours (min zoom 2, max 16). Predictions stay filtered to the India
- * bbox (the backend only has India data).
+ * Map interaction: maxBounds clamp to India + a small ring of neighbours
+ * (INDIA_MAX_BOUNDS). Predictions stay filtered to the shared India bbox,
+ * and the backend serves only Indian-territory cells (polygon land mask).
  *
  * Model honesty: hover tooltip shows the qualitative confidenceLabel badge
  * only — never a bare numeric %. QuickSearch misses produce an
@@ -44,9 +44,11 @@ import {
   CLASS_COLORS,
   CLASS_LABELS,
   INDIA_CENTER,
+  INDIA_BOUNDS,
   fetchPredictions,
   fetchHealth,
   fetchExplanation,
+  isOutsideIndia,
   onApiModeChange,
   confidenceLabel,
   parseCaveatFlag,
@@ -55,7 +57,7 @@ import {
 
 import { useMapLocation } from '../services/mapLocation';
 import {
-  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, PMTILES_AVAILABLE
+  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, CLASS_DOT_ICONS, PMTILES_AVAILABLE
 } from '../services/basemapStyles';
 
 // ─── PMTiles protocol registration (static, guarded against HMR re-eval) ─────
@@ -74,10 +76,22 @@ registerPmtilesProtocol();
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-// India filter for client-side prediction clamping (backend holds India data
-// only). NOT a map maxBounds — the map itself pans freely (Dhruv, 2026-09-09:
-// "freedom to move around India, around the neighbours").
-const INDIA_FILTER = { minLon: 68, maxLon: 98, minLat: 6, maxLat: 36 };
+// India filter for client-side prediction clamping, derived from the single
+// shared geography contract in api.js (matches the ingestion INDIA_BBOX and
+// backend fetch area). The server already applies the India polygon land
+// mask, so foreign detections (Sri Lanka, open water) never arrive here —
+// this filter stays as cheap insurance, and INDIA_MAX_BOUNDS clamps the map
+// itself to India + a small ring of neighbours for context.
+const INDIA_FILTER = {
+  minLon: INDIA_BOUNDS.min_lon,
+  maxLon: INDIA_BOUNDS.max_lon,
+  minLat: INDIA_BOUNDS.min_lat,
+  maxLat: INDIA_BOUNDS.max_lat
+};
+const INDIA_MAX_BOUNDS = [
+  [INDIA_FILTER.minLon - 7, INDIA_FILTER.minLat - 6], // SW (Arabian Sea, Gulf of Mannar)
+  [INDIA_FILTER.maxLon + 7, INDIA_FILTER.maxLat + 6]  // NE (Myanmar, Tibet, Bay of Bengal)
+];
 
 // Canonical class ordering for availableClasses (Agent B flag: raw Set spread
 // gave non-deterministic order; Object.keys(CLASS_COLORS) is the taxonomy order).
@@ -163,8 +177,10 @@ export default function FireMapPage() {
     }
   }, []);
 
-  // Health / review thresholds for Legend + DataReliabilityBlock
+  // Health / review thresholds for Legend + DataReliabilityBlock, plus the
+  // ingestion data-quality/provenance block (states served, foreign rejections)
   const [reviewThresholds, setReviewThresholds] = useState(null);
+  const [ingestionInfo, setIngestionInfo] = useState(null);
 
   // API mode for OfflineBanner subscription
   const [apiMode, setApiMode] = useState('live');
@@ -196,6 +212,7 @@ export default function FireMapPage() {
   useEffect(() => {
     fetchHealth().then((h) => {
       if (h?.review_thresholds) setReviewThresholds(h.review_thresholds);
+      if (h?.ingestion) setIngestionInfo(h.ingestion);
       const latest = h?.latest_acq_date;
       if (latest) setAcqDate(latest);
     }).catch(() => {});
@@ -296,8 +313,12 @@ export default function FireMapPage() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  // Client-side India filter (task 5b — cheap insurance against backend regressions)
+  // Client-side India filter — isOutsideIndia() trusts server provenance
+  // when present and falls back to conservative geometry (bbox + Sri Lanka
+  // box) for legacy/malformed responses lacking it; plus the shared bbox.
+  // Cheap insurance against backend regressions.
   const indiaFiltered = useMemo(() => predictions.filter(p =>
+    !isOutsideIndia(p) &&
     p.latitude  >= INDIA_FILTER.minLat && p.latitude  <= INDIA_FILTER.maxLat &&
     p.longitude >= INDIA_FILTER.minLon && p.longitude <= INDIA_FILTER.maxLon
   ), [predictions]);
@@ -316,15 +337,25 @@ export default function FireMapPage() {
     return CLASS_ORDER.filter(cls => present.has(cls));
   }, [indiaFiltered]);
 
+  // Detections whose cell lies outside the model's original 10-state
+  // training/evaluation geography — served, but flagged for analyst review
+  // server-side (needs_review forced + geographic caveat).
+  const geoReviewCount = useMemo(
+    () => indiaFiltered.filter(p => p.geography === 'india_outside_training').length,
+    [indiaFiltered]
+  );
+
   // ── Deck.gl layers ────────────────────────────────────────────────────────
   // Per-class fire-pin icons (Dhruv, 2026-09-09: "instead of hexagons, generate
   // or get icons" — one distinct glyph per classification). Below zoom 6 the
   // national view can hold ~2500 detections; icons are decluttered to the top
   // 600 by calibrated confidence so the overview stays readable. Presentation-
   // only ranking — no data is fabricated or relabeled.
-  const iconSize = zoomLevel <= 4.5 ? 26
-    : zoomLevel <= 6 ? 32
-    : zoomLevel <= 8 ? 40 : 48;
+  // Flat class markers stay readable over satellite imagery; the glyph fades
+  // in only at regional zoom where it can be recognized without clutter.
+  const iconSize = zoomLevel <= 4.5 ? 28
+    : zoomLevel <= 6 ? 34
+    : zoomLevel <= 8 ? 44 : 52;
 
   const displayPredictions = useMemo(() => {
     if (zoomLevel >= 6 || filteredPredictions.length <= 600) return filteredPredictions;
@@ -345,17 +376,14 @@ export default function FireMapPage() {
       filled: false,
       lineWidthUnits: 'pixels',
       getLineWidth: 1.6,
-      getColor: d => [
+      getLineColor: d => [
         ...(CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified), 190
       ],
       getDashArray: [4, 3],
       dashJustified: true,
       extensions: [new PathStyleExtension({ dash: true })],
       pickable: false,
-      updateTriggers: {
-        getRadius: [iconSize],
-        getColor: [activeClasses]
-      }
+      updateTriggers: { getRadius: [iconSize] }
     });
 
     // Solid halo under the selected pin
@@ -371,19 +399,18 @@ export default function FireMapPage() {
       filled: false,
       lineWidthUnits: 'pixels',
       getLineWidth: 2.4,
-      getColor: [255, 255, 255, 220],
+      getLineColor: [255, 255, 255, 220],
       pickable: false,
       updateTriggers: { getRadius: [iconSize] }
     });
 
-    // oxlint-disable-next-line react/refs -- handleIconHover reads refs only
-    // inside the hover event handler, never during render; the useMemo merely
-    // captures the stable callback for the layer.
+    // oxlint-disable-next-line react/refs -- handleIconHover reads refs only inside the hover event handler.
     const iconLayer = new IconLayer({
       id: 'fire-icons',
       data: displayPredictions,
       getPosition: d => [d.longitude, d.latitude],
-      getIcon: d => CLASS_ICONS[d.predicted_class] ?? CLASS_ICONS.unclassified,
+      getIcon: d => CLASS_ICONS[d.predicted_class]
+        ?? CLASS_DOT_ICONS.unclassified,
       sizeUnits: 'pixels',
       getSize: iconSize,
       getColor: [255, 255, 255],
@@ -397,14 +424,11 @@ export default function FireMapPage() {
         }
       },
       onHover: handleIconHover,
-      updateTriggers: {
-        getIcon: [],
-        getSize: [iconSize]
-      }
+      updateTriggers: { getSize: [iconSize] }
     });
 
     return [reviewRingLayer, selectionHaloLayer, iconLayer];
-  }, [displayPredictions, selectedCell, activeClasses, iconSize, handleIconHover]);
+  }, [displayPredictions, selectedCell, iconSize, handleIconHover]);
 
   // ── Map style ─────────────────────────────────────────────────────────────
   const mapStyle = useMemo(() => buildBasemapStyle(basemapId), [basemapId]);
@@ -438,8 +462,9 @@ export default function FireMapPage() {
               zoom: INDIA_CENTER.zoom ?? 5
             }}
             mapStyle={mapStyle}
-            minZoom={2}
+            minZoom={PMTILES_AVAILABLE ? 3 : 4}
             maxZoom={PMTILES_AVAILABLE ? 16 : 9}
+            maxBounds={INDIA_MAX_BOUNDS}
             onMoveEnd={debouncedMoveEnd}
             style={{ width: '100%', height: '100%' }}
           >
@@ -462,7 +487,7 @@ export default function FireMapPage() {
             <div className="firemap-empty-state">
               <div className="firemap-empty-title">No detections in view</div>
               <div className="firemap-empty-sub">
-                Nothing classified for {acqDate} in the current viewport.
+                Nothing matches the selected classes for {acqDate} in the current viewport.
                 {isToday ? '' : ' Try panning over India or switching the observation date.'}
               </div>
             </div>
@@ -556,7 +581,7 @@ export default function FireMapPage() {
               }}
             >
               <span style={{ color: 'var(--text-muted, #8b949e)', fontWeight: 500 }}>Live Ingestion:</span>
-              <span style={{ color: '#eceff4', fontFamily: 'monospace', fontWeight: 600 }}>
+              <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>
                 {acqDate}{isToday ? ' (Today)' : ' (Newest available)'}
               </span>
             </div>
@@ -570,7 +595,7 @@ export default function FireMapPage() {
           />
 
           {/* Legend — empirical unclassified visibility */}
-          <Legend reviewThresholds={reviewThresholds} availableClasses={availableClasses} />
+          <Legend availableClasses={availableClasses} />
 
           {/* Clear-selection control — HexInspectorPanel contract has no onClose */}
           {selectedCell && (
@@ -594,13 +619,39 @@ export default function FireMapPage() {
             loadingExplanation={loadingExplanation}
           />
 
-          {/* Detections in View count */}
+          {/* Detections in View count + data-quality provenance */}
           <div>
             <div className="firemap-section-label">Detections in View</div>
             <div className="firemap-count-box">
               <span className="firemap-count-label">Total visible</span>
-              <span className="firemap-count-value">{filteredPredictions.length}</span>
+              <span className="firemap-count-value">{loadingPredictions ? '…' : filteredPredictions.length}</span>
             </div>
+            <div className="firemap-count-box">
+              <span className="firemap-count-label">Indian detections (post-mask)</span>
+              <span className="firemap-count-value">{loadingPredictions ? '…' : indiaFiltered.length}</span>
+            </div>
+            {geoReviewCount > 0 && (
+              <div className="firemap-count-box">
+                <span className="firemap-count-label">Geo-generalization review</span>
+                <span className="firemap-count-value">{geoReviewCount}</span>
+              </div>
+            )}
+            {ingestionInfo?.available && (
+              <div
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '0.72rem',
+                  color: 'var(--text-muted, #8b949e)',
+                  lineHeight: 1.45,
+                }}
+              >
+                Ingestion provenance: serving {ingestionInfo.states_served ?? '—'} states/UTs ·
+                {' '}{ingestionInfo.outside_india_rejected ?? 0} outside-India detections rejected ·
+                {' '}{ingestionInfo.outside_training_geography_rows ?? 0} rows outside the validated
+                10-state training geography (analyst review required). Nationwide inference is not
+                nationwide validation.
+              </div>
+            )}
           </div>
 
           <div className="firemap-divider" />

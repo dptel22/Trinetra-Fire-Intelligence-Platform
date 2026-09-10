@@ -43,7 +43,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem', color: '#abb2bf', lineHeight: 1.5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem', color: 'var(--text-muted, #abb2bf)', lineHeight: 1.5 }}>
         {/* Industrial */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
           <span
@@ -57,7 +57,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Industrial Facility:</strong> High labeled ground truth support from mapped facility overlays. Predictions reviewed below {getThresholdDisplay('industrial', 0.70)} confidence.
+            <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Industrial Facility:</strong> High labeled ground truth support from mapped facility overlays. Predictions are sent for analyst review below {getThresholdDisplay('industrial', 0.70)} confidence.
           </div>
         </div>
 
@@ -74,7 +74,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Wildfire:</strong> Forest and open-land fire signature class with strong FRP-based evidence. Predictions reviewed below {getThresholdDisplay('wildfire', 0.70)} confidence.
+            <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Wildfire:</strong> Forest and open-land fire signature class with strong FRP-based evidence. Predictions are sent for analyst review below {getThresholdDisplay('wildfire', 0.70)} confidence.
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Mining / Smelter:</strong> {KNOWN_CAVEATS.mining} Calibrated review threshold set at {getThresholdDisplay('mining', 0.85)} confidence.
+            <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Mining / Smelter:</strong> {KNOWN_CAVEATS.mining} Calibrated analyst-review threshold is {getThresholdDisplay('mining', 0.85)} confidence.
           </div>
         </div>
 
@@ -108,7 +108,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Agricultural Burn:</strong> Review threshold 1.01 — all detections automatically flagged for human analyst review. Relies on distance-threshold rule under active refinement.
+            <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Agricultural Burn:</strong> All predictions require human analyst review while the distance-based rule is under active refinement.
           </div>
         </div>
 
@@ -125,7 +125,7 @@ export default function DataReliabilityBlock({ reviewThresholds = null }) {
             }}
           />
           <div>
-            <strong style={{ color: '#eceff4' }}>Unclassified Fallback:</strong> Low-confidence fallback class for thermal hotspots that do not meet classification confidence criteria, preventing false-alarm operational actions.
+            <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Unclassified Fallback:</strong> Low-confidence fallback class for thermal hotspots that do not meet classification confidence criteria, preventing false-alarm operational actions.
           </div>
         </div>
       </div>
