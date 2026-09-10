@@ -92,6 +92,13 @@ export default function HexInspectorPanel({
   const labelQuality = confidenceLabel(cell);
   const caveats = parseCaveatFlag(cell.caveat_flag);
   const assessment = deriveClassificationAssessment(cell, explanation || {});
+  const persistence = explanation?.persistence;
+  const persistenceBadge = {
+    persistent_source: { label: 'Persistent source', color: '#2ecc71' },
+    new_event: { label: 'New activity', color: '#f1c40f' },
+    unknown_provenance: { label: 'Unknown', color: '#a0a0a0' }
+  }[persistence?.event_type];
+  const miningSubtype = explanation?.mining_subtype;
 
   // Sort probabilities descending
   const sortedProbabilities = Array.isArray(cell.probabilities)
@@ -325,6 +332,44 @@ export default function HexInspectorPanel({
                   <div><strong>Likely wildfire:</strong> <span className={`assessment-${assessment.wildfire.toLowerCase().replace(/\s+/g, '-')}`}>{assessment.wildfire}</span></div>
                   <div className="classification-assessment-note">{assessment.note}</div>
                 </div>
+                {persistenceBadge && persistence && (
+                  <div
+                    style={{
+                      border: `1px solid ${persistenceBadge.color}66`,
+                      backgroundColor: `${persistenceBadge.color}14`,
+                      borderRadius: '6px',
+                      padding: '7px 9px',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    <div style={{ color: persistenceBadge.color, fontWeight: 700 }}>
+                      {persistenceBadge.label}
+                    </div>
+                    {persistence.description && (
+                      <div style={{ color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.3 }}>
+                        {persistence.description}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {miningSubtype && (
+                  <div
+                    style={{
+                      alignSelf: 'flex-start',
+                      border: '1px solid rgba(97, 175, 239, 0.35)',
+                      backgroundColor: 'rgba(97, 175, 239, 0.1)',
+                      borderRadius: '999px',
+                      padding: '4px 8px',
+                      color: '#61afef',
+                      fontSize: '0.72rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    {miningSubtype.subtype === 'underground' ? 'Underground mining' : 'Surface mining'}
+                    {' · '}
+                    {Number(miningSubtype.nearest_km).toFixed(1)} km
+                  </div>
+                )}
                 {explanation.summary_statement && (
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '2px' }}>
                     {explanation.summary_statement}

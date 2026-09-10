@@ -10,6 +10,8 @@ data/*.zip
 notebooks/eda/*.parquet
 
 # Agent/IDE temp
+/check_data_v2.py
+/check_settings.py
 .qwen/
 .zcode/
 .claude/

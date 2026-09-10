@@ -21,6 +21,13 @@ The DuckDB feature store is seeded from processed parquet artifacts:
 - `data/processed/sih2026_h3_daily_features_firms.parquet` -> `h3_daily`
 - `data/processed/sih2026_h3_daily_features_with_osm_wri.parquet` -> `osm_wri_static`
 
+### Pipeline Provenance Flags
+
+The following metadata flags are derived during the ingestion pipeline:
+
+- `is_static_land`: Derived from the FIRMS archive `fire_type` field. A value of 1 indicates a "static source" (e.g., industrial flares, volcanoes). A value of 0 indicates non-static, and -1 indicates NRT/unknown.
+- `is_first_observation`: First-ever observation for an H3 cell in the historical corpus; it is not a "new detection today" signal. Use `active_days_7d` and `active_days_30d` for recent activity.
+
 The backend does not train a model at startup and does not invent fallback predictions when artifacts are missing.
 
 ## API Surfaces

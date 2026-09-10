@@ -64,6 +64,8 @@ class ExplanationResponse(BaseModel):
     base_value: float
     feature_attributions: list[FeatureAttribution]
     top_features: list[str] = Field(default_factory=list)
+    persistence: dict[str, str | None] | None = None
+    mining_subtype: dict[str, str | float] | None = None
     caveat_flag: str | None = None
     summary_statement: str
     latency_ms: float

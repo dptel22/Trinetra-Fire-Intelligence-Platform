@@ -372,6 +372,16 @@ Ownership split, interface contract, and per-agent prompts live in
   - FIRMS_MAP_KEY rotation still recommended (it appeared in a screenshot/URL during setup).
 - Blockers / questions: none.
 
+### 2026-09-10T11:30+05:30 Codex — Persistence classification for SHAP explanations
+
+- Files changed: `app/services/model_service.py`, `app/schemas/prediction.py`, `frontend/src/components/HexInspectorPanel.jsx`, `tests/test_backend.py`.
+- What changed: Added deterministic persistence classification and mining subtype context to `ExplanationResponse`; rendered backend-provided persistence descriptions and optional mining subtype badges without changing SHAP extraction or ranking.
+- Interface impact: `GET /api/v1/predictions/{cell_id}/explain` now includes optional `persistence` and `mining_subtype` fields. `CellPredictionDetailResponse` and the CatBoost 55-feature contract are unchanged.
+- Verification: Focused helper tests passed (`2 passed`) before broader verification. Full backend/frontend verification pending.
+- Data note: Current live latest-day rows have resolved `is_static_land` values but all are `-1`, so the UI will honestly show `Unknown` until a resolved historical/demo date is selected.
+
+- Final verification: `tests/test_backend.py` passed 12/12 under the pinned `.venv`; `npm run lint` exited 0 with one pre-existing unused-import warning; `npm run build` passed; `git diff --check` passed. Full pytest was attempted and reported 96 passed, 8 unrelated data-artifact/geography/parity failures, and 29 Windows temp-directory permission errors.
+
 ---
 
 ### [2026-09-08T23:35:00+05:30] Agent BACK-1 — Serving Path & API Surface Complete
@@ -531,5 +541,28 @@ Ownership split, interface contract, and per-agent prompts live in
   - Simplified `CONTRIBUTING.md` to reference Agent conventions and updated folder structures.
   - Updated `FRONTEND_INTEGRATION_GUIDE.md` to match taxonomy, colors, and backend contract (calibrated, needs_review).
   - Audited `AGENTS.md`, `CLAUDE.md`, and `TRAINING_SERVING_SKEW_TEST_REPORT.md` for consistency.
+  - Updated `BACKEND_DOCUMENTATION.md` to clarify provenance of `is_static_land` and `is_first_observation` flags.
 - Interface impact: none (docs only).
 - Blockers / questions: none.
+
+---
+
+## [2026-09-10T18:00:00+05:30] Agent: Persistence Null-Safety Review
+
+- Files changed:
+  - `app/services/model_service.py`
+  - `tests/test_backend.py`
+  - `BACKEND_DOCUMENTATION.md`
+  - `.gitignore`
+- What changed:
+  - Normalized `None` and float/NumPy `NaN` values for static provenance and recent-activity fields before persistence classification.
+  - Added regression coverage for nullable and missing inputs, plus a real serving row that predicts `mining` and exercises subtype output end to end.
+  - Corrected `is_first_observation` documentation to describe historical first observation rather than current-event novelty.
+  - Ignored only the two requested root diagnostics: `check_data_v2.py` and `check_settings.py`.
+- Verification:
+  - `tests/test_backend.py`: 13 passed.
+  - Frontend `npm run lint`: passed with the existing unused `fetchArchiveRuns` warning; `npm run build`: passed.
+  - Baseline `HEAD` and working-tree full-suite runs used the same pinned environment and ignored artifacts; both had the same five failing node IDs: the locked static schema, nationwide serving coverage, and three training-serving parity checks.
+  - `git diff --check`: passed.
+- Interface impact: explain responses retain the three SHAP attributions and now include nullable-safe persistence and mining subtype context.
+- Blockers / questions: unrelated deleted `.agents/skills/code-review/*` files and user diagnostic files were preserved outside the feature changes.

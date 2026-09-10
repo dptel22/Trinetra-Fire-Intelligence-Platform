@@ -42,6 +42,79 @@ GEO_OUTSIDE_INDIA = "outside_india"
 _OUTSIDE_INDIA_STATE = "Outside India"  # matches ingestion.osm_wri_load.OUTSIDE_INDIA_STATE
 
 
+def classify_persistence(cell_features: dict[str, Any]) -> dict[str, str | None]:
+    """Classify recent persistence using upstream FIRMS and rolling features."""
+    static_flag = cell_features.get("is_static_land", -1)
+    if static_flag is None or (
+        isinstance(static_flag, (float, np.floating)) and np.isnan(static_flag)
+    ):
+        static_flag = -1
+
+    active_days_7d = cell_features.get("active_days_7d", 0)
+    if active_days_7d is None or (
+        isinstance(active_days_7d, (float, np.floating)) and np.isnan(active_days_7d)
+    ):
+        active_days_7d = 0
+
+    active_days_30d = cell_features.get("active_days_30d", 0)
+    if active_days_30d is None or (
+        isinstance(active_days_30d, (float, np.floating)) and np.isnan(active_days_30d)
+    ):
+        active_days_30d = 0
+
+    if static_flag == 1:
+        return {
+            "event_type": "persistent_source",
+            "description": (
+                "Recurring detection at this location (FIRMS static-source "
+                "classification) — consistent with a flare, plant, or other "
+                "continuously operating industrial heat source, not a discrete "
+                "fire event."
+            ),
+        }
+
+    if static_flag == -1:
+        return {
+            "event_type": "unknown_provenance",
+            "description": "Static-source status unresolved for this detection.",
+        }
+
+    if (
+        active_days_7d <= 1
+        and active_days_30d <= 3
+    ):
+        return {
+            "event_type": "new_event",
+            "description": "Fresh activity, no recurring history at this location.",
+        }
+
+    return {"event_type": "ambiguous", "description": None}
+
+
+def classify_mining_subtype(
+    cell_features: dict[str, Any],
+) -> dict[str, str | float] | None:
+    """Classify mining context from nearest mapped underground/surface features."""
+    mineshaft = cell_features.get("dist_osm_mineshaft_km")
+    adit = cell_features.get("dist_osm_adit_km")
+    quarry = cell_features.get("dist_osm_quarry_km")
+    underground = [
+        value
+        for value in (mineshaft, adit)
+        if value is not None and pd.notna(value)
+    ]
+    underground_dist = min(underground) if underground else None
+    quarry_available = quarry is not None and pd.notna(quarry)
+
+    if underground_dist is None and not quarry_available:
+        return None
+    if underground_dist is not None and (
+        not quarry_available or underground_dist < quarry
+    ):
+        return {"subtype": "underground", "nearest_km": float(underground_dist)}
+    return {"subtype": "surface", "nearest_km": float(quarry)}
+
+
 class CatBoostModelService:
     """Inference service for Dhruv's real PS26162 H3-day CatBoost model."""
 
@@ -374,6 +447,15 @@ class CatBoostModelService:
             )
         attributions.sort(key=lambda attr: abs(attr.shap_value), reverse=True)
         top_features = top_human_features(attributions, top_n=3)
+        persistence = classify_persistence(cell_features)
+        mining_subtype = (
+            classify_mining_subtype(cell_features)
+            if final_class == "mining"
+            else None
+        )
+        summary_statement = f"Top drivers for {final_class}: {', '.join(top_features)}."
+        if persistence["event_type"] != "ambiguous":
+            summary_statement = f"{summary_statement} {persistence['description']}"
 
         return ExplanationResponse(
             cell_id=str(cell_features["h3_08"]),
@@ -384,8 +466,10 @@ class CatBoostModelService:
             base_value=round(base_value, 6),
             feature_attributions=attributions[:3],
             top_features=top_features,
+            persistence=persistence,
+            mining_subtype=mining_subtype,
             caveat_flag=caveat_str,
-            summary_statement=f"Top drivers for {final_class}: {', '.join(top_features)}.",
+            summary_statement=summary_statement,
             latency_ms=round((time.time() - started) * 1000, 2),
         )
 

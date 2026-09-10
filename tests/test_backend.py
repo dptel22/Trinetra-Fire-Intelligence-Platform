@@ -15,11 +15,54 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.main import app
 from app.services.feature_store import STATIC_COLUMNS, feature_store
-from app.services.model_service import model_service
+from app.services.model_service import (
+    classify_mining_subtype,
+    classify_persistence,
+    model_service,
+)
 
 EXPECTED_CLASSES = {"industrial", "mining", "agricultural_burn", "wildfire"}
 MODEL_EXISTS = Path(settings.MODEL_PATH).exists()
 PARQUET_EXISTS = Path(settings.OSMWRI_PARQUET).exists()
+
+
+def test_classify_persistence_precedence():
+    assert classify_persistence({"is_static_land": 1, "active_days_7d": 0})["event_type"] == "persistent_source"
+    assert classify_persistence({"is_static_land": -1, "active_days_7d": 0})["event_type"] == "unknown_provenance"
+    assert classify_persistence({"is_static_land": None, "active_days_7d": 0, "active_days_30d": 0})["event_type"] == "unknown_provenance"
+    assert classify_persistence({"is_static_land": np.nan, "active_days_7d": 0, "active_days_30d": 0})["event_type"] == "unknown_provenance"
+    assert classify_persistence({"is_static_land": 0, "active_days_7d": 1, "active_days_30d": 3})["event_type"] == "new_event"
+    assert classify_persistence({"is_static_land": 0, "active_days_7d": None, "active_days_30d": None})["event_type"] == "new_event"
+    assert classify_persistence({"is_static_land": 0, "active_days_7d": 2, "active_days_30d": 3})["event_type"] == "ambiguous"
+    assert classify_persistence({"is_static_land": 0})["event_type"] == "new_event"
+
+
+def test_classify_mining_subtype():
+    assert classify_mining_subtype({"dist_osm_mineshaft_km": 1.2, "dist_osm_adit_km": 2.0, "dist_osm_quarry_km": 3.0}) == {
+        "subtype": "underground",
+        "nearest_km": 1.2,
+    }
+    assert classify_mining_subtype({"dist_osm_mineshaft_km": 5.0, "dist_osm_adit_km": 6.0, "dist_osm_quarry_km": 2.0}) == {
+        "subtype": "surface",
+        "nearest_km": 2.0,
+    }
+    assert classify_mining_subtype({"dist_osm_mineshaft_km": None, "dist_osm_adit_km": None, "dist_osm_quarry_km": None}) is None
+
+
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires real serving model and parquet")
+def test_real_mining_explanation_includes_subtype():
+    model_service.load_model()
+    row = feature_store.get_cell("883ca83005fffff", "2026-09-08")
+    assert row is not None
+
+    prediction = model_service.predict(row)
+    assert prediction.predicted_class == "mining"
+
+    explanation = model_service.explain(row)
+    assert explanation.predicted_class == "mining"
+    assert explanation.mining_subtype is not None
+    assert explanation.mining_subtype["subtype"] in {"underground", "surface"}
+    assert isinstance(explanation.mining_subtype["nearest_km"], float)
 
 
 def _calendar_features(acq_date: str) -> dict[str, float]:
@@ -147,6 +190,17 @@ def test_health_predictions_and_explain_endpoints():
         explain_json = explain.json()
         assert len(explain_json["feature_attributions"]) == 3
         assert explain_json["predicted_class"] in EXPECTED_CLASSES | {"unclassified"}
+        assert explain_json["persistence"]["event_type"] in {
+            "persistent_source",
+            "unknown_provenance",
+            "new_event",
+            "ambiguous",
+        }
+        assert "mining_subtype" in explain_json
+        if explain_json["predicted_class"] != "mining":
+            assert explain_json["mining_subtype"] is None
+        if explain_json["persistence"]["event_type"] != "ambiguous":
+            assert explain_json["persistence"]["description"] in explain_json["summary_statement"]
         assert explain_json["caveat_flag"] is not None
         assert settings.CAVEAT_MANIFEST["pseudo_label_circularity"] in explain_json["caveat_flag"]
 
