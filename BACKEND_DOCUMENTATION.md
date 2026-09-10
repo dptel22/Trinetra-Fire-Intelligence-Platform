@@ -33,7 +33,7 @@ Root prediction aliases are also exposed at `http://localhost:8000/predictions`.
 
 `GET /health`
 
-Returns model loaded state, schema version/hash, artifact path, startup latency, and target classes.
+Returns model loaded state, schema version/hash, artifact path, startup latency, target classes, and latest acquisition date.
 
 ### Bounding Box Predictions
 
@@ -45,13 +45,19 @@ Returns H3-day cell predictions inside the bbox for the requested UTC acquisitio
 
 `GET /predictions/{cell_id}?acq_date=2025-01-26`
 
-Returns class, confidence, probabilities, context, and top explanation fields for one H3-day cell.
+Returns class, confidence, probabilities, calibration state, review requirement, caveat flag, and context for one H3-day cell.
 
 ### Cell Explanation
 
 `GET /predictions/{cell_id}/explain?acq_date=2025-01-26`
 
 Runs CatBoost native TreeSHAP on demand and returns the top three SHAP drivers.
+
+### Audit Endpoints
+
+`POST /api/v1/audit/override` · `GET /api/v1/audit/logs`
+
+Allows analysts to override predictions and retrieve audit logs.
 
 ## Response Shape
 
@@ -69,6 +75,8 @@ Runs CatBoost native TreeSHAP on demand and returns the top three SHAP drivers.
     { "class_name": "wildfire", "probability": 0.94 }
   ],
   "confidence": 0.94,
+  "calibrated": true,
+  "needs_review": false,
   "caveat_flag": null,
   "latency_ms": 8.2
 }

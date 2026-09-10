@@ -235,3 +235,7 @@ and `build` are the verification hooks there.
   (it is the deployed contract). Other `.cbm`/`.joblib` binaries are ignored.
 - To reproduce serving data from scratch, run the ingestion pipeline inside `ingestion/`;
   to redistribute the model, attach it to a GitHub Release.
+
+## 13. License
+
+TODO: Specify project license (e.g., MIT, Apache 2.0).

@@ -516,3 +516,20 @@ Ownership split, interface contract, and per-agent prompts live in
 - Browser (live backend + live FIRMS run): acknowledge → confirm flows update chips/counts; history shows append-only events with analyst ids and notes; evidence panel shows the honest not-captured/empty-day states; archive run-manifest block shows run id, raw parts, and plausibility warnings; a real `RUN-20260909T235222-6cef34` run (0 points, flagged) wrote zero-row parts for 2026-09-10 and served evidence with `ingestion_status=plausibility_warning`.
 
 **Known honest limitations:** dates ingested before this change have no raw parts (UI says so explicitly); FIRMS NRT's rolling window means gap-fill re-queries of older days legitimately return 0 rows and the newest-run provenance rule then flags those days as `plausibility_warning` — intended, truthful behavior.
+
+
+---
+
+## [2026-09-10T10:00:00+05:30] Agent: Documentation Update
+- Files changed:
+  - `BACKEND_DOCUMENTATION.md`
+  - `CONTRIBUTING.md`
+  - `FRONTEND_INTEGRATION_GUIDE.md`
+  - `AGENT_LOG.md`
+- What changed:
+  - Updated backend documentation to include audit endpoints, and corrected response shape (calibrated, needs_review).
+  - Simplified `CONTRIBUTING.md` to reference Agent conventions and updated folder structures.
+  - Updated `FRONTEND_INTEGRATION_GUIDE.md` to match taxonomy, colors, and backend contract (calibrated, needs_review).
+  - Audited `AGENTS.md`, `CLAUDE.md`, and `TRAINING_SERVING_SKEW_TEST_REPORT.md` for consistency.
+- Interface impact: none (docs only).
+- Blockers / questions: none.

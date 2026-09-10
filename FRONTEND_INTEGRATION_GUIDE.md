@@ -8,15 +8,15 @@
 
 ## Classes
 
-Render exactly these four model classes:
+Render exactly these four model classes (plus `unclassified` fallback):
 
 | Class | Suggested color |
 | --- | --- |
-| `industrial` | `#C2410C` |
-| `mining` | `#A16207` |
-| `agricultural_burn` | `#65A30D` |
-| `wildfire` | `#DC2626` |
-| `unclassified` | `#6B7280` |
+| `industrial` | `#E67E22` |
+| `mining` | `#95A5A6` |
+| `agricultural_burn` | `#F1C40F` |
+| `wildfire` | `#E74C3C` |
+| `unclassified` | `#787878` |
 
 ## Load Map Predictions
 
@@ -29,9 +29,10 @@ const params = new URLSearchParams({
   min_lon: "73.79",
   max_lon: "73.86",
   acq_date: "2025-01-26",
+  zoom: "8"
 });
 
-const response = await fetch(`http://localhost:8000/predictions?${params}`);
+const response = await fetch(`http://localhost:8000/api/v1/predictions?${params}`);
 const data = await response.json();
 ```
 
@@ -39,7 +40,7 @@ Response:
 
 ```json
 {
-  "mode": "detailed_hexagons",
+  "mode": "aggregated_macro",
   "zoom": 8,
   "total_predictions": 1,
   "predictions": [
@@ -56,6 +57,8 @@ Response:
         { "class_name": "wildfire", "probability": 0.94 }
       ],
       "confidence": 0.94,
+      "calibrated": true,
+      "needs_review": false,
       "caveat_flag": null,
       "latency_ms": 8.2
     }
