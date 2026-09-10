@@ -6,6 +6,11 @@ import {
   fetchPredictionsStrict,
   fetchArchiveDates,
   fetchArchivePredictions,
+  fetchArchiveRuns,
+  fetchRawEvidence,
+  fetchAlertStates,
+  fetchAlertHistory,
+  submitAlertAction,
   fetchHealth,
   INDIA_BOUNDS,
   CLASS_COLORS,
@@ -64,12 +69,234 @@ export function StatusBadge({ status, labelPrefix = 'Feed status' }) {
 }
 
 /**
+ * Lifecycle state chip, visually distinct from the model's needs-review
+ * badge: analyst decisions (acknowledged/confirmed/dismissed) vs model flags.
+ */
+const LIFECYCLE_STYLES = {
+  new: { bg: 'rgba(120, 120, 120, 0.15)', fg: '#9aa2ab', border: 'rgba(120, 120, 120, 0.4)', label: 'New' },
+  acknowledged: { bg: 'rgba(61, 157, 232, 0.15)', fg: '#3d9de8', border: 'rgba(61, 157, 232, 0.45)', label: 'Acknowledged' },
+  confirmed: { bg: 'rgba(46, 204, 113, 0.15)', fg: '#1e9e5a', border: 'rgba(46, 204, 113, 0.45)', label: 'Confirmed' },
+  dismissed: { bg: 'rgba(231, 76, 60, 0.15)', fg: '#d64228', border: 'rgba(231, 76, 60, 0.45)', label: 'Dismissed' }
+};
+
+export function LifecycleBadge({ state }) {
+  const s = LIFECYCLE_STYLES[state] || LIFECYCLE_STYLES.new;
+  return (
+    <span
+      aria-label={`Lifecycle state: ${s.label}`}
+      style={{
+        padding: '3px 8px',
+        borderRadius: '12px',
+        fontSize: '0.72rem',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        backgroundColor: s.bg,
+        color: s.fg,
+        border: `1px solid ${s.border}`
+      }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+const ANALYST_ID_STORAGE_KEY = 'trinetra_analyst_id';
+
+function loadAnalystId() {
+  try {
+    return window.localStorage.getItem(ANALYST_ID_STORAGE_KEY) || 'DEMO_ANALYST';
+  } catch {
+    return 'DEMO_ANALYST';
+  }
+}
+
+function saveAnalystId(id) {
+  try {
+    window.localStorage.setItem(ANALYST_ID_STORAGE_KEY, id);
+  } catch { /* private mode: keep in-memory only */ }
+}
+
+/**
+ * Raw FIRMS evidence for the hotspot's date: the untouched satellite rows the
+ * immutable raw archive preserved for the decisive ingestion run. A 404 for
+ * dates that predate the archive renders as an honest note, never an error.
+ */
+function RawEvidencePanel({ acqDate, runId }) {
+  const [evidence, setEvidence] = useState(null);
+  const [state, setState] = useState('loading'); // loading | ready | notCaptured | error
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react/set-state-in-effect -- fetch state reset before the async call
+    setState('loading');
+    fetchRawEvidence({ acqDate, runId, limit: 25 })
+      .then((res) => {
+        if (!cancelled) {
+          setEvidence(res);
+          setState('ready');
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.notAvailable) {
+          setState('notCaptured');
+          setMessage(err.reason || 'No raw observations were captured for this date.');
+        } else {
+          setState('error');
+          setMessage(err.message || 'Failed to load raw evidence.');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [acqDate, runId]);
+
+  if (state === 'loading') {
+    return <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #8b949e)' }}>Loading raw FIRMS evidence…</div>;
+  }
+  if (state === 'notCaptured') {
+    return (
+      <div style={{ fontSize: '0.8rem', color: '#7a5c00' }}>
+        ℹ️ Raw evidence not captured for this date — it predates the immutable raw archive. {message}
+      </div>
+    );
+  }
+  if (state === 'error') {
+    return <div style={{ fontSize: '0.8rem', color: '#d64228' }}>Raw evidence unavailable: {message}</div>;
+  }
+  const previewCols = ['latitude', 'longitude', 'acq_date', 'acq_time', 'satellite', 'confidence', 'frp', 'daynight']
+    .filter((c) => evidence.columns.includes(c));
+  return (
+    <div style={{ fontSize: '0.75rem' }}>
+      <div style={{ color: 'var(--text-muted, #8b949e)', marginBottom: '6px' }}>
+        Run <code>{evidence.runId}</code> · {evidence.total} raw rows from the satellite (first {evidence.rows.length} shown)
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--text-primary, #eceff4)' }}>
+          <thead>
+            <tr>
+              {previewCols.map((c) => (
+                <th key={c} style={{ textAlign: 'left', padding: '2px 8px', borderBottom: '1px solid var(--hairline-border, #2e3440)' }}>{c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {evidence.rows.map((row, i) => (
+              <tr key={i}>
+                {previewCols.map((c) => (
+                  <td key={c} style={{ padding: '2px 8px' }}>{String(row[c] ?? '')}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Analyst action bar: acknowledge / confirm / dismiss with an optional note.
+ * Append-only by contract — actions create events, they never edit history.
+ * Reviewer identity persists in localStorage (default DEMO_ANALYST, visibly
+ * tagged as demo review). Disabled in frontend mock mode (no backend exists
+ * to persist to) and hidden entirely when no handler is provided (OFFLINE).
+ */
+function AlertActionBar({ hotspotId, onActionCompleted, disabled, disabledReason }) {
+  const [note, setNote] = useState('');
+  const [analystId, setAnalystId] = useState(loadAnalystId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const isDemoAnalyst = !analystId || analystId === 'DEMO_ANALYST';
+
+  const submit = async (action) => {
+    setBusy(true);
+    setError(null);
+    saveAnalystId(analystId);
+    try {
+      const event = await submitAlertAction(hotspotId, { action, note: note.trim() || null, analystId });
+      setNote('');
+      onActionCompleted?.(event);
+    } catch (err) {
+      setError(err.detail || err.message || 'Action failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const inputStyle = {
+    backgroundColor: 'var(--bg-dark, #0a0e12)',
+    color: 'var(--text-primary, #eceff4)',
+    border: '1px solid var(--hairline-border, #2e3440)',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    fontSize: '0.78rem',
+    fontFamily: 'monospace'
+  };
+
+  if (disabled) {
+    return (
+      <div title={disabledReason} style={{ fontSize: '0.78rem', color: 'var(--text-muted, #8b949e)' }}>
+        {disabledReason}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid var(--hairline-border, #2e3440)', paddingTop: '10px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          aria-label="Reviewer identity"
+          value={analystId}
+          onChange={(e) => setAnalystId(e.target.value)}
+          placeholder="DEMO_ANALYST"
+          style={{ ...inputStyle, width: '150px' }}
+        />
+        <input
+          aria-label="Analyst note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Optional note (required for dismissals)"
+          style={{ ...inputStyle, flex: 1, minWidth: '200px' }}
+        />
+        <button type="button" onClick={() => submit('acknowledged')} disabled={busy} style={{ ...smallButtonStyle, cursor: busy ? 'wait' : 'pointer' }}>Acknowledge</button>
+        <button type="button" onClick={() => submit('confirmed')} disabled={busy} style={{ ...smallButtonStyle, cursor: busy ? 'wait' : 'pointer' }}>Confirm</button>
+        <button
+          type="button"
+          onClick={() => submit('dismissed')}
+          disabled={busy}
+          title="Dismissals require a note (min 10 characters)"
+          style={{ ...smallButtonStyle, cursor: busy ? 'wait' : 'pointer' }}
+        >
+          Dismiss
+        </button>
+      </div>
+      {isDemoAnalyst && (
+        <div style={{ fontSize: '0.7rem', color: '#a07d00' }}>
+          DEMO review — actions are tagged analyst_id=DEMO_ANALYST and remain fully auditable.
+        </div>
+      )}
+      {error && <div role="alert" style={{ fontSize: '0.75rem', color: '#d64228' }}>{error}</div>}
+    </div>
+  );
+}
+
+/**
  * One prediction row, shared by the current alerts feed and the archive page
  * so the markup is never duplicated. `mapDate` (when present) is appended to
  * the map deep link so the Fire Map opens the same acquisition date.
+ *
+ * Optional lifecycle props (wired by the pages): `alertState` (replayed
+ * lifecycle state), `onActionCompleted(event)` enables the action bar,
+ * `actionsDisabled`/`actionsDisabledReason` gate it (e.g. mock mode), and
+ * `evidenceRunId` enables the raw-evidence panel for the date.
  */
-export function AlertCard({ alert, index, mapDate = null }) {
+export function AlertCard({ alert, index, mapDate = null, alertState = null, onActionCompleted = null, actionsDisabled = false, actionsDisabledReason = null, evidenceRunId = null }) {
   const [probExpanded, setProbExpanded] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [history, setHistory] = useState(null);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const [localState, setLocalState] = useState(null);
   const pClass = alert.predicted_class || 'unclassified';
   const color = CLASS_COLORS[pClass] || CLASS_COLORS.unclassified;
   const labelQuality = confidenceLabel(alert);
@@ -77,6 +304,43 @@ export function AlertCard({ alert, index, mapDate = null }) {
   const canonicalCaveat = KNOWN_CAVEATS[pClass];
   const probabilities = Array.isArray(alert.probabilities) ? alert.probabilities : [];
   const cellKey = alert.cell_id || alert.h3_index || index;
+  // hotspot ids are '{h3_08}_{acq_date}' (the backend's alert-lifecycle key).
+  // In prediction payloads cell_id carries only the h3 index, so the id must
+  // always be composed with the acquisition date.
+  const h3Key = alert.h3_index || alert.cell_id;
+  const hotspotId = h3Key && mapDate ? `${h3Key}_${mapDate}` : null;
+  const effectiveState = localState || alertState;
+
+  const loadHistory = async () => {
+    if (history || !hotspotId) return;
+    try {
+      const res = await fetchAlertHistory(hotspotId);
+      setHistory(res.events);
+    } catch {
+      setHistory([]);
+    }
+  };
+
+  const handleActionCompleted = (event) => {
+    // Mirror the backend replay semantics: `note` never moves state,
+    // `reopened` returns to new, everything else becomes the state.
+    const nextState = event.action === 'reopened'
+      ? 'new'
+      : (event.action === 'note' ? (effectiveState?.state || 'new') : event.action);
+    setLocalState({
+      hotspot_id: event.hotspot_id,
+      h3_08: event.h3_08,
+      acq_date: event.acq_date,
+      state: nextState,
+      last_action: event.action,
+      last_note: event.note,
+      analyst_id: event.analyst_id,
+      last_event_at: event.timestamp,
+      last_event_id: event.event_id
+    });
+    setHistory(null); // refetch next time the panel opens
+    onActionCompleted?.(event);
+  };
 
   return (
     <div
@@ -124,6 +388,7 @@ export function AlertCard({ alert, index, mapDate = null }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {hotspotId && <LifecycleBadge state={effectiveState?.state || 'new'} />}
           <span
             style={{
               padding: '3px 8px',
@@ -286,6 +551,73 @@ export function AlertCard({ alert, index, mapDate = null }) {
           )}
         </div>
       )}
+
+      {/* Lifecycle: last analyst decision + append-only history + raw evidence */}
+      {hotspotId && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid var(--hairline-border, #2e3440)', paddingTop: '8px' }}>
+          {effectiveState?.last_action && (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>
+              Last review: {effectiveState.last_action} by <code>{effectiveState.analyst_id || 'unknown'}</code>
+              {effectiveState.last_event_at ? ` at ${effectiveState.last_event_at}` : ''}
+              {effectiveState.last_note ? ` — "${effectiveState.last_note}"` : ''}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              aria-expanded={historyExpanded}
+              onClick={() => {
+                setHistoryExpanded((v) => !v);
+                if (!historyExpanded) loadHistory();
+              }}
+              style={{ background: 'transparent', border: 'none', color: 'var(--accent-blue, #3d9de8)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+            >
+              {historyExpanded ? '▲ Hide review history' : '▼ Review history'}
+            </button>
+            {mapDate && (
+              <button
+                type="button"
+                aria-expanded={evidenceExpanded}
+                onClick={() => setEvidenceExpanded((v) => !v)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--accent-blue, #3d9de8)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                {evidenceExpanded ? '▲ Hide raw FIRMS evidence' : '▼ View raw FIRMS evidence'}
+              </button>
+            )}
+          </div>
+
+          {historyExpanded && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {history === null && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Loading history…</div>}
+              {Array.isArray(history) && history.length === 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>
+                  No review events yet — this hotspot is in the "new" state. Actions are appended below and never overwritten.
+                </div>
+              )}
+              {Array.isArray(history) && history.map((ev) => (
+                <div key={ev.event_id} style={{ fontSize: '0.75rem', color: 'var(--text-primary, #eceff4)' }}>
+                  <code>{ev.timestamp}</code> — {ev.action} by <code>{ev.analyst_id}</code>
+                  {ev.note ? ` — "${ev.note}"` : ''}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {evidenceExpanded && mapDate && (
+            <RawEvidencePanel acqDate={mapDate} runId={evidenceRunId} />
+          )}
+
+          {onActionCompleted && (
+            <AlertActionBar
+              hotspotId={hotspotId}
+              onActionCompleted={handleActionCompleted}
+              disabled={actionsDisabled}
+              disabledReason={actionsDisabledReason}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -323,6 +655,10 @@ export default function FireAlertsPage() {
   const [healthIngestion, setHealthIngestion] = useState(null);
   const [datesError, setDatesError] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [alertStates, setAlertStates] = useState(null); // {statesByHotspot, counts} | null
+  const [statesError, setStatesError] = useState(null);
+  const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|acknowledged|confirmed|dismissed
+  const [dateRunId, setDateRunId] = useState(null); // decisive ingestion run for the selected date
   const [truncatedTotal, setTruncatedTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -337,12 +673,25 @@ export default function FireAlertsPage() {
   // ── Load predictions for the selected date ────────────────────────────────
   const loadAlertsRef = useRef(null);
   const datesDataModeRef = useRef(null);
+  const loadStates = useCallback(async (date) => {
+    // Lifecycle states are complementary evidence, not the alert feed itself:
+    // a states failure must not blank the list, but it is surfaced, never silent.
+    try {
+      const res = await fetchAlertStates(date);
+      setAlertStates({ statesByHotspot: res.statesByHotspot, counts: res.counts });
+      setStatesError(null);
+    } catch (err) {
+      setAlertStates(null);
+      setStatesError(err.notAvailable ? null : (err.message || 'Lifecycle states unavailable'));
+    }
+  }, []);
   const loadAlerts = useCallback(async (dateArg) => {
     const date = dateArg || acqDate;
     if (!date) return;
     setLoading(true);
     setError(null);
     setErrorKind('error');
+    loadStates(date);
     try {
       const newest = newestDate;
       if (newest && date < newest) {
@@ -352,6 +701,7 @@ export default function FireAlertsPage() {
         setAlerts(res.predictions);
         setBackendDataMode(res.dataMode);
         setPerDateIngestionStatus(res.ingestionStatus);
+        setDateRunId(res.ingestionRunId);
         setTruncatedTotal(res.total > res.predictions.length ? res.total : null);
       } else {
         const data = await fetchPredictionsStrict(INDIA_BOUNDS, date, 5);
@@ -362,6 +712,7 @@ export default function FireAlertsPage() {
         // 'historical' does not bleed into the newest day's status.
         setBackendDataMode(datesDataModeRef.current);
         setPerDateIngestionStatus(null);
+        setDateRunId(null); // evidence panel falls back to the decisive run
         setTruncatedTotal(null);
       }
     } catch (err) {
@@ -373,7 +724,7 @@ export default function FireAlertsPage() {
     } finally {
       setLoading(false);
     }
-  }, [acqDate, newestDate]);
+  }, [acqDate, newestDate, loadStates]);
   useEffect(() => { loadAlertsRef.current = loadAlerts; }, [loadAlerts]);
 
   // ── Bootstrap: discover available dates + health provenance, then load ────
@@ -498,10 +849,22 @@ export default function FireAlertsPage() {
   };
 
   // ── Filtered and sorted alerts ─────────────────────────────────────────────
+  const lifecycleStateFor = useCallback((alert) => {
+    const h3Key = alert.h3_index || alert.cell_id;
+    const hotspotId = h3Key && acqDate ? `${h3Key}_${acqDate}` : null;
+    return alertStates?.statesByHotspot?.[hotspotId]?.state || 'new';
+  }, [alertStates, acqDate]);
+
   const filteredAlerts = useMemo(() => {
-    const list = effectiveSelectedClass === 'all'
+    let list = effectiveSelectedClass === 'all'
       ? alerts
       : alerts.filter(a => a.predicted_class === effectiveSelectedClass);
+
+    if (stateFilter === 'needs_review') {
+      list = list.filter(a => a.needs_review);
+    } else if (stateFilter !== 'all') {
+      list = list.filter(a => lifecycleStateFor(a) === stateFilter);
+    }
 
     return list.slice().sort((a, b) => {
       if (sortBy === 'review') {
@@ -518,7 +881,23 @@ export default function FireAlertsPage() {
       }
       return 0;
     });
-  }, [alerts, effectiveSelectedClass, sortBy]);
+  }, [alerts, effectiveSelectedClass, sortBy, stateFilter, lifecycleStateFor]);
+
+  // Lifecycle counts over the full (class-filtered) day, not the pagination.
+  const lifecycleCounts = useMemo(() => {
+    const base = effectiveSelectedClass === 'all'
+      ? alerts
+      : alerts.filter(a => a.predicted_class === effectiveSelectedClass);
+    const counts = { new: 0, acknowledged: 0, confirmed: 0, dismissed: 0 };
+    for (const a of base) counts[lifecycleStateFor(a)] += 1;
+    return counts;
+  }, [alerts, effectiveSelectedClass, lifecycleStateFor]);
+  const reviewedCount = lifecycleCounts.acknowledged + lifecycleCounts.confirmed + lifecycleCounts.dismissed;
+
+  const handleActionCompleted = useCallback(() => {
+    // Append-only store: refresh the replay-derived view for this date.
+    if (acqDate) loadStates(acqDate);
+  }, [acqDate, loadStates]);
 
   // ── Pagination slice ───────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
@@ -531,8 +910,13 @@ export default function FireAlertsPage() {
   const handleExportCsv = () => {
     if (filteredAlerts.length === 0) return;
     try {
+      const rowsWithLifecycle = filteredAlerts.map((a) => ({
+        ...a,
+        alert_state: lifecycleStateFor(a),
+        analyst_note: alertStates?.statesByHotspot?.[`${a.h3_index || a.cell_id}_${acqDate}`]?.last_note ?? ''
+      }));
       exportPredictionsToCsv(
-        filteredAlerts,
+        rowsWithLifecycle,
         `trinetra_alerts_${acqDate || 'unknown-date'}.csv`,
         { acqDate: acqDate || undefined, dataMode: status.toLowerCase() }
       );
@@ -830,6 +1214,39 @@ export default function FireAlertsPage() {
           })}
         </div>
 
+        {/* Lifecycle state filter chips (replay-derived analyst decisions) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #55595E)', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.05em' }}>
+            REVIEW STATE:
+          </span>
+          {[
+            ['all', `All (${alerts.length})`],
+            ['needs_review', `Needs review (${alerts.filter(a => a.needs_review).length})`],
+            ['new', `New (${lifecycleCounts.new})`],
+            ['acknowledged', `Acknowledged (${lifecycleCounts.acknowledged})`],
+            ['confirmed', `Confirmed (${lifecycleCounts.confirmed})`],
+            ['dismissed', `Dismissed (${lifecycleCounts.dismissed})`]
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={stateFilter === value}
+              onClick={() => { setStateFilter(value); setCurrentPage(1); }}
+              style={pillButtonStyle(stateFilter === value)}
+            >
+              {label}
+            </button>
+          ))}
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #55595E)' }}>
+            {reviewedCount} reviewed · {lifecycleCounts.new} unreviewed (lifecycle)
+          </span>
+          {statesError && (
+            <span role="alert" style={{ fontSize: '0.72rem', color: '#d64228' }}>
+              Lifecycle states unavailable ({statesError})
+            </span>
+          )}
+        </div>
+
         {/* Loading State */}
         {loading && (
           <div style={{ padding: '5rem 2rem', textAlign: 'center', color: 'var(--text-muted, #55595E)' }} role="status">
@@ -962,7 +1379,17 @@ export default function FireAlertsPage() {
         {!loading && !error && paginatedAlerts.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {paginatedAlerts.map((alert, idx) => (
-              <AlertCard key={alert.cell_id || alert.h3_index || idx} alert={alert} index={idx} mapDate={acqDate} />
+              <AlertCard
+                key={alert.cell_id || alert.h3_index || idx}
+                alert={alert}
+                index={idx}
+                mapDate={acqDate}
+                alertState={alertStates?.statesByHotspot?.[`${alert.h3_index || alert.cell_id}_${acqDate}`] || null}
+                onActionCompleted={handleActionCompleted}
+                actionsDisabled={apiMode === 'mock'}
+                actionsDisabledReason={apiMode === 'mock' ? 'Demo preview has no backend — lifecycle actions require a live backend connection.' : null}
+                evidenceRunId={dateRunId}
+              />
             ))}
           </div>
         )}

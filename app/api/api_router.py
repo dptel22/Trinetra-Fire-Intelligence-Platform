@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import archive, audit, classify, health
+from app.api.endpoints import alerts, archive, audit, classify, evidence, health
 
 api_router = APIRouter()
 
@@ -10,6 +10,10 @@ api_router.include_router(health.router, tags=["System Health"])
 api_router.include_router(classify.router, tags=["Classification & Predictions"])
 # Historical H3-day archive browsing + provenance under /api/v1/archive/*
 api_router.include_router(archive.router, tags=["Archive & Historical"])
+# Raw FIRMS evidence + ingestion run manifests under /api/v1/archive/*
+api_router.include_router(evidence.router, tags=["Raw Evidence & Run Manifests"])
+# Alert lifecycle (analyst review actions) under /api/v1/alerts/*
+api_router.include_router(alerts.router, tags=["Alert Lifecycle"])
 # Audit trail remains available under /api/v1/audit/*
 api_router.include_router(audit.router, tags=["NTRO Audit Trail"])
 # Legacy ingest/spatial point-level routes removed from default router (pre-H3-day contract).

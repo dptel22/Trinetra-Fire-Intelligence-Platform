@@ -289,7 +289,10 @@ export function exportPredictionsToCsv(predictions, filename, metadata = {}) {
     'latency_ms',
     'is_synthetic',
     'acq_date',
-    'data_mode'
+    'data_mode',
+    'alert_state',
+    'analyst_note',
+    'ingestion_run_id'
   ];
 
   const escapeCsvField = (val) => {
@@ -316,7 +319,10 @@ export function exportPredictionsToCsv(predictions, filename, metadata = {}) {
       escapeCsvField(p.latency_ms ?? ''),
       escapeCsvField(p.is_synthetic ?? false),
       escapeCsvField(p.acq_date ?? metadata.acqDate ?? ''),
-      escapeCsvField(p.data_mode ?? metadata.dataMode ?? '')
+      escapeCsvField(p.data_mode ?? metadata.dataMode ?? ''),
+      escapeCsvField(p.alert_state ?? ''),
+      escapeCsvField(p.analyst_note ?? ''),
+      escapeCsvField(p.ingestion_run_id ?? '')
     ];
     rows.push(row.join(','));
   }
@@ -718,6 +724,167 @@ export async function fetchArchiveSummary({ startDate = null, endDate = null } =
     unavailableDates: Array.isArray(data?.unavailable_dates) ? data.unavailable_dates : [],
     dataMode: typeof data?.data_mode === 'string' ? data.data_mode : 'offline',
     source: typeof data?.source === 'string' ? data.source : ''
+  };
+}
+
+// --- Alert lifecycle + raw evidence (strict paths: no mock fallback) --------
+
+const ALERTS_BASE = `${BASE_URL}/api/v1/alerts`;
+
+/**
+ * Replay-derived lifecycle state for every hotspot of one acquisition date.
+ * Strict: failures throw — the UI must never treat missing state as "all new".
+ * @param {string} acqDate
+ * @returns {Promise<{acqDate, total, counts: object, statesByHotspot: object}>}
+ */
+export async function fetchAlertStates(acqDate) {
+  if (!acqDate) throw new Error('fetchAlertStates requires an acq_date');
+  const res = await fetch(`${ALERTS_BASE}/states?acq_date=${encodeURIComponent(acqDate)}`);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} from ${ALERTS_BASE}/states`);
+    try {
+      const body = await res.json();
+      if (body?.detail?.error === 'archive_date_not_available') err.notAvailable = true;
+    } catch { /* keep generic */ }
+    throw err;
+  }
+  const data = await res.json();
+  const states = Array.isArray(data?.states) ? data.states : [];
+  const statesByHotspot = {};
+  for (const s of states) {
+    if (s?.hotspot_id) {
+      statesByHotspot[s.hotspot_id] = s;
+    }
+  }
+  return {
+    acqDate: data?.acq_date ?? acqDate,
+    total: data?.total ?? states.length,
+    counts: data?.counts ?? {},
+    states,
+    statesByHotspot
+  };
+}
+
+/**
+ * Appends one analyst lifecycle action. Strict POST; server resolves the
+ * model prediction and ingestion run, so the client never supplies them.
+ * @param {string} hotspotId - '{h3_08}_{acq_date}'
+ * @param {object} action - { action, note?, analystId? }
+ * @returns {Promise<object>} AlertEvent
+ */
+export async function submitAlertAction(hotspotId, { action, note = null, analystId = null } = {}) {
+  if (!hotspotId) throw new Error('submitAlertAction requires a hotspot_id');
+  if (!action) throw new Error('submitAlertAction requires an action');
+  const res = await fetch(`${ALERTS_BASE}/${encodeURIComponent(hotspotId)}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, note, analyst_id: analystId })
+  });
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} from ${ALERTS_BASE}/actions`);
+    try {
+      const body = await res.json();
+      err.detail = typeof body?.detail === 'string' ? body.detail : JSON.stringify(body?.detail);
+    } catch { /* keep generic */ }
+    throw err;
+  }
+  return res.json();
+}
+
+/**
+ * Full append-only event history for one hotspot (oldest first).
+ * @param {string} hotspotId
+ * @returns {Promise<{hotspotId, total, events: Array}>}
+ */
+export async function fetchAlertHistory(hotspotId) {
+  if (!hotspotId) throw new Error('fetchAlertHistory requires a hotspot_id');
+  const res = await fetch(`${ALERTS_BASE}/${encodeURIComponent(hotspotId)}/history`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} from ${ALERTS_BASE} history`);
+  }
+  const data = await res.json();
+  return {
+    hotspotId: data?.hotspot_id ?? hotspotId,
+    total: data?.total ?? 0,
+    events: Array.isArray(data?.events) ? data.events : []
+  };
+}
+
+/**
+ * Whitelisted ingestion-run manifest entries (newest first), optionally for
+ * one acquisition date. No filesystem paths are returned by design.
+ * @param {object} [params]
+ * @returns {Promise<{total, acqDate, runs: Array}>}
+ */
+export async function fetchArchiveRuns({ acqDate = null, limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(Math.min(200, Math.max(1, limit))) });
+  if (acqDate) params.set('acq_date', acqDate);
+  const res = await fetch(`${ARCHIVE_BASE}/runs?${params}`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} from ${ARCHIVE_BASE}/runs`);
+  }
+  const data = await res.json();
+  const runs = Array.isArray(data?.runs)
+    ? data.runs.map((r) => ({
+      runId: r?.run_id ?? null,
+      startedAt: r?.started_at ?? null,
+      finishedAt: r?.finished_at ?? null,
+      ok: r?.ok ?? null,
+      targetDate: r?.target_date ?? null,
+      bbox: r?.bbox ?? null,
+      fetchMode: r?.fetch_mode ?? null,
+      rawRows: r?.raw_rows ?? {},
+      pointsTotal: r?.points_total ?? null,
+      rowsAfterHarmonize: r?.rows_after_harmonize ?? null,
+      finalDailyRows: r?.final_daily_rows ?? null,
+      modelVersion: r?.model_version ?? null,
+      schemaHash: r?.schema_hash ?? null,
+      plausibilityViolations: Array.isArray(r?.plausibility_violations) ? r.plausibility_violations : [],
+      rawArchive: r?.raw_archive ?? {}
+    }))
+    : [];
+  return {
+    total: data?.total ?? 0,
+    acqDate: data?.acq_date ?? acqDate,
+    runs
+  };
+}
+
+/**
+ * Raw FIRMS observations behind one prediction date — immutable evidence.
+ * A 404 with error "raw_evidence_not_available" rejects with err.notAvailable
+ * and err.reason so the UI can say "predates the raw archive" honestly.
+ * @param {object} params
+ * @returns {Promise<{acqDate, source, runId, total, rows: Array, columns: string[], dataMode}>}
+ */
+export async function fetchRawEvidence({ acqDate, source = null, runId = null, limit = 200, offset = 0 } = {}) {
+  if (!acqDate) throw new Error('fetchRawEvidence requires an acq_date');
+  const params = new URLSearchParams({ acq_date: acqDate });
+  if (source) params.set('source', source);
+  if (runId) params.set('run_id', runId);
+  params.set('limit', String(Math.min(5000, Math.max(1, limit))));
+  params.set('offset', String(Math.max(0, offset)));
+  const res = await fetch(`${ARCHIVE_BASE}/evidence?${params}`);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status} from ${ARCHIVE_BASE}/evidence`);
+    try {
+      const body = await res.json();
+      if (body?.detail?.error === 'raw_evidence_not_available') {
+        err.notAvailable = true;
+        err.reason = body.detail.reason ?? 'no raw observations captured for this date';
+      }
+    } catch { /* keep generic */ }
+    throw err;
+  }
+  const data = await res.json();
+  return {
+    acqDate: data?.acq_date ?? acqDate,
+    source: data?.source ?? source,
+    runId: data?.run_id ?? runId,
+    total: data?.total ?? 0,
+    rows: Array.isArray(data?.rows) ? data.rows : [],
+    columns: Array.isArray(data?.columns) ? data.columns : [],
+    dataMode: typeof data?.data_mode === 'string' ? data.data_mode : 'historical'
   };
 }
 

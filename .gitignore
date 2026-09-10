@@ -1,6 +1,7 @@
 # Data directories - large files never committed
 data/raw/**
 data/processed/**
+data/archive/**
 !data/sample/**
 data/DL_FIRE_*
 data/*.zip

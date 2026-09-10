@@ -127,6 +127,7 @@ class Settings:
         "OSMWRI_PARQUET",
         str(_DATA_DIR / "processed" / "sih2026_h3_daily_features_with_osm_wri.parquet"),
     )
+    RAW_ARCHIVE_DIR = os.environ.get("RAW_ARCHIVE_DIR", str(_DATA_DIR / "archive" / "firms"))
     CAVEAT_MANIFEST: ClassVar[dict[str, str]] = {
         "pseudo_label_circularity": "Labels derive partly from FIRMS/OSM/WRI features, so metrics are not independent ground truth.",
         "satellite_nunique_only": "Only satellite count is modeled, not satellite identity.",

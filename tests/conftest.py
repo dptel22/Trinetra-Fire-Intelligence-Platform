@@ -25,3 +25,5 @@ if os.environ.get("INGESTION_ON_STARTUP_TESTS", "") != "1":
 _TEST_DATA_DIR = tempfile.mkdtemp(prefix="trinetra-tests-")
 os.environ.setdefault("DUCKDB_PATH", os.path.join(_TEST_DATA_DIR, "feature_store.duckdb"))
 os.environ.setdefault("AUDIT_DB_PATH", os.path.join(_TEST_DATA_DIR, "audit_log.duckdb"))
+os.environ.setdefault("INGESTION_DB_PATH", os.path.join(_TEST_DATA_DIR, "ingestion.duckdb"))
+os.environ.setdefault("RAW_ARCHIVE_DIR", os.path.join(_TEST_DATA_DIR, "archive", "firms"))

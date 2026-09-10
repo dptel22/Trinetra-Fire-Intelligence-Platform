@@ -6,6 +6,8 @@ import {
   fetchArchiveDates,
   fetchArchivePredictions,
   fetchArchiveSummary,
+  fetchArchiveRuns,
+  fetchAlertStates,
   CLASS_LABELS,
   PRIMARY_CLASSES,
   exportPredictionsToCsv,
@@ -72,6 +74,13 @@ export default function ArchivePage() {
   const [total, setTotal] = useState(0);
   const [dataMode, setDataMode] = useState('historical');
   const [ingestionStatus, setIngestionStatus] = useState(null);
+  const [ingestionRunId, setIngestionRunId] = useState(null);
+
+  const [alertStates, setAlertStates] = useState(null);
+  const [statesError, setStatesError] = useState(null);
+  const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|acknowledged|confirmed|dismissed
+  const [runManifest, setRunManifest] = useState(null);
+  const [manifestOpen, setManifestOpen] = useState(false);
 
   const [summary, setSummary] = useState(null);
   const [summaryError, setSummaryError] = useState(null);
@@ -129,6 +138,26 @@ export default function ArchivePage() {
 
   const loadRowsRef = useRef(null);
 
+  // Lifecycle states + the decisive run manifest for the selected date. Both
+  // are supplementary provenance: a failure is surfaced, never silent, and
+  // never blanks the prediction list.
+  const loadProvenance = useCallback(async (date) => {
+    try {
+      const res = await fetchAlertStates(date);
+      setAlertStates({ statesByHotspot: res.statesByHotspot, counts: res.counts });
+      setStatesError(null);
+    } catch (err) {
+      setAlertStates(null);
+      setStatesError(err.notAvailable ? null : (err.message || 'Lifecycle states unavailable'));
+    }
+    try {
+      const res = await fetchArchiveRuns({ acqDate: date, limit: 5 });
+      setRunManifest(res.runs.find((r) => r.targetDate === date) || res.runs[0] || null);
+    } catch {
+      setRunManifest(null);
+    }
+  }, []);
+
   // ── Load one archived day (server-side filters, offset honored) ───────────
   const loadRows = useCallback(async (dateArg) => {
     const date = dateArg || acqDate;
@@ -136,6 +165,7 @@ export default function ArchivePage() {
     setLoadingRows(true);
     setRowsError(null);
     setDateUnavailable(null);
+    loadProvenance(date);
     try {
       const res = await fetchArchivePredictions({
         acqDate: date,
@@ -150,6 +180,7 @@ export default function ArchivePage() {
       setTotal(res.total);
       setDataMode(res.dataMode);
       setIngestionStatus(res.ingestionStatus);
+      setIngestionRunId(res.ingestionRunId);
     } catch (err) {
       console.error('[ArchivePage] Failed to fetch archive predictions:', err);
       if (err.notAvailable) {
@@ -162,7 +193,7 @@ export default function ArchivePage() {
     } finally {
       setLoadingRows(false);
     }
-  }, [acqDate, selectedClass, selectedState, needsReviewOnly, minConfidence]);
+  }, [acqDate, selectedClass, selectedState, needsReviewOnly, minConfidence, loadProvenance]);
   useEffect(() => { loadRowsRef.current = loadRows; }, [loadRows]);
 
   // Single mount trigger.
@@ -217,12 +248,30 @@ export default function ArchivePage() {
   // ── Client-side pagination over the loaded (≤1000) rows ───────────────────
   // The displayed page is clamped during render so shrinking filters can never
   // point past the last page (avoids a set-state-in-effect render cascade).
-  const totalPages = Math.max(1, Math.ceil(predictions.length / PAGE_SIZE));
+  const lifecycleStateFor = useCallback((alert) => {
+    const hotspotId = alert.cell_id || (alert.h3_index ? `${alert.h3_index}_${acqDate}` : null);
+    return alertStates?.statesByHotspot?.[hotspotId]?.state || 'new';
+  }, [alertStates, acqDate]);
+
+  const lifecycleFiltered = useMemo(() => {
+    if (stateFilter === 'all') return predictions;
+    if (stateFilter === 'needs_review') return predictions.filter((p) => p.needs_review);
+    return predictions.filter((p) => lifecycleStateFor(p) === stateFilter);
+  }, [predictions, stateFilter, lifecycleStateFor]);
+
+  const lifecycleCounts = useMemo(() => {
+    const counts = { new: 0, acknowledged: 0, confirmed: 0, dismissed: 0 };
+    for (const p of predictions) counts[lifecycleStateFor(p)] += 1;
+    return counts;
+  }, [predictions, lifecycleStateFor]);
+  const reviewedCount = lifecycleCounts.acknowledged + lifecycleCounts.confirmed + lifecycleCounts.dismissed;
+
+  const totalPages = Math.max(1, Math.ceil(lifecycleFiltered.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const paginated = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE;
-    return predictions.slice(start, start + PAGE_SIZE);
-  }, [predictions, safePage]);
+    return lifecycleFiltered.slice(start, start + PAGE_SIZE);
+  }, [lifecycleFiltered, safePage]);
 
   const setPage = useCallback((page) => setCurrentPage(Math.min(Math.max(1, page), totalPages)), [totalPages]);
 
@@ -254,10 +303,15 @@ export default function ArchivePage() {
   const perDateWarning = ingestionStatusWarning(ingestionStatus);
 
   const handleExportCsv = () => {
-    if (predictions.length === 0) return;
+    if (lifecycleFiltered.length === 0) return;
     try {
+      const rowsWithLifecycle = lifecycleFiltered.map((p) => ({
+        ...p,
+        alert_state: lifecycleStateFor(p),
+        analyst_note: alertStates?.statesByHotspot?.[`${p.h3_index || p.cell_id}_${acqDate}`]?.last_note ?? ''
+      }));
       exportPredictionsToCsv(
-        predictions,
+        rowsWithLifecycle,
         `trinetra_archive_${acqDate || 'unknown-date'}.csv`,
         { acqDate: acqDate || undefined, dataMode: 'historical' }
       );
@@ -265,6 +319,10 @@ export default function ArchivePage() {
       console.error('[ArchivePage] CSV export failed:', err);
     }
   };
+
+  const handleActionCompleted = useCallback(() => {
+    if (acqDate) loadProvenance(acqDate);
+  }, [acqDate, loadProvenance]);
 
   return (
     <div style={{ backgroundColor: 'var(--bg-dark, #0a0e12)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -507,6 +565,72 @@ export default function ArchivePage() {
           </div>
         </div>
 
+        {/* Lifecycle review-state filter (replay-derived analyst decisions) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #55595E)', fontFamily: 'var(--font-heading)', fontWeight: 700, letterSpacing: '0.05em' }}>
+            REVIEW STATE:
+          </span>
+          {[
+            ['all', `All (${predictions.length})`],
+            ['needs_review', `Needs review (${predictions.filter((p) => p.needs_review).length})`],
+            ['new', `New (${lifecycleCounts.new})`],
+            ['acknowledged', `Acknowledged (${lifecycleCounts.acknowledged})`],
+            ['confirmed', `Confirmed (${lifecycleCounts.confirmed})`],
+            ['dismissed', `Dismissed (${lifecycleCounts.dismissed})`]
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={stateFilter === value}
+              onClick={() => { setStateFilter(value); setCurrentPage(1); }}
+              style={smallButtonStyle}
+            >
+              {label}
+            </button>
+          ))}
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #55595E)' }}>
+            {reviewedCount} reviewed · {lifecycleCounts.new} unreviewed (lifecycle)
+          </span>
+          {statesError && (
+            <span role="alert" style={{ fontSize: '0.72rem', color: '#d64228' }}>
+              Lifecycle states unavailable ({statesError})
+            </span>
+          )}
+        </div>
+
+        {/* Decisive ingestion run manifest for the selected date */}
+        <div style={{ marginBottom: '1.5rem', padding: '12px 16px', backgroundColor: 'var(--panel-surface, #1e222a)', border: '1px solid var(--hairline-border, #2e3440)', borderRadius: '8px' }}>
+          <button
+            type="button"
+            aria-expanded={manifestOpen}
+            onClick={() => setManifestOpen((v) => !v)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--accent-blue, #3d9de8)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+          >
+            {manifestOpen ? '▲ Hide ingestion run manifest' : '▼ Ingestion run manifest (provenance for this date)'}
+          </button>
+          {manifestOpen && (
+            runManifest ? (
+              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', color: 'var(--text-primary, #eceff4)' }}>
+                <div>Run <code>{runManifest.runId || '(pre-manifest run)'}</code> · target date {runManifest.targetDate || '—'} · mode {runManifest.fetchMode || 'unknown'} · {runManifest.ok ? 'ok' : 'failed'}</div>
+                <div style={{ fontFamily: 'monospace', color: 'var(--text-muted, #8b949e)' }}>
+                  Raw rows by source: {Object.entries(runManifest.rawRows || {}).map(([k, v]) => `${k}=${v}`).join(', ') || 'n/a'}
+                  {runManifest.pointsTotal != null ? ` · points_total=${runManifest.pointsTotal}` : ''}
+                </div>
+                <div style={{ fontFamily: 'monospace', color: 'var(--text-muted, #8b949e)' }}>
+                  Raw evidence parts: {(runManifest.rawArchive?.parts || []).map((p) => `${p.source}/${p.acq_date} (${p.rows} rows)`).join(', ') || 'none captured for this date'}
+                </div>
+                {(runManifest.plausibilityViolations || []).length > 0 && (
+                  <div role="alert" style={{ color: '#7a5c00' }}>⚠ Plausibility warnings: {runManifest.plausibilityViolations.join('; ')}</div>
+                )}
+              </div>
+            ) : (
+              <div style={{ marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-muted, #55595E)' }}>
+                No ingestion run manifest is available for this date (it predates run-level manifests).
+              </div>
+            )
+          )}
+        </div>
+
         {/* Loading */}
         {loadingRows && (
           <div role="status" style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted, #55595E)' }}>
@@ -605,7 +729,17 @@ export default function ArchivePage() {
               </div>
             )}
             {paginated.map((alert, idx) => (
-              <AlertCard key={alert.cell_id || alert.h3_index || idx} alert={alert} index={idx} mapDate={acqDate} />
+              <AlertCard
+                key={alert.cell_id || alert.h3_index || idx}
+                alert={alert}
+                index={idx}
+                mapDate={acqDate}
+                alertState={alertStates?.statesByHotspot?.[`${alert.h3_index || alert.cell_id}_${acqDate}`] || null}
+                onActionCompleted={handleActionCompleted}
+                actionsDisabled={apiMode === 'mock'}
+                actionsDisabledReason={apiMode === 'mock' ? 'Demo preview has no backend — lifecycle actions require a live backend connection.' : null}
+                evidenceRunId={ingestionRunId}
+              />
             ))}
           </div>
         )}

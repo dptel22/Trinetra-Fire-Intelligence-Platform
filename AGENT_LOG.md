@@ -488,3 +488,31 @@ Ownership split, interface contract, and per-agent prompts live in
 - Deliberately NOT changed (documented in docs/coordination/alerts-archive/agent-4-adversarial-review.md): LIVE label on unknown provenance in the /health-fallback path (test-asserted design, disclosed inline), ingestionStatusWarning('failed') wording nuance (backend shape makes no-run and failed indistinguishable), CSV formula-prefix escaping (backend-controlled values only).
 - Verification: npm run build passes; npm run lint 0 errors; node test_agent_alerts.mjs 22/22; node test_agent_b.mjs 11/11; pytest tests/test_archive.py 26 passed; git diff --check clean. Full report: docs/coordination/alerts-archive/agent-4-adversarial-review.md.
 - Interface impact: StatusBadge gains an optional labelPrefix prop (default 'Feed status' — existing call sites unchanged); ArchivePage bootstrap now fetches the summary sequentially after dates (bounded window). No backend, schema, or dependency changes.
+
+## [2026-09-10T05:10+05:30] Agent: ZCode — Phase 3+4 complete: raw FIRMS evidence archive, run manifests, alert lifecycle
+
+**Scope:** Closed the three remaining gaps from the code-verified review. No new database engine; reuses the audit DuckDB, atomic-parquet, and run-history patterns.
+
+**Backend:**
+- `ingestion/firms_pull.py` — `fetch_firms_both(return_raw=True)` now also returns the untouched per-source `_parse_csv` frames (column superset preserved).
+- `ingestion/raw_archive.py` (new) — immutable raw archive at `data/archive/firms/source=<SRC>/acq_date=<DATE>/part-<run_id>.parquet`; run_id in the filename makes parts immutable by construction; zero-detection days still write schema-carrying partitions; `has_parts()` / `read_raw_observations()` for serving; sha256 per part; no filesystem paths in returned descriptors.
+- `ingestion/manifest.py` (new) — best-effort INSERT-only `ingestion_runs` DuckDB manifest (`INGESTION_DB_PATH`); a manifest failure never fails a run; JSON run history stays authoritative.
+- `ingestion/run_ingestion.py` — real `run_id` (`RUN-<UTC>-<hex6>`), raw parts written BEFORE aggregation (evidence survives mid-run crashes), `schema_hash` (sha256 of the daily arrow schema) + `model_version` + `raw_archive` in run stats and history; override runs record `raw_archive.skipped`; failure-path history entries carry run ids.
+- `app/services/audit_service.py` — single persistent read-write connection under a Lock (removes the latent read_only/read-write mixed-config failure under the FastAPI threadpool); new append-only `alert_lifecycle_events` table; `log_action` (server-side resolution of model output + run provenance), `get_state_for_date` (replay: latest state-changing event wins, `note` never moves state, `reopened` → new), `get_history`.
+- `app/api/endpoints/alerts.py` + `app/schemas/alerts.py` (new) — `POST /alerts/{hotspot_id}/actions` (DEMO_ANALYST default applied server-side; dismissals require a >=10-char note), `GET /alerts/states?acq_date=`, `GET /alerts/{hotspot_id}/history`.
+- `app/api/endpoints/evidence.py` + `app/schemas/evidence.py` (new) — `GET /archive/runs` (whitelisted manifest fields, path-free, acq_date matches targets, @date chunk keys and raw parts) and `GET /archive/evidence` (raw rows behind a prediction date; run_id defaults to the decisive run; 404 "raw_evidence_not_available" only when no partition exists — a zero-row partition is a valid empty day, 200).
+- `app/services/archive_service.py` — `_run_id()` promotes real run ids, falls back to the synthetic `date:started_at` key for pre-manifest history.
+- `app/core/config.py` — `RAW_ARCHIVE_DIR` (env-overridable).
+
+**Frontend (`backend/frontend`):**
+- `src/services/api.js` — strict-path `submitAlertAction` / `fetchAlertStates` / `fetchAlertHistory` / `fetchArchiveRuns` / `fetchRawEvidence`; CSV export gains `alert_state`, `analyst_note`, `ingestion_run_id`.
+- `AlertCard` (shared) — lifecycle state chip (distinct from the model's needs-review badge), analyst action bar with reviewer identity persisted in localStorage (default DEMO_ANALYST + visible demo tag; disabled in mock mode — no backend to persist to), append-only review-history toggle, raw-FIRMS-evidence panel with an honest "predates the raw archive" state.
+- `FireAlertsPage` + `ArchivePage` — replay-derived states fetched per date and joined by `{h3_08}_{acq_date}` (prediction `cell_id` carries only the h3 index, so ids are composed with the acquisition date), REVIEW STATE filter chips with counts, reviewed/unreviewed-lifecycle totals, run-manifest block on the archive page.
+- Fixed mid-verification: hotspot id composition (browser POSTs were 400ing on bare h3 ids) and empty-day evidence 404 conflation.
+
+**Verification:**
+- Backend pytest: **131 passed, 1 deselected** (28 new tests: raw archive, ingestion hook, manifest, lifecycle, evidence).
+- `npm run lint` → 0 errors; `npm run build` → pass.
+- Browser (live backend + live FIRMS run): acknowledge → confirm flows update chips/counts; history shows append-only events with analyst ids and notes; evidence panel shows the honest not-captured/empty-day states; archive run-manifest block shows run id, raw parts, and plausibility warnings; a real `RUN-20260909T235222-6cef34` run (0 points, flagged) wrote zero-row parts for 2026-09-10 and served evidence with `ingestion_status=plausibility_warning`.
+
+**Known honest limitations:** dates ingested before this change have no raw parts (UI says so explicitly); FIRMS NRT's rolling window means gap-fill re-queries of older days legitimately return 0 rows and the newest-run provenance rule then flags those days as `plausibility_warning` — intended, truthful behavior.

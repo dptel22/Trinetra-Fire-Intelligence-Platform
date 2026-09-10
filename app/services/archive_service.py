@@ -80,6 +80,11 @@ class ArchiveService:
     def _run_id(run: dict[str, Any] | None) -> str | None:
         if not run:
             return None
+        # Real run ids (manifest era) take precedence; pre-manifest history
+        # entries fall back to the synthetic date:started_at key so older
+        # dates keep working provenance.
+        if run.get("run_id"):
+            return str(run["run_id"])
         started = run.get("started_at")
         return f"{run.get('target_date')}:{started}" if started else None
 

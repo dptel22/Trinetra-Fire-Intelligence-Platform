@@ -32,11 +32,13 @@ runs. This keeps demo restarts zero-latency.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
 import shutil
 import time
+import uuid
 from datetime import date as date_cls
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -44,6 +46,7 @@ from pathlib import Path
 import pandas as pd
 
 from app.core.config import settings
+from ingestion import raw_archive
 from ingestion.aggregate import DAILY_COLUMNS, build_daily_frame
 from ingestion.firms_pull import (
     MAX_DAY_RANGE,
@@ -270,8 +273,11 @@ def run_ingestion(
     target_date = validate_date(date) or datetime.now(timezone.utc).date().isoformat()
     daily_path = Path(daily_path or settings.H3_DAILY_PARQUET)
     static_path = Path(static_path or settings.OSMWRI_PARQUET)
+    run_id = f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
     stats: dict = {
+        "run_id": run_id,
+        "model_version": settings.VERSION,
         "target_date": target_date,
         "bbox": bbox,
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -281,16 +287,23 @@ def run_ingestion(
     # 1. Fail loud on missing raw inputs (OSM PBF / WRI CSV / shapefile).
     validate_raw_inputs()
 
-    # 2. Fetch FIRMS points for the planned day chunks.
+    # 2. Fetch FIRMS points for the planned day chunks, capturing the raw
+    # per-source frames so the immutable raw archive can persist the exact
+    # API evidence before any harmonization/filtering drops rows.
+    raw_parts: list[dict] = []
     if points_override is not None:
         points = points_override.copy()
         stats["fetch"] = {"mode": "override", "raw_rows": {"override": int(len(points))}}
+        stats["raw_archive"] = {"skipped": "override", "reason": "no live FIRMS fetch to preserve"}
     else:
         chunks = _plan_day_chunks(target_date, daily_path, day_range, gap_fill)
         stats["fetch"] = {"mode": "live_firms", "chunks": chunks, "per_chunk": {}}
         frames: list[pd.DataFrame] = []
+        raw_by_source: dict[str, list[pd.DataFrame]] = {}
         for chunk_date, span in chunks:
-            pts, chunk_stats = fetch_firms_both(bbox, day_range=span, date=chunk_date)
+            pts, chunk_stats, chunk_raw = fetch_firms_both(bbox, day_range=span, date=chunk_date, return_raw=True)
+            for src, frame in chunk_raw.items():
+                raw_by_source.setdefault(src, []).append(frame)
             # Per-chunk FIRMS row counts make day-over-day plausibility
             # comparisons possible straight from the run-history JSON.
             stats["fetch"]["per_chunk"][chunk_date] = {
@@ -306,6 +319,16 @@ def run_ingestion(
         points = pd.concat(frames, ignore_index=True) if frames else points_override
         if points is None or points.empty:
             points = pd.DataFrame()
+        # Immutable raw evidence is written BEFORE aggregation: a crash in any
+        # later step must not lose what the satellite actually reported.
+        raw_parts = raw_archive.write_raw_observations(
+            {src: pd.concat(parts, ignore_index=True) for src, parts in raw_by_source.items()},
+            run_id=run_id,
+            requested_date=target_date,
+            bbox=bbox,
+            ingested_at=datetime.now(timezone.utc).isoformat(),
+        )
+        stats["raw_archive"] = {"parts": raw_parts, "total_raw_rows": sum(p["rows"] for p in raw_parts)}
     stats["points_total"] = int(len(points))
 
     # 3. Aggregate to the typed daily frame.
@@ -465,8 +488,12 @@ def run_ingestion(
     # overrides must never pollute it — a stale override entry as "last run"
     # flips is_ingestion_current() and both misreports /health provenance and
     # can trigger a pointless live pull at boot.
+    stats["schema_hash"] = _schema_hash(target_daily_schema)
     if Path(static_path).resolve() == _CANONICAL_OSMWRI_PARQUET:
         _append_run_history(stats)
+        from ingestion.manifest import record_run
+
+        record_run(stats)  # best-effort; never fails the run (see manifest.py)
     else:
         stats["run_history_recorded"] = False
     logger.info(
@@ -498,6 +525,13 @@ def ensure_fresh_for_backend() -> dict | None:
 # ---------------------------------------------------------------------------
 # Plausibility gates (regression check for live pulls)
 # ---------------------------------------------------------------------------
+
+
+def _schema_hash(schema) -> str | None:
+    """Stable content hash of an arrow schema (manifest integrity anchor)."""
+    if schema is None:
+        return None
+    return hashlib.sha256(str(schema).encode("utf-8")).hexdigest()
 
 
 def plausibility_violations(stats: dict) -> list[str]:
@@ -556,7 +590,14 @@ def main() -> int:
         )
     except (IngestionError, RawInputError) as err:
         logger.error("Ingestion failed: %s", err)
-        _append_run_history({"ok": False, "error": str(err), "at": datetime.now(timezone.utc).isoformat()})
+        _append_run_history(
+            {
+                "run_id": f"RUN-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}-{uuid.uuid4().hex[:6]}",
+                "ok": False,
+                "error": str(err),
+                "at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         return 1
     print(json.dumps({k: v for k, v in stats.items() if k != "fetch"}, indent=2, default=str))
     return 0
