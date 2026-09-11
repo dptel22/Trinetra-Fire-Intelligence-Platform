@@ -27,106 +27,45 @@ const GLYPHS_URL = '/fonts/glyphs/{fontstack}/{range}.pbf';
 const OMT_ATTR = '© OpenMapTiles © OpenStreetMap contributors';
 const BM_ATTR = 'NASA Visible Earth (Blue Marble) · © OpenMapTiles © OpenStreetMap contributors';
 
-const FONT_REG = ['NotoSansRegular'];
-const FONT_BOLD = ['NotoSansBold'];
-
-function vectorSources() {
-  const sources = {};
-  if (PMTILES_URL) {
-    sources.openmaptiles = {
-      type: 'vector',
-      url: `pmtiles://${PMTILES_URL}`,
-      attribution: OMT_ATTR
-    };
-  }
-  return sources;
-}
-
-// Shared overlay: admin boundaries + city/town labels (works over any base).
-function boundaryAndPlaceLayers(paint) {
-  const layers = [];
-  if (PMTILES_URL) {
-    layers.push({
-      id: 'boundary-country',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'boundary',
-      filter: ['==', 'admin_level', 2],
-      paint: { 'line-color': paint.country, 'line-width': 1.6, 'line-opacity': 0.95 }
-    });
-    layers.push({
-      id: 'boundary-state',
-      type: 'line',
-      source: 'openmaptiles',
-      'source-layer': 'boundary',
-      filter: ['==', 'admin_level', 4],
-      paint: { 'line-color': paint.state, 'line-width': 0.8, 'line-opacity': 0.7 }
-    });
-    layers.push({
-      id: 'place-city',
-      type: 'symbol',
-      source: 'openmaptiles',
-      'source-layer': 'place',
-      filter: ['==', ['get', 'class'], 'city'],
-      minzoom: 4,
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-font': FONT_BOLD,
-        'text-size': ['interpolate', ['linear'], ['zoom'], 4, 12, 10, 16]
-      },
-      paint: {
-        'text-color': paint.label,
-        'text-halo-color': paint.halo,
-        'text-halo-width': 1.6
-      }
-    });
-    layers.push({
-      id: 'place-town',
-      type: 'symbol',
-      source: 'openmaptiles',
-      'source-layer': 'place',
-      filter: ['==', ['get', 'class'], 'town'],
-      minzoom: 7.5,
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-font': FONT_REG,
-        'text-size': ['interpolate', ['linear'], ['zoom'], 8, 11, 12, 13]
-      },
-      paint: {
-        'text-color': paint.label,
-        'text-halo-color': paint.halo,
-        'text-halo-width': 1.4
-      }
-    });
-  }
-  return layers;
-}
 
 function buildBlueMarbleStyle() {
-  const layers = [
-    { id: 'background', type: 'background', paint: { 'background-color': '#0b1626' } },
-    {
-      id: 'bluemarble',
-      type: 'raster',
-      source: 'bluemarble',
-      paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 }
-    }
-  ];
   const sources = {
-    bluemarble: {
+    satellite: {
       type: 'raster',
-      tiles: ['/tiles/bluemarble/{z}/{x}/{y}.jpg'],
+      tiles: [
+        'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg'
+      ],
       tileSize: 256,
-      minzoom: 0,
-      maxzoom: 6,
-      attribution: BM_ATTR
+      maxzoom: 8,
+      attribution: 'NASA Visible Earth · Blue Marble Next Generation (Shaded Relief & Bathymetry)'
+    },
+    reference: {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19
     }
   };
-  Object.assign(sources, vectorSources());
-  layers.push(...boundaryAndPlaceLayers({
-    country: '#FFFFFF', state: '#E8E8E8',
-    label: '#FFFFFF', halo: 'rgba(0,0,0,0.75)'
-  }));
+
+  const layers = [
+    { id: 'background', type: 'background', paint: { 'background-color': '#030814' } },
+    {
+      id: 'satellite-layer',
+      type: 'raster',
+      source: 'satellite',
+      paint: { 'raster-opacity': 1, 'raster-fade-duration': 150 }
+    },
+    {
+      id: 'reference-layer',
+      type: 'raster',
+      source: 'reference',
+      paint: { 'raster-opacity': 0.85, 'raster-fade-duration': 150 }
+    }
+  ];
+
   return {
     version: 8,
     name: 'blue-marble',
@@ -137,277 +76,58 @@ function buildBlueMarbleStyle() {
 }
 
 function buildStreetsStyle() {
-  if (!PMTILES_URL) {
-    return {
-      version: 8,
-      name: 'streets-fallback',
-      sources: {
-        streets: {
-          type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          maxzoom: 19,
-          attribution: '© OpenStreetMap contributors'
-        }
-      },
-      layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#F5F4F0' } },
-        { id: 'streets-raster', type: 'raster', source: 'streets', paint: { 'raster-fade-duration': 0 } }
-      ]
-    };
-  }
+  const sources = {
+    streets: {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        'https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© Esri, HERE, Garmin, USGS, NGA, EPA, USDA, NPS · © OpenStreetMap contributors'
+    }
+  };
+
+  const layers = [
+    { id: 'background', type: 'background', paint: { 'background-color': '#F5F4F0' } },
+    { id: 'streets-raster', type: 'raster', source: 'streets', paint: { 'raster-fade-duration': 150 } }
+  ];
+
   return {
     version: 8,
     name: 'streets',
     glyphs: GLYPHS_URL,
-    sources: vectorSources(),
-    layers: [
-      { id: 'background', type: 'background', paint: { 'background-color': '#F5F4F0' } },
-      {
-        id: 'landcover',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'landcover',
-        paint: {
-          'fill-opacity': 0.85,
-          'fill-color': [
-            'match', ['get', 'class'],
-            'wood', '#D8E8CB',
-            'grass', '#E4EFD6',
-            'sand', '#EFE7CE',
-            'wetland', '#D3E5D4',
-            'ice', '#E3EDF2',
-            'rgba(0,0,0,0)'
-          ]
-        }
-      },
-      {
-        id: 'landuse',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'landuse',
-        paint: {
-          'fill-opacity': 0.7,
-          'fill-color': [
-            'match', ['get', 'class'],
-            'residential', '#ECEBE7',
-            'industrial', '#E9E3DB',
-            'quarry', '#E8E0D6',
-            'farmland', '#EFE9CF',
-            'rgba(0,0,0,0)'
-          ]
-        }
-      },
-      {
-        id: 'park',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'park',
-        paint: { 'fill-color': '#CDE7C2', 'fill-opacity': 0.9 }
-      },
-      {
-        id: 'water',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'water',
-        paint: { 'fill-color': '#A8CFE3' }
-      },
-      {
-        id: 'waterway',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'waterway',
-        paint: {
-          'line-color': '#A8CFE3',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 2]
-        }
-      },
-      {
-        id: 'road-minor',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: [
-          'in', 'class', 'minor', 'service', 'track'
-        ],
-        minzoom: 11,
-        paint: {
-          'line-color': '#FFFFFF',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 16, 3]
-        }
-      },
-      {
-        id: 'road-mid',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: ['in', 'class', 'secondary', 'tertiary'],
-        minzoom: 8,
-        paint: {
-          'line-color': '#FBD8AC',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.6, 14, 3]
-        }
-      },
-      {
-        id: 'road-major',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: ['in', 'class', 'motorway', 'trunk', 'primary'],
-        paint: {
-          'line-color': '#F3A64B',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 12, 4]
-        }
-      },
-      ...boundaryAndPlaceLayers({
-        country: '#C0453A', state: '#B7BCC2',
-        label: '#35393D', halo: '#FFFFFF'
-      })
-    ]
+    sources,
+    layers
   };
 }
 
 function buildTopographicStyle() {
-  if (!PMTILES_URL) {
-    return {
-      version: 8,
-      name: 'topographic-fallback',
-      sources: {
-        topographic: {
-          type: 'raster',
-          tiles: ['https://tile.opentopomap.org/{z}/{x}/{y}.png'],
-          tileSize: 256,
-          maxzoom: 17,
-          attribution: '© OpenTopoMap (CC-BY-SA) · © OpenStreetMap contributors'
-        }
-      },
-      layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#EDE7D9' } },
-        { id: 'topographic-raster', type: 'raster', source: 'topographic', paint: { 'raster-fade-duration': 0 } }
-      ]
-    };
-  }
+  const sources = {
+    topographic: {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        'https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}'
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© Esri, USGS, NOAA · © OpenStreetMap contributors'
+    }
+  };
+
+  const layers = [
+    { id: 'background', type: 'background', paint: { 'background-color': '#EDE7D9' } },
+    { id: 'topographic-raster', type: 'raster', source: 'topographic', paint: { 'raster-fade-duration': 150 } }
+  ];
+
   return {
     version: 8,
     name: 'topographic',
     glyphs: GLYPHS_URL,
-    sources: vectorSources(),
-    layers: [
-      { id: 'background', type: 'background', paint: { 'background-color': '#EDE7D9' } },
-      {
-        id: 'landcover',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'landcover',
-        paint: {
-          'fill-opacity': 0.9,
-          'fill-color': [
-            'match', ['get', 'class'],
-            'wood', '#C6D9AE',
-            'grass', '#DFE6BE',
-            'sand', '#EDE0B8',
-            'wetland', '#C2D6C5',
-            'rgba(0,0,0,0)'
-          ]
-        }
-      },
-      {
-        id: 'landuse',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'landuse',
-        paint: {
-          'fill-opacity': 0.8,
-          'fill-color': [
-            'match', ['get', 'class'],
-            'farmland', '#E6DCB8',
-            'residential', '#E3DCCE',
-            'quarry', '#E0D4C2',
-            'rgba(0,0,0,0)'
-          ]
-        }
-      },
-      {
-        id: 'park',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'park',
-        paint: { 'fill-color': '#CBE3B5', 'fill-opacity': 0.9 }
-      },
-      {
-        id: 'water',
-        type: 'fill',
-        source: 'openmaptiles',
-        'source-layer': 'water',
-        paint: { 'fill-color': '#9FC1D8' }
-      },
-      {
-        id: 'waterway',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'waterway',
-        paint: {
-          'line-color': '#9FC1D8',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.5, 12, 2]
-        }
-      },
-      {
-        id: 'road-minor',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: ['in', 'class', 'minor', 'service', 'track'],
-        minzoom: 11,
-        paint: {
-          'line-color': '#FFFFFF',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 16, 2.5]
-        }
-      },
-      {
-        id: 'road-mid',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: ['in', 'class', 'secondary', 'tertiary'],
-        minzoom: 8,
-        paint: {
-          'line-color': '#B49B76',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 14, 2.2]
-        }
-      },
-      {
-        id: 'road-major',
-        type: 'line',
-        source: 'openmaptiles',
-        'source-layer': 'transportation',
-        filter: ['in', 'class', 'motorway', 'trunk', 'primary'],
-        paint: {
-          'line-color': '#C97F3D',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 12, 3.5]
-        }
-      },
-      ...(PMTILES_URL ? [{
-        id: 'peak-label',
-        type: 'symbol',
-        source: 'openmaptiles',
-        'source-layer': 'mountain_peak',
-        minzoom: 8,
-        layout: {
-          'text-field': ['concat', ['get', 'name'], ' · ', ['get', 'ele'], 'm'],
-          'text-font': FONT_REG,
-          'text-size': 10
-        },
-        paint: {
-          'text-color': '#6B5233',
-          'text-halo-color': '#F2ECDD',
-          'text-halo-width': 1.2
-        }
-      }] : []),
-      ...boundaryAndPlaceLayers({
-        country: '#7A5C33', state: '#A98F63',
-        label: '#4A3A22', halo: '#F2ECDD'
-      })
-    ]
+    sources,
+    layers
   };
 }
 
@@ -427,15 +147,22 @@ export function buildBasemapStyle(id) {
 }
 
 // ─── Per-class detection markers (flat, high-clarity icon system) ───────────
-// One restrained marker shape keeps the map calm; the white pictogram carries
-// the class meaning so the taxonomy is not dependent on color alone.
+// ─── Per-class detection markers (exact hexagonal icon system) ───────────────
+// Hexagonal pins matching the classified taxonomy icons:
+//   industrial: orange hexagon with factory smokestacks & billowing smoke
+//   mining: dark slate hexagon with heavy excavator digging rock rubble
+//   agricultural_burn: emerald green hexagon with perspective crop furrows, wheat & flame
+//   wildfire: red hexagon with fir trees & roaring flame
+//   unclassified: purple hexagon with crosshair reticle & question mark
 
-const ICON_SIZE = 72;
+const ICON_SIZE = 80;
 
 function markerSvg(fill, glyph) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ICON_SIZE}" height="${ICON_SIZE}" viewBox="0 0 72 72">
-  <rect x="7" y="7" width="58" height="58" rx="18" fill="#0B1626" fill-opacity="0.92" stroke="#0B1626" stroke-width="5"/>
-  <rect x="10" y="10" width="52" height="52" rx="15" fill="${fill}" stroke="#FFFFFF" stroke-width="2.5"/>
+  // Pointy-topped hexagon with rounded corners, dark contrast base and crisp inner stroke
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ICON_SIZE}" height="${ICON_SIZE}" viewBox="0 0 80 80">
+  <polygon points="40,5 71,22.8 71,57.2 40,75 9,57.2 9,22.8" fill="#070D18" stroke="#070D18" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="40,7 68.5,23.5 68.5,56.5 40,73 11.5,56.5 11.5,23.5" fill="${fill}" stroke="${fill}" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="40,8.5 67,24.5 67,55.5 40,71.5 13,55.5 13,24.5" fill="none" stroke="#FFFFFF" stroke-width="1.3" stroke-opacity="0.9" stroke-linejoin="round"/>
   ${glyph}
 </svg>`;
   return {
@@ -448,37 +175,100 @@ function markerSvg(fill, glyph) {
   };
 }
 
-const ICON_COLORS = {
-  industrial: '#F28C28',
-  mining: '#8FA3AE',
-  agricultural_burn: '#E9B923',
-  wildfire: '#E8554F',
-  unclassified: '#697783'
+export const ICON_COLORS = {
+  industrial: '#FF7A00',
+  mining: '#333A44',
+  agricultural_burn: '#0E8A38',
+  wildfire: '#E62325',
+  unclassified: '#6E22C7'
 };
 
-// Pictograms are deliberately simple so they remain recognizable at z4–z16.
-const GLYPHS = {
-  industrial: `<path d="M27 51 V39 h12 l7 5 v-17 h6 v24 h-6 V51 Z" fill="#FFFFFF"/>
-    <path d="M51 27 c0-3 3-3 3-6 c3 3 3 6 0 8 c-2 1-3 0-3-2 Z" fill="#FFFFFF"/>`,
-  wildfire: `<path d="M36 51 c-5-7-1-13 5-18 c0 5 3 6 4 9 c2-4 2-8 1-13 c8 7 11 13 8 20
-    a12 12 0 0 1-23 2 c-1-4 1-7 4-10 c0 4 1 7 1 10 Z" fill="#FFFFFF"/>`,
-  mining: `<g stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" fill="none">
-    <path d="M29 49 L49 29"/><path d="M42 27 Q51 27 57 34"/>
-    <path d="M47 47 l8 8"/>
-  </g>`,
-  agricultural_burn: `<g stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" fill="none">
-    <path d="M36 53 V33 M36 41 l-7-6 M36 44 l7-7 M36 48 l-7-6"/>
-    <path d="M46 53 V38 M46 44 l7-6 M46 47 l-7-5"/>
-    <path d="M27 56 H56" stroke-width="3.8"/>
-  </g>`,
-  unclassified: `<text x="36" y="49" font-family="Arial, Helvetica, sans-serif" font-size="25"
-    font-weight="bold" fill="#FFFFFF" text-anchor="middle">?</text>`
-};
+function getGlyph(cls, fill) {
+  switch (cls) {
+    case 'industrial':
+      return `
+        <rect x="15" y="44" width="31" height="15" rx="0.5" fill="#FFFFFF"/>
+        <rect x="18" y="50" width="3.5" height="3.5" rx="0.5" fill="${fill}"/>
+        <rect x="25" y="50" width="3.5" height="3.5" rx="0.5" fill="${fill}"/>
+        <rect x="32" y="50" width="3.5" height="3.5" rx="0.5" fill="${fill}"/>
+        <rect x="39" y="50" width="3.5" height="3.5" rx="0.5" fill="${fill}"/>
+        <polygon points="21,44 23,30 27,30 28,44" fill="#FFFFFF"/>
+        <polygon points="29,44 31,31 35,31 36,44" fill="#FFFFFF"/>
+        <rect x="49" y="38" width="6.5" height="21" rx="0.5" fill="#FFFFFF"/>
+        <rect x="58" y="42" width="6.5" height="17" rx="0.5" fill="#FFFFFF"/>
+        <path d="M 24,30 C 23,24 28,19 33,20 C 36,17 43,17 46,20 C 50,18 56,21 57,25 C 58,29 55,33 50,32 C 45,32 42,34 37,32 C 32,32 29,33 24,30 Z" fill="#FFFFFF"/>
+      `;
+    case 'mining':
+      return `
+        <rect x="15" y="51" width="26" height="8" rx="4" fill="#FFFFFF"/>
+        <rect x="18" y="53.5" width="20" height="3" rx="1.5" fill="${fill}"/>
+        <circle cx="21" cy="55" r="1" fill="#FFFFFF"/>
+        <circle cx="25" cy="55" r="1" fill="#FFFFFF"/>
+        <circle cx="28" cy="55" r="1" fill="#FFFFFF"/>
+        <circle cx="31" cy="55" r="1" fill="#FFFFFF"/>
+        <circle cx="35" cy="55" r="1" fill="#FFFFFF"/>
+        <path d="M 23 51 V 40 H 35 V 51 Z" fill="#FFFFFF"/>
+        <rect x="27.5" y="42" width="6" height="5" rx="0.8" fill="${fill}"/>
+        <polygon points="32,45 35,42 49,24 53,26 36,47" fill="#FFFFFF"/>
+        <polygon points="49,24 60,37 57,39.5 47,27" fill="#FFFFFF"/>
+        <path d="M 58,37 L 64,42 C 65,47 62,51 57,51 L 56,46 L 55,41 Z" fill="#FFFFFF"/>
+        <polygon points="56,51 57,53.5 58,51" fill="#FFFFFF"/>
+        <polygon points="59,51 60,53.5 61,51" fill="#FFFFFF"/>
+        <polygon points="46,59 53,48 60,59" fill="#FFFFFF"/>
+        <polygon points="41,59 45,53 49,59" fill="#FFFFFF"/>
+        <polygon points="57,59 61,52 65,59" fill="#FFFFFF"/>
+      `;
+    case 'agricultural_burn':
+      return `
+        <path d="M 38.5,49 L 41.5,49 L 43,62 L 37,62 Z" fill="#FFFFFF"/>
+        <path d="M 34,50 L 36.5,50 L 33.5,62 L 28,62 Z" fill="#FFFFFF"/>
+        <path d="M 29.5,51 L 32,51 L 24.5,62 L 19,62 Z" fill="#FFFFFF"/>
+        <path d="M 25,52.5 L 27.5,52.5 L 16,61 L 13.5,59.5 Z" fill="#FFFFFF"/>
+        <path d="M 43.5,50 L 46,50 L 52,62 L 46.5,62 Z" fill="#FFFFFF"/>
+        <path d="M 48,51 L 50.5,51 L 61,62 L 55.5,62 Z" fill="#FFFFFF"/>
+        <path d="M 52.5,52.5 L 55,52.5 L 66.5,59.5 L 64,61 Z" fill="#FFFFFF"/>
+        <line x1="16" y1="48" x2="64" y2="48" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+        <line x1="21" y1="46" x2="21" y2="30" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 21,34 Q 17,32 17,34 Q 18,37 21,36 M 21,34 Q 25,32 25,34 Q 24,37 21,36 M 21,39 Q 17,37 17,39 Q 18,42 21,41 M 21,39 Q 25,37 25,39 Q 24,42 21,41 M 21,30 Q 19,27 21,25 Q 23,27 21,30" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.8"/>
+        <line x1="29" y1="46" x2="29" y2="28" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+        <path d="M 29,32 Q 25,30 25,32 Q 26,35 29,34 M 29,32 Q 33,30 33,32 Q 32,35 29,34 M 29,37 Q 25,35 25,37 Q 26,40 29,39 M 29,37 Q 33,35 33,37 Q 32,40 29,39 M 29,28 Q 27,25 29,23 Q 31,25 29,28" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="0.8"/>
+        <path d="M 48,46 C 40,46 38,39 42,34 C 44,30 45,28 43,24 C 46,23 50,19 51,18 C 52,23 57,25 54,29 C 58,29 62,33 60,38 C 59,44 54,46 48,46 Z" fill="#FFFFFF"/>
+        <path d="M 48,43 C 45,43 43,40 45,36 C 46,34 47,32 46,30 C 48,31 51,34 50,37 C 49,41 48,43 48,43 Z" fill="${fill}"/>
+      `;
+    case 'wildfire':
+      return `
+        <path d="M 17,59 Q 40,55 63,59" stroke="#FFFFFF" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+        <rect x="39" y="53" width="2" height="5" fill="#FFFFFF"/>
+        <polygon points="32,53 48,53 40,45" fill="#FFFFFF"/>
+        <polygon points="34,47 46,47 40,40" fill="#FFFFFF"/>
+        <polygon points="36,42 44,42 40,35" fill="#FFFFFF"/>
+        <rect x="25" y="55" width="1.8" height="4" fill="#FFFFFF"/>
+        <polygon points="19,55 33,55 26,48" fill="#FFFFFF"/>
+        <polygon points="21,50 31,50 26,43" fill="#FFFFFF"/>
+        <rect x="53" y="55" width="1.8" height="4" fill="#FFFFFF"/>
+        <polygon points="47,55 61,55 54,48" fill="#FFFFFF"/>
+        <polygon points="49,50 59,50 54,43" fill="#FFFFFF"/>
+        <path d="M 40,16 C 49,21 52,29 48,34 C 52,32 55,34 54,40 C 53,44 47,47 40,47 C 33,47 27,44 26,40 C 25,34 28,32 32,34 C 28,29 31,21 40,16 Z" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 40,25 C 43,28 44,32 42,36 C 40,38 37,38 37,35" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round"/>
+      `;
+    case 'unclassified':
+      return `
+        <circle cx="40" cy="40" r="18" fill="none" stroke="#FFFFFF" stroke-width="2.8" stroke-dasharray="23 5.5 23 5.5 23 5.5 23 5.5" transform="rotate(45 40 40)"/>
+        <line x1="40" y1="14" x2="40" y2="21" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+        <line x1="40" y1="59" x2="40" y2="66" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+        <line x1="14" y1="40" x2="21" y2="40" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+        <line x1="59" y1="40" x2="66" y2="40" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+        <text x="40" y="48.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="25" font-weight="900" fill="#FFFFFF" text-anchor="middle">?</text>
+      `;
+    default:
+      return '';
+  }
+}
 
 function buildClassIcons(withGlyph) {
   const out = {};
   for (const [cls, fill] of Object.entries(ICON_COLORS)) {
-    out[cls] = markerSvg(fill, withGlyph ? GLYPHS[cls] : '');
+    out[cls] = markerSvg(fill, withGlyph ? getGlyph(cls, fill) : '');
   }
   return out;
 }

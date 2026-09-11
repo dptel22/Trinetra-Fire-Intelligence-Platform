@@ -950,3 +950,17 @@ a:focus,
     transform: none !important;
   }
 }
+
+@keyframes marqueeScroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.category-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-ember) !important;
+}

@@ -748,3 +748,138 @@ Ownership split, interface contract, and per-agent prompts live in
 **Verification:**
 - `node frontend/test_home_page.mjs` → PASS
 - `npm run lint` → 0 warnings, 0 errors.
+
+---
+
+## [2026-09-11 17:45] Agent: Antigravity
+
+**Scope:** Frontend and backend end-to-end connection, parquet data generation, and map verification.
+**Files touched:**
+- scripts/generate_demo_parquets.py
+- data/processed/sih2026_h3_daily_features_firms.parquet
+- data/processed/sih2026_h3_daily_features_with_osm_wri.parquet
+- rontend/.env
+- AGENT_LOG.md
+**What changed:**
+- Generated serving feature parquets matching the 55-feature v3 schema for DuckDB feature store in data/processed/.
+- Bootstrapped and launched FastAPI backend (uvicorn app.main:app) on port 8000; validated /api/v1/health (healthy, CatBoost model and calibrators loaded) and /api/v1/predictions.
+- Configured rontend/.env with VITE_API_URL=http://localhost:8000.
+- Verified frontend build (
+pm run build) with all map chunks (maplibre-gl, deck-gl, h3-js) compiling cleanly.
+- Relaunched Vite dev server (http://localhost:5173) and validated live end-to-end integration using browser subagent: verified LIVE connection status (no offline banner), 101 rendered hotspot detections across India, active deck.gl hexagon rendering, and interactive classification filtering.
+**Verification:**
+- http://127.0.0.1:8000/api/v1/health -> HTTP 200 status: healthy
+- http://127.0.0.1:8000/api/v1/predictions -> HTTP 200 with calibrated predictions
+- rontend production build: 
+pm run build -> 0 errors
+- Browser subagent on http://localhost:5173/fire-map: verified LIVE badge, active hexagon rendering, interactive filter toggling.
+
+---
+
+## [2026-09-11 18:40] Agent: Antigravity
+
+**Scope:** High-resolution basemaps restoration across all 3 modes and Data Analyst reliability matrix redesign.
+**Files touched:**
+- rontend/src/services/basemapStyles.js
+- rontend/src/components/FireMapPage.jsx
+- rontend/src/components/FireMapPage.css
+- rontend/src/components/DataReliabilityBlock.jsx
+- rontend/.env
+- AGENT_LOG.md
+**What changed:**
+- Replaced missing local PMTiles vector archive dependency with high-resolution, watermark-free raster basemap providers for all three switcher modes:
+  - **Blue Marble (Satellite)**: High-resolution Esri World Imagery (sub-meter satellite tiles up to zoom 19) + place labels and administrative boundaries overlay.
+  - **Streets**: High-resolution Esri World Street Map (highways, arterial roads, cities, state boundaries, watermark-free).
+  - **Topographic**: Esri World Topographic Map (elevation contours, hillshading, mountain ranges, rivers, terrain labels up to zoom 19).
+- Upgraded map zoom range to minZoom=3 and maxZoom=18 for smooth deep zoom inspection across India.
+- Redesigned DataReliabilityBlock.jsx into a structured, defense-grade Data Analyst intelligence matrix: replaced unstructured text paragraphs with cards featuring colored class accent borders, monospace review threshold badges (< 70% Review, < 85% Review, 100% Review (Mandatory), Abstention Fallback), evidence & support tags, and crisp 1-line guidance notes.
+- Updated FireMapPage.css with styling for the new reliability matrix cards, live status pulsing indicator, and dismissible basemap notice.
+**Verification:**
+- 
+pm run lint: 0 warnings, 0 errors.
+- 
+pm run build: built in 1.45s with all map chunks compiled cleanly.
+- 
+ode test_agent_b.mjs: 11 / 11 test groups passed.
+- Browser subagent visual verification: verified all 3 basemaps (Streets, Topographic, Satellite) load in high resolution across India with active hotspot pins and verified the redesigned right-hand Data Analyst panel.
+
+## 2026-09-12 | Agent B � FireAlertsPage visual overhaul
+
+**Files touched:** rontend/src/components/FireAlertsPage.jsx`n
+**What changed:**
+- AlertCard completely redesigned with left color-accent bar (4px, class-colored), premium card layout
+- New MetricBar component: animated horizontal bar chart for sensor/model metrics
+- Confidence now rendered as a large monospace percentage + color-coded mini progress bar (green =80, yellow =60, red <60)
+- Metadata displayed in a structured auto-grid (Latitude, Longitude, Acquired, Calibrated, H3 Cell, Inference latency)
+- Caveats section redesigned as a subtle amber warning panel instead of floating tags
+- Show Feature Analysis expandable replaces old Inspect class distribution: shows (a) gradient probability bars with ? TOP marker, (b) Sensor Metrics grid (FRP Max, FRP Mean, Detections, Inference) from lert.context or top-level fields, (c) Confidence Analysis grid with per-class threshold disclosure
+- Page gets a live 5-tile Summary Stats bar (Total Detections, Needs Review, High Confidence, Unreviewed, Reviewed)
+- Filter chip rows now enclosed in styled panel containers for visual grouping
+- Page max-width expanded from 1140px to 1200px
+
+**Interface impact:** Export-safe � all exported symbols (AlertCard, StatusBadge, LifecycleBadge) preserve their exact prop contracts. No api.js or other Agent-A files touched.
+
+
+---
+
+## 2026-09-12 | Agent: Antigravity - FireAlertsPage Header & Controls Alignment
+
+**Files touched:**
+- frontend/src/components/FireAlertsPage.jsx
+- AGENT_LOG.md
+
+**What changed:**
+- Re-architected and aligned the top header, stats bar, and control deck on FireAlertsPage.jsx:
+  - **Header Alignment**: Integrated the top status bar (feed eyebrow, live/historical badge, ingestion provenance pill) with right-aligned action buttons (Historical Archive, Refresh, Export CSV) on a single clean row, followed by crisp page title and descriptive subtitle.
+  - **Data Quality Notice**: Replaced heavy mustard banner with a sleek, compact amber notice featuring a 4px accent left border and clear typography.
+  - **KPI Metric Cards**: Converted the dense 5-cell grid into individual glassmorphic cards with class/status color top borders, clean iconography, large monospace figures, and uppercase labels.
+  - **Command & Filter Toolbar**: Redesigned the controls panel into a cohesive 2-tier command bar. The top tier features an integrated date stepper ([‹ Older | 📅 Date | Newer ›]), sort dropdown, and reviewed progress chip. The filter tier enforces a strict 64px label width for both CLASS and STATE rows, ensuring perfect vertical alignment of all pills and tags.
+  - **Pill Styles**: Upgraded pillButtonStyle with modern dark glass borders and active glow states.
+
+**Verification:**
+- 
+pm run lint: 0 warnings, 0 errors across all 23 files.
+- Visual check via browser subagent on http://localhost:5173/fire-alerts: confirmed all elements, cards, and control buttons align with modern data intelligence dashboard aesthetics.
+
+---
+
+## 2026-09-12 | Agent: Antigravity - Hexagonal Map Taxonomy Icons Restoration
+
+**Files touched:**
+- frontend/src/services/basemapStyles.js
+- frontend/src/components/FireMapPage.jsx
+- AGENT_LOG.md
+
+**What changed:**
+- Replaced the squircle/rounded-rect markers with the exact pointy-topped hexagonal icons specified in the design taxonomy:
+  - **Industrial**: Bright orange hexagon (#FF7A00) with dual smokestacks emitting billowing smoke, windowed factory base, and stepped towers.
+  - **Mining**: Dark slate/charcoal hexagon (#333A44) with articulated hydraulic excavator, caterpillar tracks, cab, and excavated rock/ore mounds.
+  - **Agricultural Burn**: Forest/emerald green hexagon (#0E8A38) with radiating perspective tilled field furrows, dual wheat stalks, and curling fire flame.
+  - **Wildfire**: Crimson/fire-red hexagon (#E62325) with three evergreen fir trees on a ground horizon with tall leaping flames behind.
+  - **Unclassified**: Violet/purple hexagon (#6E22C7) with 4-tick target reticle crosshairs and centered question mark.
+- Hexagons feature a dark #070D18 outer halo border for maximum contrast against all 3 basemap layers (Satellite Blue Marble, Streets, Topographic) and a crisp inner white contour.
+- Updated FireMapPage.jsx layer scaling (iconSize from 32px up to 60px) and review ring colors to match the exact hex taxonomy colors.
+
+**Verification:**
+- 
+pm run lint: 0 warnings, 0 errors.
+- Visual check via browser subagent across all 3 basemaps (Blue Marble, Streets, Topographic) at multiple zoom levels: confirmed icons render with exact shapes, colors, and pictograms from the reference image.
+
+---
+
+## 2026-09-12 | Agent: Antigravity - NASA Blue Marble (Next Generation + Bathymetry) Integration
+
+**Files touched:**
+- frontend/src/services/basemapStyles.js
+- AGENT_LOG.md
+
+**What changed:**
+- Replaced the previous generic aerial satellite imagery under uildBlueMarbleStyle with the authentic **NASA Blue Marble: Next Generation (Shaded Relief & Bathymetry)** WMTS stream from NASA GIBS (https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg).
+- Confirmed full spatial coverage across India's coordinate extent 68.03, 6.75, 97.42, 37.1 and adjacent oceans without black cutoffs.
+- Retained boundaries and city labels reference layer for orientation.
+- Maintained Streets and Topographic styles untouched.
+
+**Verification:**
+- 
+pm run lint: 0 warnings, 0 errors.
+- Visual inspection via browser subagent on http://localhost:5173/fire-map: verified authentic NASA Blue Marble bathymetry and shaded relief rendering across India with new hexagonal icons.

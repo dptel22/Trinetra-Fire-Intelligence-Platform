@@ -58,7 +58,7 @@ import {
 
 import { useMapLocation } from '../services/mapLocation';
 import {
-  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, CLASS_DOT_ICONS, PMTILES_AVAILABLE
+  buildBasemapStyle, BASEMAP_OPTIONS, CLASS_ICONS, CLASS_DOT_ICONS, PMTILES_AVAILABLE, ICON_COLORS
 } from '../services/basemapStyles';
 
 // ─── PMTiles protocol registration (static, guarded against HMR re-eval) ─────
@@ -109,6 +109,9 @@ function hexToRgb(hex) {
 // Pre-build RGB table for the 5 classes
 const CLASS_RGB = Object.fromEntries(
   Object.entries(CLASS_COLORS).map(([k, v]) => [k, hexToRgb(v)])
+);
+const ICON_RGB = Object.fromEntries(
+  Object.entries(ICON_COLORS).map(([k, v]) => [k, hexToRgb(v)])
 );
 
 // ─── Deck overlay wrapper ─────────────────────────────────────────────────────
@@ -186,8 +189,9 @@ export default function FireMapPage() {
   // API mode for OfflineBanner subscription
   const [apiMode, setApiMode] = useState('live');
 
-  // Basemap selection (local Blue Marble; PMTiles preferred for vector styles).
-  const [basemapId, setBasemapId] = useState('bluemarble');
+  // Basemap selection (Satellite / Blue Marble, Streets, Topographic).
+  const [basemapId, setBasemapId] = useState('streets');
+  const [showBasemapNotice, setShowBasemapNotice] = useState(false);
 
   // Current map zoom — drives icon sizing and low-zoom decluttering
   const [zoomLevel, setZoomLevel] = useState(INDIA_CENTER.zoom ?? 5);
@@ -354,9 +358,9 @@ export default function FireMapPage() {
   // only ranking — no data is fabricated or relabeled.
   // Flat class markers stay readable over satellite imagery; the glyph fades
   // in only at regional zoom where it can be recognized without clutter.
-  const iconSize = zoomLevel <= 4.5 ? 28
-    : zoomLevel <= 6 ? 34
-    : zoomLevel <= 8 ? 44 : 52;
+  const iconSize = zoomLevel <= 4.5 ? 32
+    : zoomLevel <= 6 ? 40
+    : zoomLevel <= 8 ? 50 : 60;
 
   const displayPredictions = useMemo(() => {
     if (zoomLevel >= 6 || filteredPredictions.length <= 600) return filteredPredictions;
@@ -376,9 +380,9 @@ export default function FireMapPage() {
       stroked: true,
       filled: false,
       lineWidthUnits: 'pixels',
-      getLineWidth: 1.6,
+      getLineWidth: 2.0,
       getLineColor: d => [
-        ...(CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified), 190
+        ...(ICON_RGB[d.predicted_class] ?? CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified), 220
       ],
       getDashArray: [4, 3],
       dashJustified: true,
@@ -463,8 +467,8 @@ export default function FireMapPage() {
               zoom: INDIA_CENTER.zoom ?? 5
             }}
             mapStyle={mapStyle}
-            minZoom={PMTILES_AVAILABLE ? 3 : 4}
-            maxZoom={PMTILES_AVAILABLE ? 16 : 9}
+            minZoom={3}
+            maxZoom={18}
             maxBounds={INDIA_MAX_BOUNDS}
             onMoveEnd={debouncedMoveEnd}
             style={{ width: '100%', height: '100%' }}
@@ -472,12 +476,18 @@ export default function FireMapPage() {
             <DeckOverlay layers={layers} />
           </Map>
 
-          {/* PMTiles missing → vector layers use truthful public raster fallbacks. */}
-          {!PMTILES_AVAILABLE && (
+          {/* High-res basemap notice (dismissible) */}
+          {!PMTILES_AVAILABLE && showBasemapNotice && (
             <div className="firemap-basemap-notice">
-              Offline vector basemap pack not installed — Blue Marble is local;
-              Streets and Topographic use public raster tiles. See
-              docs/PMTILES_BUILD.md to enable fully offline vector layers.
+              <span>High-resolution online basemaps active (Streets, Topographic &amp; Satellite).</span>
+              <button
+                type="button"
+                className="firemap-notice-close"
+                onClick={() => setShowBasemapNotice(false)}
+                aria-label="Dismiss notice"
+              >
+                ✕
+              </button>
             </div>
           )}
 
