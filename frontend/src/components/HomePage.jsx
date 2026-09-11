@@ -109,22 +109,69 @@ export default function HomePage() {
     <div style={{ backgroundColor: 'var(--bg-dark)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header />
 
+      {/* 1. Orange Marquee Alert Ribbon - Placed directly below top nav bar */}
+      <div 
+        className="alert-marquee-ribbon"
+        style={{
+          width: '100%',
+          backgroundColor: '#FF6B35',
+          color: '#0A0E12',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          padding: '0.65rem 1.25rem',
+          fontSize: '0.92rem',
+          fontFamily: 'var(--font-heading)',
+          fontWeight: 800,
+          letterSpacing: '0.06em',
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid rgba(0,0,0,0.15)',
+          boxShadow: '0 2px 8px rgba(255, 107, 53, 0.3)',
+          zIndex: 90
+        }}
+      >
+        <div 
+          className="marquee-track"
+          style={{
+            display: 'inline-block',
+            animation: 'marqueeScroll 25s linear infinite',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <span style={{ marginRight: '3.5rem' }}>
+            ⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)
+          </span>
+          <span style={{ marginRight: '3.5rem' }}>
+            ⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector
+          </span>
+          <span style={{ marginRight: '3.5rem' }}>
+            ⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab
+          </span>
+          <span style={{ marginRight: '3.5rem' }}>
+            ⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division
+          </span>
+          <span style={{ marginRight: '3.5rem' }}>
+            ⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin
+          </span>
+        </div>
+      </div>
+
       {/* 3D Perspective Hero Presentation Canvas */}
       <section className="hero-3d-canvas">
         <div className="hero-3d-frame">
           <div className="hero-3d-banner">
             <div className="hero-banner-overlay" />
 
-            <div className="hero-content-grid">
-              {/* Left Column: Headline, Subtext & CTA */}
-              <div className="hero-left-content">
+            <div className="hero-content-grid" style={{ gridTemplateColumns: '1fr', padding: '3.5rem 3rem 2.5rem' }}>
+              {/* Hero Main Content */}
+              <div className="hero-left-content" style={{ maxWidth: '100%', width: '100%' }}>
                 <span className="eyebrow-tag">
                   BREAKING INTELLIGENCE · SATELLITE RADAR
                 </span>
                 <h1 className="hero-main-title">
-                  See which fires are industrial before they're declared.
+                  Not all hotspots are the same. We tell you which kind you're looking at.
                 </h1>
-                <p className="hero-main-subtext">
+                <p className="hero-main-subtext" style={{ maxWidth: '900px' }}>
                   Satellite thermal detections across India, assessed with land-cover and infrastructure context to distinguish industrial sources, wildfires, mining activity, and agricultural burns.
                 </p>
                 <div className="hero-actions">
@@ -135,68 +182,216 @@ export default function HomePage() {
                     View alerts <span aria-hidden="true">↗</span>
                   </Link>
                 </div>
-                <div className="hero-taxonomy" aria-label="Fire classification taxonomy">
-                  <span className="hero-taxonomy-label">Classifies</span>
-                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-industrial" />Industrial</span>
-                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-mining" />Mining</span>
-                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-agri" />Agricultural</span>
-                  <span className="hero-taxonomy-item"><i className="taxonomy-dot taxonomy-wildfire" />Wildfire</span>
+
+                {/* 3. Category Cards Grid (Full Line Width, Bigger Cards, No Scroll) */}
+                <div 
+                  className="category-carousel-container"
+                  style={{
+                    width: '100%',
+                    marginTop: '2.5rem',
+                    paddingTop: '1.75rem',
+                    borderTop: '1px solid var(--hairline-border)'
+                  }}
+                >
+                  <div 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '1.25rem'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.85rem', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--accent-ember)' }}>
+                      CLASSIFICATION CATEGORIES
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                      5 Primary Thermal Detection Classes
+                    </span>
+                  </div>
+
+                  <div 
+                    className="category-cards-grid"
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                      gap: '1.25rem',
+                      width: '100%'
+                    }}
+                  >
+                    {/* Card 1: Industrial */}
+                    <div 
+                      className="category-card"
+                      style={{
+                        backgroundColor: 'var(--panel-surface, #12181F)',
+                        border: '1px solid rgba(230, 126, 34, 0.35)',
+                        borderRadius: '14px',
+                        padding: '1.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 20px rgba(230, 126, 34, 0.15)',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'default'
+                      }}
+                    >
+                      {/* Industrial Hexagon Badge */}
+                      <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#E67E22" />
+                        <path d="M30 65 V45 L42 41 V65 H30 Z M45 65 V48 L57 44 V65 H45 Z M62 65 V50 H72 V65 H62 Z" fill="#FFFFFF" />
+                        <path d="M38 41 C38 34 48 35 44 28 C42 25 48 22 55 24 C60 26 56 31 66 32" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" />
+                      </svg>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        Industrial
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#E67E22', fontWeight: 700 }}>
+                        Active Flares
+                      </span>
+                    </div>
+
+                    {/* Card 2: Mining */}
+                    <div 
+                      className="category-card"
+                      style={{
+                        backgroundColor: 'var(--panel-surface, #12181F)',
+                        border: '1px solid rgba(149, 165, 166, 0.35)',
+                        borderRadius: '14px',
+                        padding: '1.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 20px rgba(149, 165, 166, 0.15)',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'default'
+                      }}
+                    >
+                      {/* Mining Hexagon Badge */}
+                      <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#4A5568" />
+                        <path d="M25 58 L45 35 L62 48 L75 32" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                        <path d="M75 32 L75 42 M75 32 L65 32" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" fill="none" />
+                        <path d="M48 65 L55 56 L62 65 Z M60 65 L66 58 L72 65 Z M32 65 H78" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" />
+                      </svg>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        Mining
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#95A5A6', fontWeight: 700 }}>
+                        Smelter Activity
+                      </span>
+                    </div>
+
+                    {/* Card 3: Agricultural Burn */}
+                    <div 
+                      className="category-card"
+                      style={{
+                        backgroundColor: 'var(--panel-surface, #12181F)',
+                        border: '1px solid rgba(46, 204, 113, 0.35)',
+                        borderRadius: '14px',
+                        padding: '1.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 20px rgba(46, 204, 113, 0.15)',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'default'
+                      }}
+                    >
+                      {/* Agricultural Burn Hexagon Badge */}
+                      <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#2ECC71" />
+                        {/* Stalks & Flame */}
+                        <path d="M28 48 C28 40 34 38 34 38 M34 48 C34 40 40 38 40 38" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" />
+                        <path d="M60 48 C60 30 75 35 68 25 C58 35 52 42 60 48 Z" fill="#FFFFFF" />
+                        {/* Furrowed Field Base */}
+                        <path d="M20 62 L32 52 M32 62 L42 52 M44 62 L54 52 M56 62 L66 52 M68 62 L78 52" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                      </svg>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        Agricultural Burn
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#2ECC71', fontWeight: 700 }}>
+                        Stubble Fires
+                      </span>
+                    </div>
+
+                    {/* Card 4: Wildfire */}
+                    <div 
+                      className="category-card"
+                      style={{
+                        backgroundColor: 'var(--panel-surface, #12181F)',
+                        border: '1px solid rgba(231, 76, 60, 0.35)',
+                        borderRadius: '14px',
+                        padding: '1.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 20px rgba(231, 76, 60, 0.15)',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'default'
+                      }}
+                    >
+                      {/* Wildfire Hexagon Badge */}
+                      <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#E74C3C" />
+                        {/* Trees */}
+                        <polygon points="30 58, 22 58, 26 48, 23 48, 27 38, 33 38, 37 48, 34 48, 38 58" fill="#FFFFFF" />
+                        <polygon points="50 58, 40 58, 45 45, 41 45, 46 32, 54 32, 59 45, 55 45, 60 58" fill="#FFFFFF" />
+                        <polygon points="70 58, 62 58, 66 48, 63 48, 67 38, 73 38, 77 48, 74 48, 78 58" fill="#FFFFFF" />
+                        {/* Canopy Flame */}
+                        <path d="M50 32 C50 18 68 22 60 12 C48 22 42 28 50 32 Z" fill="#FFFFFF" />
+                      </svg>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        Wildfire
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#E74C3C', fontWeight: 700 }}>
+                        Canopy Burns
+                      </span>
+                    </div>
+
+                    {/* Card 5: Unclassified */}
+                    <div 
+                      className="category-card"
+                      style={{
+                        backgroundColor: 'var(--panel-surface, #12181F)',
+                        border: '1px solid rgba(155, 89, 182, 0.35)',
+                        borderRadius: '14px',
+                        padding: '1.75rem 1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        boxShadow: '0 6px 20px rgba(155, 89, 182, 0.15)',
+                        transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                        cursor: 'default'
+                      }}
+                    >
+                      {/* Unclassified Hexagon Badge */}
+                      <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#8E44AD" />
+                        {/* Target Reticle + Question Mark */}
+                        <circle cx="50" cy="48" r="20" stroke="#FFFFFF" strokeWidth="4" fill="none" />
+                        <line x1="50" y1="22" x2="50" y2="28" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+                        <line x1="50" y1="68" x2="50" y2="74" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+                        <line x1="24" y1="48" x2="30" y2="48" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+                        <line x1="70" y1="48" x2="76" y2="48" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+                        <text x="50" y="55" fill="#FFFFFF" fontSize="22" fontWeight="900" textAnchor="middle" fontFamily="sans-serif">?</text>
+                      </svg>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+                        Unclassified
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#9B59B6', fontWeight: 700 }}>
+                        Analyst Review
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              {/* Right Column: Floating 3D News & Intelligence Cards Overlapping Hero */}
-              <div className="hero-floating-cards">
-                {/* Floating Card 1 - Industrial Glow */}
-                <Link to="/fire-map" className="floating-3d-card glow-industrial">
-                  <div className="card-thumbnail-container">
-                    <img src="/images/hero-wildfire.jpg" alt="Refinery Flare" />
-                    <span className="card-badge">Industrial Facility</span>
-                  </div>
-                  <div className="card-body-text">
-                    <div className="card-title">
-                      Jamnagar Petrochemical Thermal Anomaly
-                    </div>
-                    <div className="card-meta">
-                      Illustrative gas-flare assessment
-                    </div>
-                  </div>
-                </Link>
-
-                {/* Floating Card 2 - Wildfire Glow */}
-                <Link to="/fire-alerts" className="floating-3d-card glow-wildfire">
-                  <div className="card-thumbnail-container">
-                    <img src="/images/hero-wildfire.jpg" alt="Wildfire Alert" />
-                    <span className="card-badge card-badge-wildfire">
-                      Wildfire
-                    </span>
-                  </div>
-                  <div className="card-body-text">
-                    <div className="card-title">
-                      Shimla Canopy Wildfire Surge
-                    </div>
-                    <div className="card-meta">
-                      Illustrative open-land assessment
-                    </div>
-                  </div>
-                </Link>
-
-                {/* Floating Card 3 - Mining Glow */}
-                <Link to="/fire-map" className="floating-3d-card glow-mining">
-                  <div className="card-thumbnail-container">
-                    <img src="/images/hero-wildfire.jpg" alt="Mining and smelter context" />
-                    <span className="card-badge card-badge-mining">
-                      Mining / Smelter
-                    </span>
-                  </div>
-                  <div className="card-body-text">
-                    <div className="card-title">
-                      Infrastructure-context assessment
-                    </div>
-                    <div className="card-meta">
-                      Illustrative mining-context assessment
-                    </div>
-                  </div>
-                </Link>
               </div>
             </div>
           </div>
@@ -213,7 +408,6 @@ export default function HomePage() {
           <strong>{landingStatus?.label || 'Checking data availability'}</strong>
           {landingStatus?.detail && <span className="landing-status-detail">{landingStatus.detail}</span>}
         </div>
-        <Link to="/fire-map">Open fire map</Link>
       </section>
 
       {/* Two-Column Panel Section Split by Hairline Border */}
