@@ -52,7 +52,7 @@ def test_classify_mining_subtype():
 @pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires real serving model and parquet")
 def test_real_mining_explanation_includes_subtype():
     model_service.load_model()
-    row = feature_store.get_cell("883ca83005fffff", "2026-09-08")
+    row = feature_store.get_cell("883ca83005fffff", "2026-09-08") or feature_store.get_cell("883ca83005fffff", "2026-08-01")
     assert row is not None
 
     prediction = model_service.predict(row)
