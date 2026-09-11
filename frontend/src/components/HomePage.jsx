@@ -1,9 +1,59 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from './Header';
+import {
+  CLASS_LABELS,
+  FIRE_COLORS,
+  KNOWN_CAVEATS,
+  PRIMARY_CLASSES,
+  assessIngestionFreshness,
+  fetchHealth,
+  getApiMode,
+  onApiModeChange
+} from '../services/api';
+
+// oxlint-disable-next-line react/only-export-components -- deterministic status mapping is covered by the landing-page test.
+export function deriveLandingStatus(health, apiMode, today = new Date().toLocaleDateString('en-CA')) {
+  if (apiMode === 'mock') {
+    return {
+      tone: 'demo',
+      label: 'Demo data',
+      detail: 'Simulated data is shown and must not be used for operational decisions.'
+    };
+  }
+
+  if (!health || health.status === 'offline') {
+    return {
+      tone: 'offline',
+      label: 'Live data unavailable',
+      detail: 'The service could not verify current data. Open the map to retry.'
+    };
+  }
+
+  const { warnings } = assessIngestionFreshness({
+    ingestion: health.ingestion,
+    latestAcqDate: health.latest_acq_date,
+    today
+  });
+
+  if (warnings.length || !health.latest_acq_date) {
+    return {
+      tone: 'caution',
+      label: 'Data freshness requires review',
+      detail: warnings[0] || 'The latest acquisition date is unavailable from the service.'
+    };
+  }
+
+  return {
+    tone: 'live',
+    label: `Latest verified acquisition: ${health.latest_acq_date}`,
+    detail: ''
+  };
+}
 
 export default function HomePage() {
   const aboutRef = useRef(null);
+  const [landingStatus, setLandingStatus] = useState(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -29,6 +79,32 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshStatus = async () => {
+      const health = await fetchHealth();
+      if (!cancelled) {
+        setLandingStatus(deriveLandingStatus(health, getApiMode()));
+      }
+    };
+
+    refreshStatus();
+    const unsubscribe = onApiModeChange(refreshStatus);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  const classificationContext = {
+    industrial: 'Thermal sources near mapped industrial facilities, including routine flare operations.',
+    mining: KNOWN_CAVEATS.mining,
+    agricultural_burn: KNOWN_CAVEATS.agricultural_burn,
+    wildfire: 'Open-land and canopy thermal sources that require analyst review alongside local context.'
+  };
+
   return (
     <div style={{ backgroundColor: 'var(--bg-dark)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header />
@@ -49,7 +125,7 @@ export default function HomePage() {
                   See which fires are industrial before they're declared.
                 </h1>
                 <p className="hero-main-subtext">
-                  Classifying thermal anomalies across India by source — industrial facilities (including gas flares), wildfires, mining operations, and agricultural burns — using satellite thermal infrared signals and spatial infrastructure records.
+                  Satellite thermal detections across India, assessed with land-cover and infrastructure context to distinguish industrial sources, wildfires, mining activity, and agricultural burns.
                 </p>
                 <div className="hero-actions">
                   <Link to="/fire-map" className="tri-btn-ember hero-action-primary">
@@ -127,6 +203,19 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section
+        className={`landing-status${landingStatus ? ` landing-status-${landingStatus.tone}` : ' landing-status-checking'}`}
+        aria-live="polite"
+        aria-label="Data status"
+      >
+        <div>
+          <span className="landing-status-label">Data status</span>
+          <strong>{landingStatus?.label || 'Checking data availability'}</strong>
+          {landingStatus?.detail && <span className="landing-status-detail">{landingStatus.detail}</span>}
+        </div>
+        <Link to="/fire-map">Open fire map</Link>
+      </section>
+
       {/* Two-Column Panel Section Split by Hairline Border */}
       <section 
         style={{
@@ -136,7 +225,8 @@ export default function HomePage() {
           width: '100%'
         }}
       >
-        <div 
+        <div
+          className="landing-action-grid"
           style={{
             maxWidth: '1280px',
             margin: '0 auto',
@@ -173,6 +263,10 @@ export default function HomePage() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem', maxWidth: '480px' }}>
               Live thermal detections over India, classified as industrial facility, mining / smelter, agricultural burn, or wildfire. Gas flare is an evidence-based industrial assessment, not a separate class.
             </p>
+            <ul style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6, margin: '0 0 1.5rem', paddingLeft: '1.1rem' }}>
+              <li>Review national context and source classification.</li>
+              <li>Inspect a detection alongside its available evidence.</li>
+            </ul>
             <Link 
               to="/fire-map" 
               className="tri-btn-ember"
@@ -183,7 +277,7 @@ export default function HomePage() {
           </div>
 
           {/* Hairline Divider */}
-          <div style={{ backgroundColor: 'var(--hairline-border)', width: '1px', height: '100%' }} />
+          <div className="landing-action-grid-divider" style={{ backgroundColor: 'var(--hairline-border)', width: '1px', height: '100%' }} />
 
           {/* Fire Alerts Panel */}
           <div className="panel-card-hover-blue" style={{ padding: '3.5rem 2.5rem', textAlign: 'left', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -212,6 +306,10 @@ export default function HomePage() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.75rem', maxWidth: '480px' }}>
               Notifications for new or persistent thermal sources near critical infrastructure, sent as they're detected.
             </p>
+            <ul style={{ color: 'var(--text-muted)', fontSize: '0.88rem', lineHeight: 1.6, margin: '0 0 1.5rem', paddingLeft: '1.1rem' }}>
+              <li>Prioritize detections that need analyst review.</li>
+              <li>Review alert history and export archived evidence.</li>
+            </ul>
             <Link 
               to="/fire-alerts" 
               className="tri-btn-blue"
@@ -219,6 +317,32 @@ export default function HomePage() {
             >
               View alerts →
             </Link>
+          </div>
+        </div>
+      </section>
+
+      <section style={{ borderBottom: '1px solid var(--hairline-border)', backgroundColor: 'var(--panel-surface)', padding: '4.5rem 2.5rem' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+          <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent-blue)' }}>
+            Assessment workflow
+          </span>
+          <h2 style={{ marginTop: '0.6rem', marginBottom: '2rem', fontSize: '2rem' }}>How TRINETRA supports assessment</h2>
+          <div className="landing-process-grid">
+            <article>
+              <span>01</span>
+              <h3>Detect</h3>
+              <p>Start with satellite thermal detections across the national operating area.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Contextualize</h3>
+              <p>Assess the thermal signal with land-cover and infrastructure context.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Investigate</h3>
+              <p>Open the map or alerts feed to review source evidence before escalation.</p>
+            </article>
           </div>
         </div>
       </section>
@@ -235,7 +359,8 @@ export default function HomePage() {
           textAlign: 'left'
         }}
       >
-        <div style={{ maxWidth: '620px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '3rem', alignItems: 'start' }} className="landing-classification-list">
+          <div style={{ maxWidth: '620px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
           <span 
             style={{
               fontFamily: 'var(--font-heading)',
@@ -247,14 +372,30 @@ export default function HomePage() {
               marginBottom: '1.25rem'
             }}
           >
-            About the app
+            Assessment context
           </span>
+          <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Classification context for analysts</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
-            Most satellite fire monitoring systems detect thermal anomalies, but struggle to distinguish between benign agricultural burns, routine industrial flare operations, and high-risk facility blazes.
+            A thermal detection is not, by itself, an incident classification. TRINETRA combines the signal with spatial context so analysts can distinguish routine industrial heat from sources that warrant further attention.
           </p>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.65 }}>
-            TRINETRA classifies each thermal detection by source using land-cover data and infrastructure records alongside the thermal signal. By isolating industrial facilities from open-land fires, response teams receive precise intelligence before incidents are officially declared.
+            Classifications support assessment and must be reviewed against available evidence before escalation.
           </p>
+        </div>
+          <div>
+            <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text-muted)', display: 'block', marginBottom: '1rem' }}>
+              Source categories
+            </span>
+            {PRIMARY_CLASSES.map((className) => (
+              <div key={className} className="landing-classification-row">
+                <span style={{ backgroundColor: FIRE_COLORS[className] }} aria-hidden="true" />
+                <div>
+                  <h3>{CLASS_LABELS[className]}</h3>
+                  <p>{classificationContext[className]}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
     </div>

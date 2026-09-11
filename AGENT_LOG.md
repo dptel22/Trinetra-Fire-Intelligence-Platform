@@ -729,3 +729,22 @@ Ownership split, interface contract, and per-agent prompts live in
 - What changed: Added a media query (max-width: 768px) to `FireMapPage.css` to handle small screens by switching the layout to a vertical stack (flex-direction: column) and making the sidebar responsive.
 - Interface impact: none.
 - Blockers / questions for the other agent or for Sagar/Dhruv: none.
+
+---
+
+## [2026-09-11 11:44] Agent: Antigravity
+
+**Scope:** Landing page dynamic data status briefing update & automated unit verification.
+**Files touched:**
+- `frontend/src/components/HomePage.jsx`
+- `frontend/src/index.css`
+- `frontend/test_home_page.mjs`
+- `AGENT_LOG.md`
+**What changed:**
+- Added dynamic `deriveLandingStatus` utility to `HomePage.jsx` connecting backend health check, ingestion state, and acquisition freshness to live UI status badge.
+- Replaced unverified static claims with live data context and source categories breakdown aligned with taxonomy rules.
+- Added CSS styles for status briefing indicators and process grid.
+- Added SSR/DOM unit tests in `frontend/test_home_page.mjs` covering all landing status tones (`live`, `caution`, `demo`, `offline`) and forbidden claim assertions.
+**Verification:**
+- `node frontend/test_home_page.mjs` → PASS
+- `npm run lint` → 0 warnings, 0 errors.
