@@ -88,7 +88,7 @@ class FeatureStoreService:
                         ROW_NUMBER() OVER (PARTITION BY h3_08 ORDER BY h3_08) AS _rn
                         FROM read_parquet(?)
                         WHERE h3_08 IS NOT NULL
-                          AND state_assignment_method IN ('within', 'nearest_boundary_tie_break')
+                          AND (state_assignment_method IS NULL OR state_assignment_method IN ('within', 'nearest_boundary_tie_break', 'fallback'))
                     )
                 WHERE _rn = 1
                 """,
@@ -109,7 +109,7 @@ class FeatureStoreService:
         import pandas as pd
 
         prov = pd.read_parquet(static_path, columns=["h3_08", "state", "state_assignment_method"])
-        prov = prov[prov["state_assignment_method"].isin(("within", "nearest_boundary_tie_break"))]
+        prov = prov[prov["state_assignment_method"].isna() | prov["state_assignment_method"].isin(("within", "nearest_boundary_tie_break", "fallback"))]
         self._state_by_cell = {
             str(row.h3_08): (
                 row.state if isinstance(row.state, str) else None,

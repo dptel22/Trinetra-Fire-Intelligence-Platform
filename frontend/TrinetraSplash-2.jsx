@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 
 const SPLASH_CSS = `
 
@@ -433,9 +432,8 @@ function placeLocationTags(root) {
   return placed;
 }
 
-export default function SplashScreen({ onStart }) {
+export default function TrinetraSplash({ onStart }) {
   const containerRef = useRef(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const root = containerRef.current;
@@ -447,27 +445,23 @@ export default function SplashScreen({ onStart }) {
 
     const btn = root.querySelector(".start-btn");
     const handleStart = () => {
-      if (typeof onStart === "function") {
-        onStart();
-      } else {
-        navigate("/home");
-      }
+      if (typeof onStart === "function") onStart();
     };
     btn?.addEventListener("click", handleStart);
 
     return () => {
       btn?.removeEventListener("click", handleStart);
     };
-  }, [onStart, navigate]);
+  }, [onStart]);
 
   return (
-    <div className="trinetra-splash-container">
+    <>
       <style>{SPLASH_CSS}</style>
       <div
         ref={containerRef}
         style={{ width: "100vw", height: "100vh" }}
         dangerouslySetInnerHTML={{ __html: SPLASH_MARKUP }}
       />
-    </div>
+    </>
   );
 }
