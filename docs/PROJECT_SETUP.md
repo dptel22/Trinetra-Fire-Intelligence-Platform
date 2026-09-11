@@ -180,7 +180,7 @@ The optional basemap must be exactly:
 frontend/public/tiles/india.pmtiles
 ```
 
-Set `VITE_PMTILES_URL=/tiles/india.pmtiles`. Without it, the map uses a dark fallback but still renders fire data. Build instructions are in `docs/PMTILES_BUILD.md`; the build needs Java 21+, an India PBF, and substantial disk/RAM.
+Set `VITE_PMTILES_URL=/tiles/india.pmtiles` when the optional local vector pack is available. Without it, Blue Marble remains local and Streets/Topographic use disclosed public raster tiles; the build instructions are in `docs/PMTILES_BUILD.md` and require Java 21+, an India PBF, and substantial disk/RAM.
 
 ## Docker
 

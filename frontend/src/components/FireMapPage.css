@@ -23,6 +23,24 @@
   isolation: isolate;
 }
 
+@media (max-width: 768px) {
+  .firemap-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .firemap-map-pane {
+    flex: 0 0 40vh;
+  }
+  .firemap-sidebar {
+    width: 100%;
+    height: auto;
+    overflow-y: visible;
+    box-shadow: none;
+    border-left: none;
+    border-top: 1px solid var(--hairline-border, #2e3440);
+  }
+}
+
 .firemap-body::before {
   content: '';
   position: absolute;

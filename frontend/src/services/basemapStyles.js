@@ -1,11 +1,13 @@
 // Basemap styles + per-class fire icons (Agent A — map engine).
 //
-// Three switchable basemaps, ALL self-hosted (offline demo):
+// Three switchable basemaps:
 //   bluemarble — NASA Blue Marble Web-Mercator raster tiles
 //                (public/tiles/bluemarble/{z}/{x}/{y}.jpg)
 //                + admin boundaries / place labels from the local PMTiles archive.
 //   streets    — light OpenMapTiles-schema vector style from the local PMTiles archive.
 //   topographic— earth-tone vector style from the same archive.
+// When the optional PMTiles archive is missing, Streets and Topographic use
+// public raster fallbacks instead of rendering an empty background.
 //
 // Text labels use self-hosted Noto Sans glyph pages in public/fonts/glyphs/
 // (fontstack names on disk have no spaces: NotoSansRegular / NotoSansBold).
@@ -16,9 +18,9 @@
 const PMTILES_URL = import.meta.env?.VITE_PMTILES_URL ?? null;
 
 // True when the offline vector archive is configured via VITE_PMTILES_URL.
-// When false the map runs on the local Blue Marble raster tiles and flat vector
-// fallbacks — the UI surfaces a "basemap pack not installed" notice instead of
-// failing silently (docs/PMTILES_BUILD.md).
+// When false the map runs on the local Blue Marble raster tiles and public
+// Streets/Topographic raster fallbacks — the UI surfaces the missing local pack
+// instead of failing silently (docs/PMTILES_BUILD.md).
 export const PMTILES_AVAILABLE = Boolean(PMTILES_URL);
 
 const GLYPHS_URL = '/fonts/glyphs/{fontstack}/{range}.pbf';
@@ -139,9 +141,18 @@ function buildStreetsStyle() {
     return {
       version: 8,
       name: 'streets-fallback',
-      sources: {},
+      sources: {
+        streets: {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          maxzoom: 19,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
       layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#F5F4F0' } }
+        { id: 'background', type: 'background', paint: { 'background-color': '#F5F4F0' } },
+        { id: 'streets-raster', type: 'raster', source: 'streets', paint: { 'raster-fade-duration': 0 } }
       ]
     };
   }
@@ -261,9 +272,18 @@ function buildTopographicStyle() {
     return {
       version: 8,
       name: 'topographic-fallback',
-      sources: {},
+      sources: {
+        topographic: {
+          type: 'raster',
+          tiles: ['https://tile.opentopomap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          maxzoom: 17,
+          attribution: '© OpenTopoMap (CC-BY-SA) · © OpenStreetMap contributors'
+        }
+      },
       layers: [
-        { id: 'background', type: 'background', paint: { 'background-color': '#EDE7D9' } }
+        { id: 'background', type: 'background', paint: { 'background-color': '#EDE7D9' } },
+        { id: 'topographic-raster', type: 'raster', source: 'topographic', paint: { 'raster-fade-duration': 0 } }
       ]
     };
   }

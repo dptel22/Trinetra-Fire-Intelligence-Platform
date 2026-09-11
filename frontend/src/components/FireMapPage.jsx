@@ -3,9 +3,10 @@
  *
  * Stack: react-map-gl/maplibre + deck.gl IconLayer + MapboxOverlay + PMTiles
  *
- * Basemap: three switchable self-hosted styles (Blue Marble / Streets /
- * Topographic) from ../services/basemapStyles.js — no CDN, no network beyond
- * localhost. Vector styles consume the OpenMapTiles-schema PMTiles archive
+ * Basemap: three switchable styles (Blue Marble / Streets / Topographic) from
+ * ../services/basemapStyles.js. Blue Marble is local; Streets and Topographic
+ * use local PMTiles when available and disclosed public raster fallbacks.
+ * Vector styles consume the OpenMapTiles-schema PMTiles archive
  * built by Planetiler (docs/PMTILES_BUILD.md).
  *
  * Detections render as per-class SVG fire-pin icons (CLASS_ICONS) instead of
@@ -185,7 +186,7 @@ export default function FireMapPage() {
   // API mode for OfflineBanner subscription
   const [apiMode, setApiMode] = useState('live');
 
-  // Basemap selection (Blue Marble / Streets / Topographic — all self-hosted)
+  // Basemap selection (local Blue Marble; PMTiles preferred for vector styles).
   const [basemapId, setBasemapId] = useState('bluemarble');
 
   // Current map zoom — drives icon sizing and low-zoom decluttering
@@ -471,13 +472,12 @@ export default function FireMapPage() {
             <DeckOverlay layers={layers} />
           </Map>
 
-          {/* Basemap pack missing → the current style is a degraded fallback.
-              Surface it instead of letting a stretched static image look broken. */}
+          {/* PMTiles missing → vector layers use truthful public raster fallbacks. */}
           {!PMTILES_AVAILABLE && (
             <div className="firemap-basemap-notice">
-              Offline basemap pack not installed — running on low-res satellite
-              fallback (zoom capped). See docs/PMTILES_BUILD.md to enable full
-              vector basemaps.
+              Offline vector basemap pack not installed — Blue Marble is local;
+              Streets and Topographic use public raster tiles. See
+              docs/PMTILES_BUILD.md to enable fully offline vector layers.
             </div>
           )}
 

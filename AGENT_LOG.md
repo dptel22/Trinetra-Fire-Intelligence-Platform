@@ -703,3 +703,29 @@ Ownership split, interface contract, and per-agent prompts live in
 - Known open items: official PS26162 text still absent from the repo
   (documented as UNKNOWN); PMTiles pack unbuilt; `VITE_API_URL` vs
   `VITE_API_BASE_URL` naming mismatch documented, not changed.
+## 2026-09-11 — basemap fallback repair
+
+- Scope: frontend map layer behavior only.
+- Root cause: Streets and Topographic returned background-only styles when the
+  optional PMTiles archive was absent, so their buttons appeared to work but
+  displayed no map layer.
+- Change: kept local PMTiles as the preferred source; added OpenStreetMap and
+  OpenTopoMap raster fallbacks for the no-PMTiles case and updated the notice to
+  disclose the fallback and its network requirement.
+- Verification pending: frontend lint/build and browser checks for all three
+  basemap buttons.
+## 2026-09-11 — basemap fallback verification
+
+- Verification: `npm run lint` passed; `npm run build` passed; browser checks
+  confirmed Streets renders OpenStreetMap tiles and Topographic renders
+  OpenTopoMap tiles, with fire detections still visible and no actionable
+  browser console warnings/errors.
+- The optional PMTiles path remains unchanged and remains the route to fully
+  offline vector basemaps.
+
+
+### [2026-09-11T12:15:00+05:30] Agent A — Mobile layout responsiveness for FireMapPage
+- Files changed: `frontend/src/components/FireMapPage.css`
+- What changed: Added a media query (max-width: 768px) to `FireMapPage.css` to handle small screens by switching the layout to a vertical stack (flex-direction: column) and making the sidebar responsive.
+- Interface impact: none.
+- Blockers / questions for the other agent or for Sagar/Dhruv: none.

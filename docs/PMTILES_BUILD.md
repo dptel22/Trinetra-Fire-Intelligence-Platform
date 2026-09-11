@@ -4,8 +4,10 @@ How to regenerate the offline India basemap served to the frontend.
 
 > Note (2026-09-10): this build is **optional**. The repo ships NASA Blue
 > Marble raster tiles (`frontend/public/tiles/bluemarble/`) that work offline
-> today; the PMTiles archive produced by this guide enables the Streets and
-> Topographic vector styles. No `.pmtiles` archive is currently present — see
+> today; the PMTiles archive produced by this guide enables the fully offline
+> Streets and Topographic vector styles. No `.pmtiles` archive is currently
+> present — the app uses disclosed public raster fallbacks until this guide is
+> run. See
 > [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md) §15.
 
 ## Why
