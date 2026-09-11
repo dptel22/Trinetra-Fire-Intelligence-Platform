@@ -1,5 +1,15 @@
 # The Case for CatBoost: An Adversarial Evaluation for High-Cardinality Spatio-Temporal Classification Under NTRO Constraints
 
+> **STATUS: RESEARCH / PARTIALLY SUPERSEDED (noted 2026-09-10).**
+> This essay is the rationale that led to selecting CatBoost — that decision
+> stands. However, several assumptions were superseded during implementation:
+> the model trains on **four** classes (not six), uses **55 H3-res-8 cell-day
+> features** (not the point-level set implied here), and "NTRO constraints" /
+> "defense-grade" framing is **project interpretation**, not a verified
+> official requirement. Do not cite this essay as a description of the current
+> implementation. Current source of truth:
+> [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md).
+
 ## Problem Deconstruction: A Multi-Layered Challenge
 
 The selection of an optimal machine learning model for classifying NASA FIRMS thermal hotspots is not a standard classification task; it is a multi-layered challenge defined by the unique properties of the data and the stringent operational constraints of the National Technical Research Organization (NTRO). The problem space is characterized by three primary dimensions: the inherent complexity of high-cardinality spatial tabular data, the practical limitations of the computational environment, and the non-negotiable requirements for model transparency and trustworthiness. Understanding these dimensions is critical to navigating the landscape of potential models and arriving at a scientifically valid and operationally feasible solution.

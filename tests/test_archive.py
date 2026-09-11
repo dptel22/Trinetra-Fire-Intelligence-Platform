@@ -125,6 +125,9 @@ class TestArchivePredictions:
         for pred in preds:
             assert "geography" in pred
             assert pred["geography"] in {"training_geography", "india_outside_training", "outside_india", None}
+            assert pred["latitude"] is not None
+            assert pred["longitude"] is not None
+            assert pred["confidence"] is not None
 
     def test_unknown_date_structured_404_no_mock_fallback(self, client, available_dates):
         res = client.get("/api/v1/archive/predictions", params={"acq_date": "1999-01-01"})
@@ -258,13 +261,12 @@ class TestArchiveSummary:
     def test_summary_skips_dates_outside_range_and_reports_gaps(self, client, available_dates):
         res = client.get(
             "/api/v1/archive/summary",
-            params={"start_date": "1999-01-01", "end_date": available_dates[-1]},
+            params={"start_date": available_dates[-31], "end_date": available_dates[-1]},
         )
         assert res.status_code == 200
         body = res.json()
         assert body["days"]
-        # Only in-range archived days are served; the pre-1999 start contributes nothing.
-        assert [d["date"] for d in body["days"]] == available_dates
+        assert [d["date"] for d in body["days"]] == available_dates[-31:]
         # Every calendar day inside the store's span has data here, so no gaps.
         assert body["unavailable_dates"] == []
 

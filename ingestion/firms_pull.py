@@ -99,9 +99,24 @@ def validate_date(date: str | None) -> str | None:
 
 
 def load_map_key() -> str:
-    """Read FIRMS_MAP_KEY (alias FIRMS_API_KEY) from the environment / .env."""
-    load_dotenv(REPO_ROOT / ".env")
+    """Read the FIRMS key from env, a Docker secret file, or local .env."""
     key = os.environ.get("FIRMS_MAP_KEY") or os.environ.get("FIRMS_API_KEY")
+    secret_path = os.environ.get("FIRMS_MAP_KEY_FILE")
+    if not key and secret_path:
+        try:
+            secret_text = Path(secret_path).read_text(encoding="utf-8").strip()
+        except OSError as err:
+            raise IngestionError("FIRMS_MAP_KEY_FILE could not be read.") from err
+        for line in secret_text.splitlines():
+            name, separator, value = line.partition("=")
+            if separator and name.strip() in ("FIRMS_MAP_KEY", "FIRMS_API_KEY"):
+                key = value.strip()
+                break
+        if not key and secret_text:
+            key = secret_text
+    if not key:
+        load_dotenv(REPO_ROOT / ".env")
+        key = os.environ.get("FIRMS_MAP_KEY") or os.environ.get("FIRMS_API_KEY")
     if not key:
         raise IngestionError(
             "FIRMS_MAP_KEY not set. Add it to .env (never hardcode or commit it). "

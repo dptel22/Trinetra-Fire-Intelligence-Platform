@@ -487,7 +487,8 @@ export default function FireMapPage() {
             <div className="firemap-empty-state">
               <div className="firemap-empty-title">No detections in view</div>
               <div className="firemap-empty-sub">
-                Nothing matches the selected classes for {acqDate} in the current viewport.
+                Nothing matches the selected classes for {acqDate} in the current viewport. States/UTs
+                with no satellite detections are not populated with synthetic rows.
                 {isToday ? '' : ' Try panning over India or switching the observation date.'}
               </div>
             </div>
@@ -645,11 +646,11 @@ export default function FireMapPage() {
                   lineHeight: 1.45,
                 }}
               >
-                Ingestion provenance: serving {ingestionInfo.states_served ?? '—'} states/UTs ·
+                Ingestion provenance: {ingestionInfo.states_served ?? '—'} states/UTs represented by detections ·
                 {' '}{ingestionInfo.outside_india_rejected ?? 0} outside-India detections rejected ·
                 {' '}{ingestionInfo.outside_training_geography_rows ?? 0} rows outside the validated
-                10-state training geography (analyst review required). Nationwide inference is not
-                nationwide validation.
+                10-state training geography (analyst review required). States/UTs with no satellite
+                detections are omitted; this is nationwide inference, not nationwide validation.
               </div>
             )}
           </div>

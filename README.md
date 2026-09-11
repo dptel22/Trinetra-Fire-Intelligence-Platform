@@ -5,10 +5,14 @@ classifies each H3 resolution-8 cell-day into one of four fire classes with a Ca
 model, and serves the results to a MapLibre/Deck.gl dashboard with honest confidence
 caveats and an analyst audit trail.
 
-> **Client:** NTRO · **Problem statement:** SIH 2026, PS26162 · **Live bench:** 2026-09-09
+> **Client:** NTRO · **Problem statement:** SIH 2026, PS26162 · **Serving data
+> refreshed:** 2026-09-10 (20 states/UTs, 2024-08-01 → 2026-09-10)
 >
-> Full backend API reference: [`BACKEND_DOCUMENTATION.md`](BACKEND_DOCUMENTATION.md) ·
-> Frontend contract: [`FRONTEND_INTEGRATION_GUIDE.md`](FRONTEND_INTEGRATION_GUIDE.md)
+> Current-state reference: [`docs/CURRENT_PROJECT_TRUTH.md`](docs/CURRENT_PROJECT_TRUTH.md) ·
+> Claim→evidence registry: [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md) ·
+> Backend API reference: [`BACKEND_DOCUMENTATION.md`](BACKEND_DOCUMENTATION.md) ·
+> Frontend contract: [`FRONTEND_INTEGRATION_GUIDE.md`](FRONTEND_INTEGRATION_GUIDE.md) ·
+> Judge demo: [`docs/HACKATHON_JUDGE_RUNBOOK.md`](docs/HACKATHON_JUDGE_RUNBOOK.md)
 
 Complete Windows clone-and-run guide, AI-agent setup instructions, artifact inventory,
 map/PMTiles setup, demo/live modes, and verification: [`docs/PROJECT_SETUP.md`](docs/PROJECT_SETUP.md).
@@ -21,7 +25,7 @@ map/PMTiles setup, demo/live modes, and verification: [`docs/PROJECT_SETUP.md`](
 |---|---|---|
 | **Ingestion** | `ingestion/` (FIRMS pull + OSM/WRI static merge) | Pull VIIRS detections, build cell-day features |
 | **Backend** | FastAPI (`app/`) + DuckDB + CatBoost | Serve `/api/v1` predictions, SHAP, audit |
-| **Model** | CatBoost multiclass (4 classes, 52 features, 2 categoricals) | Classify each `(h3_08, acq_date)` cell-day |
+| **Model** | CatBoost multiclass (4 classes, 55 features, 2 categoricals) | Classify each `(h3_08, acq_date)` cell-day |
 | **Frontend** | React 19 + Vite, MapLibre GL + Deck.gl + pmtiles | Interactive India fire map + honesty UI |
 
 **Prediction unit:** one `(h3_08, acq_date)` cell-day — an H3 resolution-8 hexagon
@@ -85,7 +89,7 @@ NASA FIRMS (VIIRS) ──> ingestion/ ──> data/processed/*.parquet
 | `agricultural_burn` | 1.01 → **always `needs_review=true`** (mechanical) |
 
 The backend fails loudly at startup if the configured `.cbm` does not match the
-52-feature / 4-class contract; it never invents fallback predictions.
+55-feature / 4-class contract; it never invents fallback predictions.
 
 ## 4. Prerequisites
 
@@ -147,12 +151,16 @@ npm run dev        # Vite dev server (default :5173)
 - `npm run build` — production build
 - `npm run preview` — serve the production build
 - The frontend expects the backend at `http://localhost:8000/api/v1` (set
-  `VITE_API_BASE_URL` if you run it elsewhere).
+  `VITE_API_URL` in `frontend/.env` if you run it elsewhere — note the code
+  reads `VITE_API_URL`, while root `.env.example` documents `VITE_API_BASE_URL`;
+  that naming mismatch is a known issue).
 
 Frontend notes:
-- The map is **MapLibre GL** via `react-map-gl/maplibre` + self-hosted **pmtiles** base
-  tiles, with a **Deck.gl `H3HexagonLayer`** overlay (`@deck.gl/mapbox` `MapboxOverlay`)
-  and `h3-js` v4.5.0.
+- The map is **MapLibre GL** via `react-map-gl/maplibre` with **deck.gl**
+  per-class detection icon layers via `@deck.gl/mapbox` `MapboxOverlay`,
+  `h3-js` v4.5.0, and self-hosted base tiles (shipped: NASA Blue Marble raster;
+  the OpenMapTiles PMTiles pack is an optional local build — see
+  [`docs/PMTILES_BUILD.md`](docs/PMTILES_BUILD.md)).
 - `frontend/src/services/api.js` implements the full contract: 2500-cap 2×2 bbox tiling,
   `CORS` via config defaults, `unclassified` shown only when the batch actually contains
   it, and backend `caveat_flag` text rendered verbatim (never a fabricated accuracy number).
@@ -216,8 +224,9 @@ python -m pytest -m live         # live FIRMS calls (opt-in, burns transactions)
 ```
 
 `pyproject.toml` sets `addopts = "-m 'not live'"` so the offline suite is the default
-and live API calls are an explicit marker. There is **no frontend test script** — `lint`
-and `build` are the verification hooks there.
+and live API calls are an explicit marker (135 passed, 1 deselected on 2026-09-10).
+There is **no frontend test script** — `lint` and `build` are the verification
+hooks there (both green on 2026-09-10).
 
 ## 11. Contributing & agent conventions
 
@@ -238,4 +247,7 @@ and `build` are the verification hooks there.
 
 ## 13. License
 
-TODO: Specify project license (e.g., MIT, Apache 2.0).
+**No license has been chosen yet.** There is no `LICENSE` file and no license
+field in `pyproject.toml`; absent a license, default copyright applies (all
+rights reserved by the project team). This is an open decision, recorded
+honestly rather than papered over.

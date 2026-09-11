@@ -1,5 +1,9 @@
 # Prompt for Agent B — Data Layer & Model-Honesty UI (Audit / Gap-Fill)
 
+> **STATUS: HISTORICAL TASK BRIEF (completed).** The api.js contract audit and
+> honesty-UI components this brief commissioned exist and shipped. Retained as
+> a record of the work split.
+
 Work only inside the `frontend-agent-b` worktree, on branch `agent-b/data-layer`.
 Read `AGENT_LOG.md` before starting and before every commit; append an entry
 after every meaningful change.

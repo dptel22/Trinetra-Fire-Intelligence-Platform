@@ -1,5 +1,9 @@
 # PS26162 Backend Documentation
 
+> Current-state reference: [`docs/CURRENT_PROJECT_TRUTH.md`](docs/CURRENT_PROJECT_TRUTH.md) ·
+> claim→evidence registry: [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md).
+> Verified 2026-09-10 against the running code and artifacts.
+
 ## Current Contract
 
 The backend serves Dhruv's real H3-day CatBoost classifier, not the older synthetic point-level demo model.
@@ -66,7 +70,26 @@ Runs CatBoost native TreeSHAP on demand and returns the top three SHAP drivers.
 
 Allows analysts to override predictions and retrieve audit logs.
 
+### Archive Endpoints (provenance-labeled)
+
+`GET /api/v1/archive/dates` · `GET /api/v1/archive/predictions` (class/state/
+needs_review/confidence filters, limit ≤ 1000, offset ≤ 100000) ·
+`GET /api/v1/archive/summary` (bounded to 31 days per request) ·
+`GET /api/v1/archive/runs` · `GET /api/v1/archive/evidence` (raw pre-harmonization
+rows, limit ≤ 5000). Every served day carries a provenance label
+(`live` / `historical` / `offline` / `failed` / `plausibility_warning` /
+`no_run_record`) derived from the ingestion run manifest — nothing fabricates
+demo data.
+
+### Alert Lifecycle Endpoints
+
+`POST /api/v1/alerts/{hotspot_id}/actions` (acknowledge / confirm / dismiss /
+reopen; dismissal requires a note) · `GET /api/v1/alerts/states?acq_date=` ·
+`GET /api/v1/alerts/{hotspot_id}/history` (append-only event replay).
+
 ## Response Shape
+
+Example values are illustrative samples (`latency_ms: 8.2` is not a benchmark):
 
 ```json
 {
@@ -98,6 +121,15 @@ The API may surface caveats for:
 - Mining support: mining has lower labeled support and should be interpreted cautiously.
 
 ## Verification
+
+Executed 2026-09-10 on the current checkout:
+
+```text
+.venv/Scripts/python.exe -m pytest tests/ -q -p no:cacheprovider
+  → 135 passed, 1 deselected, 2 known deprecation warnings
+```
+
+Interactive checks:
 
 ```bash
 python -c "from app.main import app; print(app.title)"

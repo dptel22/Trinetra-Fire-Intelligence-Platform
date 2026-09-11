@@ -23,6 +23,10 @@ if os.environ.get("INGESTION_ON_STARTUP_TESTS", "") != "1":
     os.environ["INGESTION_ON_STARTUP"] = "0"
 
 _TEST_DATA_DIR = tempfile.mkdtemp(prefix="trinetra-tests-")
+# pytest's tmp_path fixture otherwise scans the user's shared Windows temp
+# root. On this machine that root contains an ACL-protected stale directory;
+# keep all test scratch state inside the suite-owned directory instead.
+tempfile.tempdir = _TEST_DATA_DIR
 os.environ.setdefault("DUCKDB_PATH", os.path.join(_TEST_DATA_DIR, "feature_store.duckdb"))
 os.environ.setdefault("AUDIT_DB_PATH", os.path.join(_TEST_DATA_DIR, "audit_log.duckdb"))
 os.environ.setdefault("INGESTION_DB_PATH", os.path.join(_TEST_DATA_DIR, "ingestion.duckdb"))

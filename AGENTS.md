@@ -17,8 +17,11 @@ touch backend code.
 - All five Agent-B components already exist and match the contract:
   `ClassificationFilters.jsx`, `HexInspectorPanel.jsx`, `Legend.jsx`,
   `OfflineBanner.jsx`, `DataReliabilityBlock.jsx`.
-- `FireMapPage.jsx` is still **React-Leaflet** — Agent A's MapLibre + deck.gl
-  rebuild is the main unfinished work.
+- `FireMapPage.jsx` is **MapLibre GL via `react-map-gl/maplibre` + deck.gl
+  (`MapboxOverlay`) + PMTiles protocol** — Agent A's rebuild is **complete**
+  (verified 2026-09-10). `react-leaflet`/`leaflet` remain in `package.json`
+  with zero imports (dead weight; safe to drop in a dependency cleanup, but
+  do not "migrate back").
 - Frontend has **no test script** — only `npm run lint` (oxlint), `dev`, `build`,
   `preview`.
 - `QuickSearchModal.jsx` and `FireAlertsPage.jsx` are owned by **neither** agent

@@ -1,5 +1,15 @@
 # Beyond SNPP-Only: A VIIRS-NOAA-20 Merge as the Optimal Data Strategy for Thermal Hotspot Classification
 
+> **STATUS: RESEARCH — RECOMMENDATION IMPLEMENTED, ASSUMPTIONS SUPERSEDED
+> (noted 2026-09-10).** The core recommendation **was implemented**: the
+> pipeline ingests both VIIRS SNPP and NOAA-20 NRT
+> (`ingestion/firms_pull.py`). The essay's surrounding assumptions are stale:
+> it assumes six classes (current: four), a `persistence_90d` feature
+> (current contract: `active_days_90d` et al.), and XGBoost (current:
+> CatBoost). MODIS and NOAA-21 are **not** ingested. Do not cite as current
+> architecture. Current source of truth:
+> [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md).
+
 ## Comparative Analysis of Five FIRMS Satellite Platforms
 
 The selection of an optimal satellite sensor for a machine learning classification task is contingent upon a nuanced evaluation of its technical specifications, data characteristics, and practical implications within the project's unique constraints. The user's goal requires prioritizing coverage continuity over India during August 2025–August 2026 to support the computation of a critical temporal feature, `persistence_90d`, while ensuring consistent feature representation across all six classes, including 'unclassified' [[10](https://www.mdpi.com/2072-4292/16/14/2528)]. This analysis examines each of the five available FIRMS platforms—VIIRS/SNPP, VIIRS/NOAA-20, VIIRS/NOAA-21, MODIS/Terra, and MODIS/Aqua—through the lens of these priorities, distinguishing between documented evidence from NASA literature, peer-reviewed studies, and reasoned inference based on available data. The central strategic constraint is that any solution must be viable within the tight timeframe of a hackathon, favoring pragmatic engineering decisions that yield proportional gains in model performance and data reliability [[55](https://eprints.gla.ac.uk/382153/2/382153.pdf)].

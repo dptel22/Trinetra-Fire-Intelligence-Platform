@@ -1,14 +1,22 @@
 # PMTiles Basemap Build (Agent A — F1)
 
-How to regenerate the offline India basemap served to `FireMapPage.jsx`.
+How to regenerate the offline India basemap served to the frontend.
+
+> Note (2026-09-10): this build is **optional**. The repo ships NASA Blue
+> Marble raster tiles (`frontend/public/tiles/bluemarble/`) that work offline
+> today; the PMTiles archive produced by this guide enables the Streets and
+> Topographic vector styles. No `.pmtiles` archive is currently present — see
+> [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md) §15.
 
 ## Why
 
-`buildPMTilesStyle()` in `frontend/src/components/FireMapPage.jsx` expects a
+The basemap styles in `frontend/src/services/basemapStyles.js` expect an
 **OpenMapTiles-schema** vector tile archive with source-layers `landcover`,
 `water`, and `boundary` (filtered on `admin_level` 2 and 4). The tileset below is
 built with Planetiler's OpenMapTiles profile, so those layer names match
 unchanged — **the style JSON is not regenerated; the tileset is built to fit it.**
+(These styles previously lived in `FireMapPage.jsx` as
+`buildPMTilesStyle()`; they have since moved to `basemapStyles.js`.)
 
 The output is served as a single self-hosted PMTiles archive from
 `frontend/public/tiles/`, so the map renders with **zero network requests

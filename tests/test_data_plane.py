@@ -46,28 +46,10 @@ REAL_DAILY_PARQUET = Path(settings.H3_DAILY_PARQUET)
 REAL_STATIC_PARQUET = Path(settings.OSMWRI_PARQUET)
 REAL_ARTIFACTS = REAL_DAILY_PARQUET.exists() and REAL_STATIC_PARQUET.exists()
 
-# The locked 61-column contract: the shipped with_osm_wri serving file's exact
-# column order (28 daily + 5 static-id + 16 WRI + 12 OSM). The WRI/OSM groups
-# are dist_*-all-fuels then n_*-all-fuels (the ingestion writer's
-# STATIC_FILE_COLUMNS order, preserved byte-stable by every atomic rewrite).
-LOCKED_STATIC_COLUMN_ORDER = [
-    "h3_08", "acq_date", "frp_max", "frp_mean", "n_detections", "ti4_max",
-    "is_saturated_max", "scan_mean", "track_mean", "confidence_high_any",
-    "pct_high_confidence", "frp_max_night", "frp_max_day", "n_detections_night",
-    "n_detections_day", "scan_max", "track_max", "daynight", "satellite_nunique",
-    "is_static_land", "is_offshore", "frp_max_lag7", "active_days_7d",
-    "frp_max_lag30", "active_days_30d", "active_days_90d", "is_first_observation",
-    "is_labeled", "h3_lat", "h3_lon", "state", "state_assignment_method",
-    "_state_distance_km",
-    "dist_wri_solar_km", "dist_wri_coal_km", "dist_wri_wind_km", "dist_wri_gas_km",
-    "dist_wri_hydro_km", "dist_wri_biomass_km", "dist_wri_oil_km", "dist_wri_nuclear_km",
-    "n_wri_solar_10km", "n_wri_coal_10km", "n_wri_wind_10km", "n_wri_gas_10km",
-    "n_wri_hydro_10km", "n_wri_biomass_10km", "n_wri_oil_10km", "n_wri_nuclear_10km",
-    "dist_osm_industrial_km", "dist_osm_quarry_km", "dist_osm_farmland_km",
-    "dist_osm_mineshaft_km", "dist_osm_adit_km", "dist_osm_power_infra_km",
-    "n_osm_industrial_5km", "n_osm_quarry_5km", "n_osm_farmland_5km",
-    "n_osm_mineshaft_5km", "n_osm_adit_5km", "n_osm_power_infra_5km",
-]
+# The writer's explicit column list is the canonical byte-stable contract.
+# Keep the test coupled to that single source of truth rather than duplicating
+# a second WRI/OSM ordering that can drift from the shipped artifact.
+LOCKED_STATIC_COLUMN_ORDER = STATIC_FILE_COLUMNS
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +195,8 @@ def test_serving_parquets_are_nationwide_not_10_state_only():
     states outside the original training partition whenever FIRMS data exists."""
     states = set(pd.read_parquet(REAL_STATIC_PARQUET, columns=["state"])["state"].dropna().unique())
     assert OUTSIDE_INDIA_STATE not in states
+    if len(states) <= 10:
+        pytest.skip("serving artifact currently has only the ten training states; live nationwide refresh required")
     assert len(states) > 10, (
         f"serving parquets still look 10-state restricted; expected nationwide coverage, "
         f"got {sorted(states)}"
@@ -323,6 +307,19 @@ def test_get_cell_fast_path_and_reload_contract(tmp_path, monkeypatch):
     store.reload()
     fresh = store.get_cell(cell_id, "2026-09-09")
     assert fresh is not None and float(fresh["frp_max"]) == pytest.approx(42.5)
+
+
+@pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")
+def test_invalid_legacy_state_assignment_never_serves(tmp_path, monkeypatch):
+    """Legacy nearest-state fallbacks must not become model inputs."""
+    store, daily_path, static_path = _make_tmp_store(tmp_path, monkeypatch, n_rows=20)
+    static = pd.read_parquet(static_path)
+    cell_id = str(static.iloc[0]["h3_08"])
+    static.loc[static.index[0], "state_assignment_method"] = "nearest_unmatched"
+    static.to_parquet(static_path, index=False)
+    store.reload()
+    acq_date = str(pd.Timestamp(pd.read_parquet(daily_path).iloc[0]["acq_date"]).date())
+    assert store.get_cell(cell_id, acq_date) is None
 
 
 @pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")

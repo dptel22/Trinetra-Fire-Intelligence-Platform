@@ -1,5 +1,13 @@
 # PS26162 Backend Rebuild Coordination
 
+> **STATUS: HISTORICAL COORDINATION LOG (2026-09-02 → 2026-09-08).**
+> This log records the rebuild from the synthetic point-level demo to the real
+> H3-day CatBoost backend. Its mid-stream contract numbers (14/52 features)
+> were superseded by the final **55-feature** contract, and all of its open
+> items were completed. Retained as an engineering-history record only — do
+> not use as the current reference. Current source of truth:
+> [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md).
+
 Date: 2026-09-02
 
 ## Problem We Are Fixing

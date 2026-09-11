@@ -574,7 +574,7 @@ export function assessIngestionFreshness({ ingestion = null, latestAcqDate = nul
   }
 
   if (ingestion && ingestion.available) {
-    if (ingestion.last_run_ok === false) {
+    if (ingestion.last_run_ok === false || ingestion.latest_attempt_ok === false) {
       warnings.push('The most recent ingestion run failed. Shown data is last-known, not a live pull.');
     }
     const rows = ingestion.final_daily_rows;

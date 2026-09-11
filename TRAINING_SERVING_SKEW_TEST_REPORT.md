@@ -1,5 +1,15 @@
 # Training/Serving Skew Test Report
 
+> **STATUS: HISTORICAL / PARTIALLY SUPERSEDED (2026-09-10).**
+> This 2026-09-08 report is an accurate record of its day, but two details
+> have since changed: (1) the fixed parity sample cells used here were later
+> found absent from the refreshed serving data and the fixtures were changed
+> to intersect real training/serving keys (audit finding MODEL-001); (2) the
+> `.venv-pinned` environment no longer exists — use the repo `.venv`.
+> The **living** source of truth for parity is
+> `tests/test_training_serving_parity.py` (3 tests, passing 2026-09-10 —
+> see [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md) C-35).
+
 **Date:** 2026-09-08  
 **Scope:** Automated guardrail for the PS26162 CatBoost training/serving feature contract.
 

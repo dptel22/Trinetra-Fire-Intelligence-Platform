@@ -37,6 +37,10 @@ services:
       # writable named volume below; moving the parquets themselves to a
       # read-write volume is deferred until multi-run persistence is needed.
       - ./data/processed:/data:ro
+      # Raw OSM/WRI inputs stay outside the image and are read-only in the app.
+      - ./data/raw:/app/data/raw:ro
+      # Keep run history and raw-archive manifests across container restarts.
+      - ./data/processed:/app/data/processed
       - sih2026-data:/data_writable
     # Bootstrap first: seed the writable volume's parquets from the read-only
     # /data mount if absent (the compose `command:` overrides the Dockerfile

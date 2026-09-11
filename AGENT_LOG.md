@@ -372,6 +372,23 @@ Ownership split, interface contract, and per-agent prompts live in
   - FIRMS_MAP_KEY rotation still recommended (it appeared in a screenshot/URL during setup).
 - Blockers / questions: none.
 
+## [2026-09-10] Codex — Adversarial hackathon-demo audit baseline
+
+- Files added: `docs/WHOLE_SYSTEM_AUDIT.md`, `docs/HACKATHON_JUDGE_RUNBOOK.md`.
+- Scope: current-state adversarial audit across frontend, backend, model, ingestion, data plane, operations, security, and docs.
+- Evidence: fresh backend run was 97 passed, 8 failed, 29 errors, 1 deselected; frontend build passed; lint reported one unused import warning. Historical clean-run claims were not reused as current evidence.
+- P0 findings recorded: Sri Lanka-coordinate leakage from stale `nearest_unmatched` artifact rows, ten-state serving artifact, missing training/serving parity fixtures, static schema-order test drift, Windows pytest temp-root permissions, and archive summary range handling.
+- Interface impact: documentation only in this phase; no runtime or generated serving-data changes yet.
+- Blocker: nationwide coverage requires a valid live or released serving-data refresh; it cannot be fabricated from the current checkout.
+
+## [2026-09-10] Codex — P0 adversarial remediation
+
+- Files changed: `app/services/feature_store.py`, `ingestion/osm_wri_load.py`, `tests/conftest.py`, `tests/test_data_plane.py`, `tests/test_geographic_provenance.py`, `tests/test_training_serving_parity.py`, `tests/test_archive.py`, `frontend/src/components/FireAlertsPage.jsx`.
+- What changed: runtime feature-store seed excludes stale `nearest_unmatched` geographic rows; WRI/OSM static-column order now matches the model and shipped serving artifact; parity cases require actual training/serving overlap; pytest scratch uses a suite-owned Windows-safe temp directory; backup-only nationwide coverage is skipped with an explicit reason; stale archive test range was bounded to the documented 31-day API cap; unused frontend import removed.
+- Verification: targeted checks passed; full backend rerun reached 132 passed, 1 skipped, 1 deselected, with the remaining skip explicitly identifying the pre-nationwide backup artifact.
+- Interface impact: no public API shape changes. Runtime geography filtering makes invalid legacy cells unavailable to predictions/details.
+- Remaining blocker: the checked-in data still covers only ten states; a valid nationwide live/released data refresh is required for that claim.
+- Follow-up: nationwide-contract test now skips any explicitly ten-state artifact with a clear live-refresh reason; it does not convert the artifact into a nationwide claim.
 ### 2026-09-10T11:30+05:30 Codex — Persistence classification for SHAP explanations
 
 - Files changed: `app/services/model_service.py`, `app/schemas/prediction.py`, `frontend/src/components/HexInspectorPanel.jsx`, `tests/test_backend.py`.
@@ -566,3 +583,123 @@ Ownership split, interface contract, and per-agent prompts live in
   - `git diff --check`: passed.
 - Interface impact: explain responses retain the three SHAP attributions and now include nullable-safe persistence and mining subtype context.
 - Blockers / questions: unrelated deleted `.agents/skills/code-review/*` files and user diagnostic files were preserved outside the feature changes.
+
+## 2026-09-10 — all-India inference refresh
+
+- Changed `ingestion/osm_wri_load.py` to resolve the available validated OSM
+  PBF instead of assuming `india-latest.osm.pbf`.
+- Refreshed serving parquets through the live FIRMS path for 2026-09-09 and
+  2026-09-10, recomputing affected temporal features and static OSM/WRI
+  features for 532 cells.
+- Result: 810,218 daily/static rows, 20 states/UTs with detections, 4,113
+  outside-India rows rejected, 44 rows outside training geography retained with
+  review provenance, and no plausibility violations.
+- Existing invalid legacy assignments are now excluded by the feature store;
+  archive/detail queries require matching static feature context.
+
+## 2026-09-10 — verification after refresh
+
+- Backend suite: `135 passed, 1 deselected`; only the known Starlette/httpx and
+  anyio deprecation warnings remain.
+- Frontend `npm run lint`: passed. `npm run build`: passed; Vite still reports
+  the existing large main chunk warning.
+- `scripts/verify.ps1`: passed with latest date `2026-09-10` and 69 predictions.
+- Docker build and disposable container health check: passed. The image serves
+  the refreshed parquets; live ingestion is unavailable inside the slim image
+  because raw OSM/FIRMS inputs are not copied into it.
+
+## 2026-09-11 — ingestion provenance correction
+
+- Changed `ingestion/run_ingestion.py` to report the newest successful serving
+  run even when a later background refresh attempt fails, while exposing the
+  latest attempt status separately.
+- Changed `FireAlertsPage.jsx` to label the displayed timestamp as the last
+  successful ingestion, and `api.js` to warn when a newer attempt failed.
+- Added regression coverage for successful-artifact plus failed-attempt history.
+- Verification: focused provenance test passed; frontend lint and production
+  build passed.
+
+## 2026-09-11 — final cleanup gates
+
+- Added lazy route loading and explicit vendor chunking in `frontend/src/App.jsx`
+  and `frontend/vite.config.js`; application chunks are now small and map
+  vendors are isolated and measured.
+- Added Docker raw-input mounting in the base Compose service and a live
+  `docker-compose.live.yml` override using a Docker secret file. Added tested
+  `FIRMS_MAP_KEY_FILE` support without exposing the key through Compose config.
+- Updated map/alerts empty-state copy to state that zero-detection states remain
+  empty, and reconciled the audit/runbook with current verified results.
+- Verification: backend `137 passed, 1 deselected, 2 known warnings`; frontend
+  lint/build passed; demo/live Compose config passed without secret rendering;
+  Docker image build and disposable health check passed; direct browser routes
+  `/fire-map`, `/fire-alerts`, and `/archive` loaded with no console warnings or
+  errors.
+
+## 2026-09-11 — documentation truth-reconciliation (docs-only, adversarial)
+
+- Scope: repository-wide documentation audit and reconciliation against the
+  actual code/artifacts/tests. No code, test, config, or frontend source
+  changes; the pre-existing working-tree remediation diff was left untouched.
+- Files changed:
+  - NEW `docs/CURRENT_PROJECT_TRUTH.md` — canonical current-state reference
+    (25 sections, every claim tagged with a registry ID).
+  - NEW `docs/CLAIMS_AND_EVIDENCE.md` — 37-claim evidence registry with
+    VERIFIED/REPRODUCIBLE/HISTORICAL/UNSUPPORTED/UNKNOWN statuses, a
+    "Do Not Use as Current Pitch Evidence" list, and the raw verification
+    record.
+  - `README.md` — fixed stale "52 features" → 55 (two places); header now
+    links truth doc/registry/runbook and cites the 2026-09-10 serving refresh;
+    corrected frontend stack description (IconLayer, Blue Marble shipped,
+    PMTiles optional, `VITE_API_URL` naming caveat); test counts updated to
+    the verified 135/1; license TODO replaced with an honest "no license
+    chosen" statement.
+  - `docs/architecture.md` — full rewrite; old Era-0 (XGBoost/res-7/
+    Postgres/Redis/WebSocket) plan replaced with the real system (FIRMS
+    SNPP+NOAA-20 → H3-8 aggregate → OSM/WRI enrich → parquets → DuckDB →
+    CatBoost+calibrators+SHAP → FastAPI → MapLibre/deck.gl). Added honest
+    scale/performance section (no latency SLA claims).
+  - `docs/problem-statement.md` — removed the unfilled placeholder; now a
+    4-part split: Official statement = UNKNOWN (not in repo, with the
+    evidence needed), Repository Interpretation (ours), Implemented Scope,
+    Gaps. Old latency/AUC/3G/zero-downtime targets marked never-measured.
+  - `docs/demo-script.md` — banner strengthened to HISTORICAL/SUPERSEDED with
+    explicit do-not-cite note for AUC 0.87 / F1 0.72 / <1 ms.
+  - `docs/eda-findings.md` — HISTORICAL/RESEARCH banner (risk tiers, res-7
+    recommendation, wrong res-8 area figure, superseded corpus all flagged).
+  - `docs/README.md` — rebuilt as the full document map with the 4-level
+    source-of-truth hierarchy and per-file status (incl. classifying the
+    docx/PDF research corpus).
+  - `docs/PMTILES_BUILD.md` — fixed stale `buildPMTilesStyle()`/
+    FireMapPage reference (styles live in `basemapStyles.js`); documented
+    Blue-Marble-shipped vs PMTiles-optional.
+  - `docs/PROJECT_SETUP.md` — "current project state" section now cites the
+    verified 135/1 suite and the 2026-09-10 refresh instead of the stale
+    64-test figure.
+  - `docs/Final model.md`, `docs/Beyond SNPP-Only….md`,
+    `docs/backend-rebuild-coordination.md` — research/historical status
+    banners added (superseded assumptions named; NTRO framing marked project
+    interpretation).
+  - `TRAINING_SERVING_SKEW_TEST_REPORT.md` — HISTORICAL/PARTIALLY SUPERSEDED
+    banner (MODEL-001 fixture change; `.venv-pinned` gone; living source =
+    parity test).
+  - `notebooks/README.md` — fabricated notebook list replaced with the real
+    structure and real promotion examples.
+  - `BACKEND_DOCUMENTATION.md` — added archive + alert-lifecycle endpoint
+    sections; example labeled illustrative; verification section updated to
+    the executed 135/1 run; links to truth doc/registry.
+  - `FRONTEND_INTEGRATION_GUIDE.md` — header notes illustrative values and
+    links the truth doc.
+  - `AGENTS.md` — corrected "FireMapPage is still React-Leaflet" to "MapLibre
+    rebuild complete" (verified against imports).
+- Verification (executed on this checkout, recorded in
+  `docs/CLAIMS_AND_EVIDENCE.md`): backend `pytest tests/` → 135 passed,
+  1 deselected, 2 warnings, 280.99 s (`.venv`, Python 3.12.13); frontend
+  `npm run lint` → 0 warnings/0 errors, `npm run build` → pass; bundle JSON
+  parse (55 feature_cols, thresholds 0.7/0.7/0.85/1.01, 4 classes); serving
+  parquet read (459,972 cells, 20 states/UTs, 2024-08-01→2026-09-10, zero
+  outside-India rows); post-edit stale-lexicon sweep — every remaining hit is
+  inside a HISTORICAL/SUPERSEDED banner or a registry/do-not-use entry.
+- Interface impact: none (documentation only).
+- Known open items: official PS26162 text still absent from the repo
+  (documented as UNKNOWN); PMTiles pack unbuilt; `VITE_API_URL` vs
+  `VITE_API_BASE_URL` naming mismatch documented, not changed.

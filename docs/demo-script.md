@@ -1,4 +1,15 @@
-> **DEPRECATED (2026-09-02):** This script describes the old XGBoost/Postgres point-level demo (`ml-pipeline/`, 6 classes, `ml_pipeline.train`), which has been removed. The live demo path is the CatBoost H3-day backend in `app/` — see the root README.md and BACKEND_DOCUMENTATION.md for the current walkthrough.
+> **STATUS: HISTORICAL / SUPERSEDED (2026-09-02, re-verified 2026-09-10).**
+> This script describes the old XGBoost/Postgres point-level demo
+> (`ml-pipeline/`, 6 classes, `ml_pipeline.train`), which **has been removed**.
+> It is retained only as an engineering-history record and MUST NOT be used as
+> a current walkthrough or as a source of any claim.
+>
+> **Do not cite its numbers.** The metrics below (AUC 0.87, high-risk F1 0.72,
+> "< 1 ms" inference) describe a system that no longer exists and were never
+> reproducible in the current repository — see
+> [`docs/CLAIMS_AND_EVIDENCE.md`](CLAIMS_AND_EVIDENCE.md) C-34.
+>
+> Current demo source of truth: [`docs/HACKATHON_JUDGE_RUNBOOK.md`](HACKATHON_JUDGE_RUNBOOK.md).
 
 # Demo Script — SIH 2026 PS26162
 

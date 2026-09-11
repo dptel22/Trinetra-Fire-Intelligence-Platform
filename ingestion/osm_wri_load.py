@@ -104,14 +104,10 @@ CATEGORY_TAGS = {
 
 # Locked contract columns (from sih2026_h3_daily_features_with_osm_wri.parquet).
 WRI_FUELS = ["solar", "coal", "wind", "gas", "hydro", "biomass", "oil", "nuclear"]
-WRI_COLUMNS = (
-    [f"dist_wri_{fuel}_km" for fuel in WRI_FUELS]
-    + [f"n_wri_{fuel}_10km" for fuel in WRI_FUELS]
-)
-OSM_COLUMNS = (
-    [f"dist_osm_{name}_km" for name in CATEGORY_TAGS]
-    + [f"n_osm_{name}_5km" for name in CATEGORY_TAGS]
-)
+# Keep static parquet order aligned with MODEL_FEATURES and the shipped
+# serving artifact: each distance is adjacent to its corresponding count.
+WRI_COLUMNS = [column for fuel in WRI_FUELS for column in (f"dist_wri_{fuel}_km", f"n_wri_{fuel}_10km")]
+OSM_COLUMNS = [column for name in CATEGORY_TAGS for column in (f"dist_osm_{name}_km", f"n_osm_{name}_5km")]
 
 
 class RawInputError(RuntimeError):
@@ -344,7 +340,12 @@ def build_osm_feature_cache(pbf_path: Path | None = None, force: bool = False) -
     Rebuilds when the cache is missing/empty or older than the PBF. Returns
     (osm_points_df, meta) with measured build/load timings.
     """
-    pbf = pbf_path or PBF_PATH
+    if pbf_path is None:
+        import glob
+        matches = sorted(glob.glob(str(REPO_ROOT / PBF_GLOB)))
+        pbf = Path(matches[-1]) if matches else PBF_PATH
+    else:
+        pbf = pbf_path
     meta: dict = {"pbf": str(pbf)}
     t0 = time.perf_counter()
     if not force and OSM_CACHE_PATH.exists() and OSM_CACHE_PATH.stat().st_size > 0:

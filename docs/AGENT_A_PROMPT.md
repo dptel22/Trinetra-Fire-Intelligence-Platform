@@ -1,5 +1,10 @@
 # Prompt for Agent A — Map Engine
 
+> **STATUS: HISTORICAL TASK BRIEF (completed).** The MapLibre + deck.gl +
+> PMTiles rebuild this brief commissioned is **done and verified** (imports
+> checked 2026-09-10). Retained as a record of the work split; the brief's
+> assumptions about an unfinished React-Leaflet map no longer apply.
+
 Work only inside the `frontend-agent-a` worktree, on branch
 `agent-a/map-engine`. Read `AGENT_LOG.md` before starting and before every
 commit; append an entry after every meaningful change.

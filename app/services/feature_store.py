@@ -82,13 +82,14 @@ class FeatureStoreService:
                 f"""
                 CREATE OR REPLACE TABLE _osm_wri_static_staging AS
                 SELECT h3_08, h3_lat, h3_lon, {static_col_list}
-                FROM (
-                    SELECT
+                    FROM (
+                        SELECT
                         h3_08, h3_lat, h3_lon, {static_col_list},
                         ROW_NUMBER() OVER (PARTITION BY h3_08 ORDER BY h3_08) AS _rn
-                    FROM read_parquet(?)
-                    WHERE h3_08 IS NOT NULL
-                )
+                        FROM read_parquet(?)
+                        WHERE h3_08 IS NOT NULL
+                          AND state_assignment_method IN ('within', 'nearest_boundary_tie_break')
+                    )
                 WHERE _rn = 1
                 """,
                 [str(static_path)],
@@ -108,6 +109,7 @@ class FeatureStoreService:
         import pandas as pd
 
         prov = pd.read_parquet(static_path, columns=["h3_08", "state", "state_assignment_method"])
+        prov = prov[prov["state_assignment_method"].isin(("within", "nearest_boundary_tie_break"))]
         self._state_by_cell = {
             str(row.h3_08): (
                 row.state if isinstance(row.state, str) else None,
@@ -163,7 +165,7 @@ class FeatureStoreService:
                 """
                 SELECT d.*, s.* EXCLUDE (h3_08)
                 FROM h3_daily d
-                LEFT JOIN osm_wri_static s USING (h3_08)
+                INNER JOIN osm_wri_static s USING (h3_08)
                 WHERE CAST(d.acq_date AS DATE) = CAST(? AS DATE)
                 ORDER BY d.h3_08
                 """,
@@ -185,7 +187,7 @@ class FeatureStoreService:
                 """
                 SELECT d.*, s.* EXCLUDE (h3_08)
                 FROM h3_daily d
-                LEFT JOIN osm_wri_static s USING (h3_08)
+                INNER JOIN osm_wri_static s USING (h3_08)
                 WHERE d.h3_08 = ? AND CAST(d.acq_date AS DATE) = CAST(? AS DATE)
                 LIMIT 1
                 """,

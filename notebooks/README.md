@@ -2,23 +2,40 @@
 
 Exploration and experimentation notebooks only. **Never imported by production code.**
 
-## Structure
-```
+## Actual structure (verified 2026-09-10)
+
+```text
 notebooks/
-├── eda/              # Exploratory Data Analysis
-│   └── 01_eda_fire_data.ipynb
-├── experiments/      # Model experiments
-│   └── 01_xgboost_baseline.ipynb
-└── README.md         # This file
+├── eda/
+│   ├── data-eda.ipynb                        # FIRMS corpus EDA
+│   ├── osi-wri-data.ipynb                    # OSM/WRI enrichment provenance
+│   │                                           # (ingestion/osm_wri_load.py ports this)
+│   ├── sih2026_h3_daily_*.parquet            # notebook-era parquet artifacts (historical)
+│   ├── sih2026_h3_daily_labeled.parquet      # historical labeled artifact
+│   ├── state_class_heatmap.png               # label-evidence artifact
+│   ├── state_evidence_table.csv              # per-state label evidence (copied to docs/)
+│   └── Jupyter Notebook — generated with runcell.pdf   # exported output (evidence record)
+└── training/
+    └── si-catboost-training.ipynb            # CatBoost training provenance
 ```
 
-## Promotion Rule
-Once a piece of logic works in a notebook (feature function, rule threshold, training loop):
-1. Rewrite as a proper module in `ml-pipeline/`
-2. Open a small PR to promote it
-3. The notebook stays as a record of *how* you got there
+An earlier version of this README listed `01_eda_fire_data.ipynb`,
+`01_xgboost_baseline.ipynb`, and an `ml-pipeline/` promotion target — none of
+those exist. The notebooks above are the real ones.
+
+## Promotion rule
+
+Once a piece of logic works in a notebook (feature function, threshold,
+training loop), it is rewritten as a module under `ingestion/` or `app/` and
+the notebook stays as the record of how we got there. Real examples:
+`ingestion/osm_wri_load.py` ports `eda/osi-wri-data.ipynb`; the served model
+bundle comes from `training/sih-catboost-training.ipynb` (tracked at
+`models/PS26162_catboost_final/`).
 
 ## Hygiene
+
 - Strip outputs before commit: `nbstripout` or "Clear All Outputs" in Jupyter
-- Committed output cells with images/data = #1 cause of merge conflicts
-- Use `data/sample/` for small test datasets in notebooks
+  (CI runs an advisory output-strip check).
+- Committed output cells with images/data are the #1 cause of merge conflicts.
+- Use small test datasets in notebooks; do not commit large derived parquets
+  when a script can regenerate them.

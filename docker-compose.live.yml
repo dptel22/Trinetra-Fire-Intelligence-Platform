@@ -1,0 +1,14 @@
+version: '3.8'
+
+# Optional live-ingestion override. The key is mounted as a Docker secret
+# file, so `docker compose config` never renders its value.
+services:
+  backend:
+    environment:
+      - FIRMS_MAP_KEY_FILE=/run/secrets/firms_env
+    secrets:
+      - firms_env
+
+secrets:
+  firms_env:
+    file: ./.env

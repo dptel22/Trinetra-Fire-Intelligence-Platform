@@ -6,7 +6,6 @@ import {
   fetchPredictionsStrict,
   fetchArchiveDates,
   fetchArchivePredictions,
-  fetchArchiveRuns,
   fetchRawEvidence,
   fetchAlertStates,
   fetchAlertHistory,
@@ -927,7 +926,7 @@ export default function FireAlertsPage() {
 
   const dateLabel = acqDate || 'discovering...';
   const ingestionDetail = healthIngestion?.available
-    ? `Last ingestion run: ${healthIngestion.target_date || 'unknown date'} · ${healthIngestion.fetch_mode || 'unknown source'} · finished ${healthIngestion.finished_at || 'unknown time'}`
+    ? `Last successful ingestion: ${healthIngestion.target_date || 'unknown date'} · ${healthIngestion.fetch_mode || 'unknown source'} · finished ${healthIngestion.finished_at || 'unknown time'}`
     : null;
 
   return (
@@ -1341,7 +1340,8 @@ export default function FireAlertsPage() {
             <p style={{ margin: 0, color: 'var(--text-muted, #55595E)', fontSize: '0.9rem', maxWidth: '580px', marginInline: 'auto', lineHeight: 1.5 }}>
               The backend has stored data for {acqDate} but registered zero high-temperature surface anomalies.
               This is not evidence that "no fires occurred" — it means the stored passes for this date contained no detections
-              (or ingestion for this date is incomplete).
+              (or ingestion for this date is incomplete). States/UTs with no satellite detections remain
+              empty rather than being represented by synthetic alerts.
             </p>
           </div>
         )}

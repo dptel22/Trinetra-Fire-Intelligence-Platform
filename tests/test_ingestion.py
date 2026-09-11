@@ -178,6 +178,17 @@ def test_fetch_firms_bad_key_fails_loud(monkeypatch):
         fetch_firms("VIIRS_SNPP_NRT", "72.5,18.9,73.2,19.4", 1)
 
 
+def test_load_map_key_reads_secret_file_without_environment_value(tmp_path, monkeypatch):
+    from ingestion import firms_pull
+
+    monkeypatch.delenv("FIRMS_MAP_KEY", raising=False)
+    monkeypatch.delenv("FIRMS_API_KEY", raising=False)
+    secret = tmp_path / "firms-map-key"
+    secret.write_text("FIRMS_MAP_KEY=" + ("c" * 32) + "\n", encoding="utf-8")
+    monkeypatch.setenv("FIRMS_MAP_KEY_FILE", str(secret))
+    assert firms_pull.load_map_key() == "c" * 32
+
+
 def test_fetch_firms_rejects_bad_inputs(monkeypatch):
     monkeypatch.setenv("FIRMS_MAP_KEY", "a" * 32)
     with pytest.raises(IngestionError):

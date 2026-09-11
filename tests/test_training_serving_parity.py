@@ -68,6 +68,9 @@ def _locate_training_artifact() -> Path:
 def _resolve_cell_cases() -> dict[str, tuple[str, str]]:
     df = pd.read_parquet(_locate_training_artifact())
     df = df.assign(_date=df["acq_date"].astype(str).str.slice(0, 10)).sort_values(["h3_08", "_date"])
+    serving = pd.read_parquet(settings.H3_DAILY_PARQUET, columns=["h3_08", "acq_date"])
+    serving_keys = set(zip(serving["h3_08"].astype(str), serving["acq_date"].astype(str).str.slice(0, 10)))
+    df = df[df.apply(lambda row: (str(row["h3_08"]), row["_date"]) in serving_keys, axis=1)]
     non_trivial = df[df["frp_max_lag7"].notna()]
     first_obs = df[(df["is_first_observation"] == 1) & (df["frp_max_lag7"].isna())]
     if non_trivial.empty or first_obs.empty:

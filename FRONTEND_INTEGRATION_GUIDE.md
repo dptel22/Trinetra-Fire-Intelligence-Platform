@@ -1,5 +1,9 @@
 # Frontend Integration Guide
 
+> Contract verified 2026-09-10. Examples below use illustrative sample values
+> (`latency_ms: 8.2` is not a benchmark). Current-state reference:
+> [`docs/CURRENT_PROJECT_TRUTH.md`](docs/CURRENT_PROJECT_TRUTH.md) §15.
+
 ## Base URLs
 
 - API prefix: `http://localhost:8000/api/v1`

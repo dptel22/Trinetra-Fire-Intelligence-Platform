@@ -117,23 +117,57 @@ def ingestion_provenance() -> dict:
     UI can label coverage honestly instead of implying validated nationwide
     historical data.
     """
-    last = read_last_run()
-    if not last or not last.get("ok"):
-        return {"available": False, "last_run_ok": bool(last and last.get("ok"))}
+    try:
+        history = json.loads(RUN_HISTORY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        history = {}
+    runs = history.get("runs") if isinstance(history, dict) else None
+    runs = runs if isinstance(runs, list) else []
+    latest_attempt = runs[-1] if runs else None
+    last = next((run for run in reversed(runs) if run.get("ok")), None)
+    if not last:
+        return {"available": False, "last_run_ok": bool(latest_attempt and latest_attempt.get("ok"))}
     sf = last.get("state_filter", {})
+    rows_by_state = sf.get("rows_by_state") or sf.get("kept_by_state") or {}
+    states_served = sf.get("states_served")
+    if states_served is None and isinstance(rows_by_state, dict):
+        states_served = len(rows_by_state)
+    india_rows = sf.get("india_rows_retained")
+    if india_rows is None:
+        india_rows = sf.get("kept_rows")
+    outside_rejected = sf.get("outside_india_rejected")
+    if outside_rejected is None:
+        outside_rejected = sf.get("dropped_rows")
+    outside_training = sf.get("outside_training_geography_rows")
+    if outside_training is None:
+        outside_training = sum(
+            count for state, count in rows_by_state.items()
+            if state not in SERVING_STATES
+        ) if isinstance(rows_by_state, dict) else None
     return {
         "available": True,
         "last_run_ok": True,
+        "latest_attempt_ok": latest_attempt.get("ok") if latest_attempt else None,
+        "latest_attempt_target_date": latest_attempt.get("target_date") if latest_attempt else None,
         "target_date": last.get("target_date"),
         "finished_at": last.get("finished_at"),
         "gap_filled": last.get("gap_filled"),
         "fetch_mode": (last.get("fetch") or {}).get("mode"),
-        "states_served": sf.get("states_served"),
-        "india_rows_retained": sf.get("india_rows_retained"),
-        "outside_india_rejected": sf.get("outside_india_rejected"),
-        "outside_training_geography_rows": sf.get("outside_training_geography_rows"),
+        "states_served": states_served,
+        "india_rows_retained": india_rows,
+        "outside_india_rejected": outside_rejected,
+        "outside_training_geography_rows": outside_training,
+        "coverage_status": (
+            "nationwide"
+            if isinstance(states_served, int) and states_served > len(SERVING_STATES)
+            else "training-partition-only"
+        ),
         "final_daily_rows": last.get("final_daily_rows"),
-        "serving_scope": "all-india (10-state training partition retired from serving)",
+        "serving_scope": (
+            f"all-India bbox; {states_served} states/UTs represented by detections"
+            if states_served is not None
+            else "all-India bbox; state coverage unavailable"
+        ),
     }
 
 

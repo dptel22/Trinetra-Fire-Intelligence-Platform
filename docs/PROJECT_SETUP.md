@@ -188,7 +188,7 @@ Set `VITE_PMTILES_URL=/tiles/india.pmtiles`. Without it, the map uses a dark fal
 docker compose up --build backend
 ```
 
-The image copies the model and serving parquets from the build context. Compose seeds missing files into the writable `sih2026-data` volume. The host `./data/processed:/data:ro` mount can shadow baked-in image data, so an empty host directory can cause missing-artifact failures. Check `/health` after startup.
+The image copies the model and serving parquets from the build context. Compose seeds missing files into the writable `sih2026-data` volume. The host `./data/processed:/data:ro` mount can shadow baked-in image data, so an empty host directory can cause missing-artifact failures. Compose mounts `./data/raw` read-only at `/app/data/raw`; demo mode needs no key. For live ingestion, use `docker compose -f docker-compose.yml -f docker-compose.live.yml up --build backend`; the override mounts `.env` as a Docker secret and the ingestion code reads `FIRMS_MAP_KEY_FILE` without rendering the key in Compose config or image layers. Check `/health` after startup: serving readiness and live-ingestion availability are separate.
 
 ## Verification
 
@@ -244,7 +244,7 @@ still has a usable basemap without downloading the PMTiles archive.
 
 ## Current project state
 
-The reconciled agent history records a verified 55-feature model contract, real OSM/WRI enrichment, live FIRMS ingestion, 64 backend tests plus one opt-in live test, Docker boot verification, and frontend build/lint verification. Historical entries mentioning 52 features, the old model path, or the old `parts` NameError are superseded by later entries. Live setup still depends on user-supplied raw inputs and `FIRMS_MAP_KEY`; PMTiles remains optional.
+Current state of record (2026-09-10, verified on this checkout — see [`CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md) and [`CLAIMS_AND_EVIDENCE.md`](CLAIMS_AND_EVIDENCE.md)): a 55-feature CatBoost contract with real OSM/WRI enrichment and live FIRMS ingestion; serving data refreshed 2026-09-10 to 20 states/UTs (2024-08-01 → 2026-09-10); **135 backend tests passing + 1 opt-in live test deselected**; Docker build/boot and frontend lint/build verified. Historical agent-log entries mentioning 52 features, 64 tests, the old model path, or the old `parts` NameError are superseded — the current checkout is authoritative. Live setup still depends on user-supplied raw inputs and `FIRMS_MAP_KEY`; PMTiles remains optional (Blue Marble tiles ship in-repo).
 
 ## Agent protocol
 

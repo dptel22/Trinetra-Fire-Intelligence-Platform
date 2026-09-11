@@ -1,5 +1,23 @@
 # EDA Findings — SIH 2026 PS26162
 
+> **STATUS: HISTORICAL / RESEARCH (early exploration, ~2026-08-28).**
+> This is a record of the *initial* EDA on the ~1.19M-row CSV corpus that
+> predates the current system. Several of its conclusions were **superseded**:
+>
+> - The risk-tier taxonomy (`HIGH_RISK/MEDIUM_RISK/LOW_RISK/NO_FIRE`) was
+>   never shipped — the current model uses 4 trained classes
+>   (`industrial/mining/agricultural_burn/wildfire`).
+> - The "H3 res 7 is a good default" recommendation was superseded — the
+>   system uses **H3 resolution 8** cell-days.
+> - The res-8 area figure below (~1.8 km²) is wrong; res-8 hexagons are
+>   ~0.7 km².
+> - The ~1.19M-row corpus was replaced by the 2.59M-row harmonized corpus
+>   (see `docs/decisions/VIIRS_EDA_Findings_Report.docx`).
+>
+> Do not use this document as a description of the current pipeline or
+> taxonomy. Current source of truth:
+> [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md).
+
 *Living document — update as exploration progresses*
 
 ## Data Overview

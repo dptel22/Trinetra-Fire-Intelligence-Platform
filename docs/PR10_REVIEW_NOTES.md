@@ -1,5 +1,11 @@
 # PR #10 — Merge Review Notes & Run Requirements
 
+> **STATUS: HISTORICAL (noted 2026-09-11).** Review-tracking snapshot from
+> 2026-09-09. Some open items were fixed later (e.g., the FireAlertsPage date
+> sync bug, the unused `fetchArchiveRuns` import — see `AGENT_LOG.md`
+> 2026-09-10/11 entries and `docs/WHOLE_SYSTEM_AUDIT.md`). Do not treat the
+> open-bug list below as current; verify against the current checkout.
+
 > Captured 2026-09-09. This records the reviewer findings that shipped with (or were
 > surfaced by) the PR #10 merge, and the artifacts **not in git** that a fresh machine
 > must download/generate before the stack runs.
