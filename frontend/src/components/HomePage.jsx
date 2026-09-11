@@ -138,21 +138,21 @@ export default function HomePage() {
             whiteSpace: 'nowrap'
           }}
         >
-          <span style={{ marginRight: '3.5rem' }}>
+          <Link to="/fire-alerts?class=industrial" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
             ⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)
-          </span>
-          <span style={{ marginRight: '3.5rem' }}>
+          </Link>
+          <Link to="/fire-alerts?class=mining" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
             ⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector
-          </span>
-          <span style={{ marginRight: '3.5rem' }}>
+          </Link>
+          <Link to="/fire-alerts?class=agricultural_burn" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
             ⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab
-          </span>
-          <span style={{ marginRight: '3.5rem' }}>
+          </Link>
+          <Link to="/fire-alerts?class=wildfire" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
             ⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division
-          </span>
-          <span style={{ marginRight: '3.5rem' }}>
+          </Link>
+          <Link to="/fire-alerts?class=unclassified" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
             ⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin
-          </span>
+          </Link>
         </div>
       </div>
 
@@ -183,7 +183,7 @@ export default function HomePage() {
                   </Link>
                 </div>
 
-                {/* 3. Category Cards Grid (Full Line Width, Bigger Cards, No Scroll) */}
+                {/* 3. Category Cards Grid (Full Line Width, Interactive Filter Links) */}
                 <div 
                   className="category-carousel-container"
                   style={{
@@ -205,7 +205,7 @@ export default function HomePage() {
                       CLASSIFICATION CATEGORIES
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                      5 Primary Thermal Detection Classes
+                      Click any category to filter alerts
                     </span>
                   </div>
 
@@ -219,9 +219,11 @@ export default function HomePage() {
                     }}
                   >
                     {/* Card 1: Industrial */}
-                    <div 
+                    <Link 
+                      to="/fire-alerts?class=industrial"
                       className="category-card"
                       style={{
+                        textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
                         border: '1px solid rgba(230, 126, 34, 0.35)',
                         borderRadius: '14px',
@@ -233,7 +235,7 @@ export default function HomePage() {
                         textAlign: 'center',
                         boxShadow: '0 6px 20px rgba(230, 126, 34, 0.15)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                        cursor: 'default'
+                        cursor: 'pointer'
                       }}
                     >
                       {/* Industrial Hexagon Badge */}
@@ -248,12 +250,14 @@ export default function HomePage() {
                       <span style={{ fontSize: '0.8rem', color: '#E67E22', fontWeight: 700 }}>
                         Active Flares
                       </span>
-                    </div>
+                    </Link>
 
                     {/* Card 2: Mining */}
-                    <div 
+                    <Link 
+                      to="/fire-alerts?class=mining"
                       className="category-card"
                       style={{
+                        textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
                         border: '1px solid rgba(149, 165, 166, 0.35)',
                         borderRadius: '14px',
@@ -265,7 +269,7 @@ export default function HomePage() {
                         textAlign: 'center',
                         boxShadow: '0 6px 20px rgba(149, 165, 166, 0.15)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                        cursor: 'default'
+                        cursor: 'pointer'
                       }}
                     >
                       {/* Mining Hexagon Badge */}
@@ -281,12 +285,14 @@ export default function HomePage() {
                       <span style={{ fontSize: '0.8rem', color: '#95A5A6', fontWeight: 700 }}>
                         Smelter Activity
                       </span>
-                    </div>
+                    </Link>
 
                     {/* Card 3: Agricultural Burn */}
-                    <div 
+                    <Link 
+                      to="/fire-alerts?class=agricultural_burn"
                       className="category-card"
                       style={{
+                        textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
                         border: '1px solid rgba(46, 204, 113, 0.35)',
                         borderRadius: '14px',
@@ -298,7 +304,7 @@ export default function HomePage() {
                         textAlign: 'center',
                         boxShadow: '0 6px 20px rgba(46, 204, 113, 0.15)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                        cursor: 'default'
+                        cursor: 'pointer'
                       }}
                     >
                       {/* Agricultural Burn Hexagon Badge */}
@@ -316,12 +322,14 @@ export default function HomePage() {
                       <span style={{ fontSize: '0.8rem', color: '#2ECC71', fontWeight: 700 }}>
                         Stubble Fires
                       </span>
-                    </div>
+                    </Link>
 
                     {/* Card 4: Wildfire */}
-                    <div 
+                    <Link 
+                      to="/fire-alerts?class=wildfire"
                       className="category-card"
                       style={{
+                        textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
                         border: '1px solid rgba(231, 76, 60, 0.35)',
                         borderRadius: '14px',
@@ -333,7 +341,7 @@ export default function HomePage() {
                         textAlign: 'center',
                         boxShadow: '0 6px 20px rgba(231, 76, 60, 0.15)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                        cursor: 'default'
+                        cursor: 'pointer'
                       }}
                     >
                       {/* Wildfire Hexagon Badge */}
@@ -352,12 +360,14 @@ export default function HomePage() {
                       <span style={{ fontSize: '0.8rem', color: '#E74C3C', fontWeight: 700 }}>
                         Canopy Burns
                       </span>
-                    </div>
+                    </Link>
 
                     {/* Card 5: Unclassified */}
-                    <div 
+                    <Link 
+                      to="/fire-alerts?class=unclassified"
                       className="category-card"
                       style={{
+                        textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
                         border: '1px solid rgba(155, 89, 182, 0.35)',
                         borderRadius: '14px',
@@ -369,7 +379,7 @@ export default function HomePage() {
                         textAlign: 'center',
                         boxShadow: '0 6px 20px rgba(155, 89, 182, 0.15)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                        cursor: 'default'
+                        cursor: 'pointer'
                       }}
                     >
                       {/* Unclassified Hexagon Badge */}
@@ -389,7 +399,7 @@ export default function HomePage() {
                       <span style={{ fontSize: '0.8rem', color: '#9B59B6', fontWeight: 700 }}>
                         Analyst Review
                       </span>
-                    </div>
+                    </Link>
                   </div>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Header from './Header';
 import OfflineBanner from './OfflineBanner';
 import {
@@ -807,13 +807,15 @@ export default function FireAlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [alertStates, setAlertStates] = useState(null); // {statesByHotspot, counts} | null
   const [statesError, setStatesError] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedClass = searchParams.get('class') || 'all';
+
   const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|acknowledged|confirmed|dismissed
   const [dateRunId, setDateRunId] = useState(null); // decisive ingestion run for the selected date
   const [truncatedTotal, setTruncatedTotal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [errorKind, setErrorKind] = useState('error'); // 'error' | 'dateUnavailable'
-  const [selectedClass, setSelectedClass] = useState('all');
   const [sortBy, setSortBy] = useState('review'); // 'review' | 'conf_desc' | 'conf_asc'
   const [currentPage, setCurrentPage] = useState(1);
   const [apiMode, setApiModeState] = useState(() => getApiMode());
@@ -978,19 +980,32 @@ export default function FireAlertsPage() {
     ...(perDateWarning ? [perDateWarning] : [])
   ];
 
-  // ── Dynamic available classes (empirical presence in batch) ───────────────
+  // ── Dynamic available classes (empirical presence in batch + active query) ─
   const availableClasses = useMemo(() => getAvailableClasses(alerts), [alerts]);
 
-  const effectiveSelectedClass = useMemo(() => {
-    if (selectedClass !== 'all' && !availableClasses.includes(selectedClass)) {
-      return 'all';
+  const displayedClasses = useMemo(() => {
+    const order = ['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified'];
+    const present = new Set(availableClasses);
+    if (selectedClass && selectedClass !== 'all') {
+      present.add(selectedClass);
     }
-    return selectedClass;
-  }, [selectedClass, availableClasses]);
+    return order.filter(cls => present.has(cls));
+  }, [availableClasses, selectedClass]);
+
+  const effectiveSelectedClass = selectedClass;
 
   const handleSelectClass = (cls) => {
     setSelectedClass(cls);
     setCurrentPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (cls === 'all') {
+        next.delete('class');
+      } else {
+        next.set('class', cls);
+      }
+      return next;
+    }, { replace: true });
   };
 
   const handleSortChange = (sortVal) => {
@@ -1383,7 +1398,7 @@ export default function FireAlertsPage() {
                     outline: 'none'
                   }}
                 >
-                  <option value="review" style={{ backgroundColor: '#141820' }}>⚠️ Needs Review First</option>
+                  <option value="review" style={{ backgroundColor: '#141820' }}>⚠️ Unidentified First</option>
                   <option value="conf_desc" style={{ backgroundColor: '#141820' }}>Highest Confidence</option>
                   <option value="conf_asc" style={{ backgroundColor: '#141820' }}>Lowest Confidence</option>
                 </select>
@@ -1421,7 +1436,7 @@ export default function FireAlertsPage() {
               >
                 All ({alerts.length})
               </button>
-              {availableClasses.map(cls => {
+              {displayedClasses.map(cls => {
                 const count = alerts.filter(a => a.predicted_class === cls).length;
                 const clsColor = CLASS_COLORS[cls] || '#787878';
                 const label = CLASS_LABELS[cls] || cls;
@@ -1456,11 +1471,7 @@ export default function FireAlertsPage() {
               </span>
               {[
                 ['all', `All (${alerts.length})`],
-                ['needs_review', `⚠️ Needs review (${alerts.filter(a => a.needs_review).length})`],
-                ['new', `New (${lifecycleCounts.new})`],
-                ['acknowledged', `Ack (${lifecycleCounts.acknowledged})`],
-                ['confirmed', `Confirmed (${lifecycleCounts.confirmed})`],
-                ['dismissed', `Dismissed (${lifecycleCounts.dismissed})`]
+                ['needs_review', `⚠️ Unidentified (${alerts.filter(a => a.needs_review).length})`]
               ].map(([value, label]) => (
                 <button
                   key={value} type="button"
