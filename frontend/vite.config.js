@@ -4,6 +4,23 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/health': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/predictions': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      }
+    }
+  },
   build: {
     // The map vendors are intentionally loaded only by /fire-map. Keep the
     // warning threshold above their measured sizes; application chunks remain
