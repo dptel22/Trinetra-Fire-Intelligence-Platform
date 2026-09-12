@@ -960,6 +960,95 @@ export async function fetchCellDetail(cellId, acqDate) {
   return await res.json();
 }
 
+const makeMockTimeline = (overrides) => ({
+  h3_index: null,
+  requested_start_date: null,
+  requested_end_date: null,
+  available_start_date: null,
+  available_end_date: null,
+  gaps: [],
+  partial_periods: [],
+  has_more: false,
+  next_cursor: null,
+  model: { bundle_version: null, pipeline_version: 'timeline_v1', prediction_scope: 'historical_thermal_activity' },
+  caveats: ['Historical rows describe FIRMS evidence, not ground-truth land use.'],
+  ...overrides
+});
+
+export const MOCK_TIMELINES = {
+  a1d48dfffff: makeMockTimeline({
+    granularity: 'month',
+    rows: [
+      { period: '2025-01', period_type: 'month', partial: false, fire_days: 6, n_detections: 18, observation_basis: 'detections', transition_type: 'stable', transition_confidence: 'high', transition_evidence: ['seasonal pattern repeated'] },
+      { period: '2025-02', period_type: 'month', partial: false, fire_days: 5, n_detections: 14, observation_basis: 'detections', transition_type: 'stable', transition_confidence: 'high', transition_evidence: ['seasonal pattern repeated'] }
+    ],
+    materialization_status: 'materialized',
+    materialized_start_date: '2024-08-01',
+    materialized_end_date: '2025-02-28',
+    fallback_used: false,
+    archive_range_limited: true,
+    context: { osm_context_vintage: 'current_snapshot', wri_context_vintage: 'current_snapshot', historical_context_available: false, land_use_claim: false }
+  }),
+  b2c48dfffff: makeMockTimeline({
+    granularity: 'month',
+    rows: [
+      { period: '2024-11', period_type: 'month', partial: false, fire_days: 4, n_detections: 10, observation_basis: 'detections', transition_type: 'seasonal_to_persistent', transition_confidence: 'medium', transition_evidence: ['persistence increased'] },
+      { period: '2025-01', period_type: 'month', partial: false, fire_days: 21, n_detections: 64, observation_basis: 'detections', transition_type: 'seasonal_to_persistent', transition_confidence: 'medium', transition_evidence: ['persistence increased'] }
+    ],
+    materialization_status: 'materialized',
+    materialized_start_date: '2024-08-01',
+    materialized_end_date: '2025-02-28',
+    fallback_used: false,
+    archive_range_limited: true,
+    context: { osm_context_vintage: 'current_snapshot', wri_context_vintage: 'current_snapshot', historical_context_available: false, land_use_claim: false }
+  }),
+  c3d48dfffff: makeMockTimeline({
+    granularity: 'month',
+    rows: [
+      { period: '2025-02', period_type: 'month', partial: false, fire_days: 2, n_detections: 3, observation_basis: 'detections', transition_type: 'insufficient_history', transition_confidence: 'low', transition_evidence: [] }
+    ],
+    materialization_status: 'fallback_h3_daily',
+    materialized_start_date: null,
+    materialized_end_date: null,
+    fallback_used: true,
+    archive_range_limited: true,
+    context: { osm_context_vintage: 'current_snapshot', wri_context_vintage: 'current_snapshot', historical_context_available: false, land_use_claim: false }
+  }),
+  d4e48dfffff: makeMockTimeline({
+    granularity: 'month',
+    rows: [
+      { period: '2025-02', period_type: 'month', partial: true, fire_days: 0, n_detections: 0, observation_basis: 'no_detections_in_ingested_data', transition_type: 'insufficient_history', transition_confidence: 'low', transition_evidence: [] }
+    ],
+    materialization_status: 'materialized',
+    materialized_start_date: '2025-02-01',
+    materialized_end_date: '2025-02-10',
+    fallback_used: false,
+    archive_range_limited: true,
+    context: { osm_context_vintage: 'current_snapshot', wri_context_vintage: 'current_snapshot', historical_context_available: false, land_use_claim: false }
+  })
+};
+
+/** Fetch precomputed FIRMS thermal history for one H3 cell. */
+export async function fetchCellTimeline(cellId, options = {}) {
+  if (currentMode === 'mock') {
+    const suffix = Object.keys(MOCK_TIMELINES).find((key) => cellId.endsWith(key));
+    const template = MOCK_TIMELINES[suffix || 'a1d48dfffff'];
+    return { ...template, h3_index: cellId, granularity: options.granularity || template.granularity };
+  }
+  const params = new URLSearchParams({
+    granularity: options.granularity || 'month',
+    ...(options.startDate ? { start_date: options.startDate } : {}),
+    ...(options.endDate ? { end_date: options.endDate } : {}),
+    ...(options.cursor ? { cursor: options.cursor } : {}),
+    ...(options.limit ? { limit: String(options.limit) } : {})
+  });
+  const res = await fetch(`${BASE_URL}/api/v1/cells/${encodeURIComponent(cellId)}/timeline?${params}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch timeline for ${cellId}: HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
 /**
  * Fetch SHAP explanation for a cell. Provides mock explanation in mock mode.
  * @param {string} cellId 

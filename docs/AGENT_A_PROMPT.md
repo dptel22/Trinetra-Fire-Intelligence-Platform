@@ -1,4 +1,4 @@
-# Prompt for Agent A — Map Engine
+ Prompt for Agent A — Map Engine
 
 > **STATUS: HISTORICAL TASK BRIEF (completed).** The MapLibre + deck.gl +
 > PMTiles rebuild this brief commissioned is **done and verified** (imports

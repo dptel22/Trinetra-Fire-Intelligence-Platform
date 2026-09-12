@@ -158,11 +158,22 @@ GET  /api/v1/health
 GET  /api/v1/predictions?min_lat=&max_lat=&min_lon=&max_lon=&acq_date=&zoom=
 GET  /api/v1/predictions/{cell_id}?acq_date=
 GET  /api/v1/predictions/{cell_id}/explain?acq_date=
+GET  /api/v1/cells/{h3_index}/timeline?granularity=month&limit=100
 POST /api/v1/audit/override
 GET  /api/v1/audit/logs
 ```
 
 Health exposes `latest_acq_date`; clients must query that date rather than the browser calendar date. Prediction responses are capped at 2500 server-side, so the frontend tiles wide viewports. SHAP runs only for a selected cell.
+
+The H3 timeline is FIRMS thermal evidence, not ground-truth historical land use.
+Run `py -3 scripts/build_timeline.py` to materialize daily/monthly/yearly
+timeline layers under `data/processed/timeline`. The API reports the actual
+available archive range and marks gaps, partial periods, and no-detection days.
+OSM/WRI fields are current-snapshot context only. A local historical backfill
+can be validated with `py -3 scripts/build_historical_backfill.py <csv-dir>
+--output-dir <timeline-dir>`; no five-year coverage claim is valid until its
+manifest is verified. `py -3 scripts/check_osm_history.py` records whether the
+optional `osmium` feasibility probe can run.
 
 ## Frontend and map
 

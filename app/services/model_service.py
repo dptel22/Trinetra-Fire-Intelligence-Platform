@@ -306,7 +306,8 @@ class CatBoostModelService:
         return tuple(float(v) for v in h3lib.cell_to_latlng(str(features["h3_08"])))
 
     def _apply_confidence_policy(self, predicted_class: str, confidence: float) -> tuple[str, str | None]:
-        # Feature-flagged off by default; set UNCLASSIFIED_THRESHOLD env var to enable.
+        # Abstention policy, enabled via UNCLASSIFIED_THRESHOLD (.env is loaded
+        # by app.core.config; unset disables abstention).
         if settings.UNCLASSIFIED_THRESHOLD is not None and confidence < settings.UNCLASSIFIED_THRESHOLD:
             return "unclassified", f"Low confidence below configured UNCLASSIFIED_THRESHOLD={settings.UNCLASSIFIED_THRESHOLD:.3f}"
         if predicted_class == "mining":

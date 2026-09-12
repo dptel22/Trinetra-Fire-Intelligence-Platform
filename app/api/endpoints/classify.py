@@ -105,8 +105,9 @@ def get_prediction_cell_explanation(cell_id: str, acq_date: str = Query(...)):
     Single-cell on-demand SHAP explanation.
     """
     try:
-        cell = model_service.get_cell_detail(cell_id, acq_date)
-        return model_service.explain(cell.context)
+        # explain_single runs the predict+SHAP pipeline exactly once; routing
+        # through get_cell_detail would compute the full explanation twice.
+        return model_service.explain_single({"h3_08": cell_id, "acq_date": acq_date})
     except HTTPException:
         raise
     except ValueError as ve:

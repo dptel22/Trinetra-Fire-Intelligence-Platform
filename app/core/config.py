@@ -9,6 +9,33 @@ from typing import ClassVar
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent
 _DATA_DIR = _BASE_DIR / "data"
 
+
+def _load_dotenv(path: Path) -> None:
+    """Populate os.environ from a .env file without overriding existing vars.
+
+    Real environment variables (Docker `environment:`, CI, shell exports)
+    always win over the file, so deployment overrides keep working. The repo
+    has no python-dotenv dependency; this covers the flat KEY=VALUE subset.
+    """
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        # Strip one matched pair of surrounding quotes only, so a value that
+        # legitimately ends in a quote character survives intact.
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("\"", "'"):
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv(_BASE_DIR / ".env")
+
 TARGET_CLASSES = ["industrial", "mining", "agricultural_burn", "wildfire"]
 CAT_FEATURES = ["h3_08", "daynight"]
 
@@ -128,6 +155,72 @@ class Settings:
         str(_DATA_DIR / "processed" / "sih2026_h3_daily_features_with_osm_wri.parquet"),
     )
     RAW_ARCHIVE_DIR = os.environ.get("RAW_ARCHIVE_DIR", str(_DATA_DIR / "archive" / "firms"))
+    TIMELINE_DIR = os.environ.get("TIMELINE_DIR", str(_DATA_DIR / "processed" / "timeline"))
+    # Name of the sidecar manifest written next to the materialized timeline
+    # layers. It records materialized_at/version/date-range so the serving layer
+    # can prove freshness instead of guessing from file mtimes.
+    TIMELINE_MANIFEST_FILE = "materialization_manifest.json"
+    # Provenance version stamped into the manifest whenever the timeline layers
+    # are (re)materialized. Bump when the materialization logic changes shape.
+    TIMELINE_MATERIALIZATION_VERSION = os.environ.get(
+        "TIMELINE_MATERIALIZATION_VERSION", "timeline_v1"
+    )
+    # Staleness thresholds (in hours) per materialized layer. A layer is "stale"
+    # when its manifest ``materialized_at`` is older than the threshold for the
+    # requested granularity, which fails the request closed (HTTP 503) unless
+    # TIMELINE_ALLOW_FALLBACK=1 is explicitly set.
+    #
+    # DAILY is intentionally TIGHT: 48h = 2x the daily FIRMS NRT pull (day_range
+    # 1-5, nominal 1 run/day), so exactly one missed ingestion cycle is tolerated
+    # before we fail loud. This is deliberate — week-old evidence must NEVER be
+    # served as "current". Do NOT raise this number to paper over a broken
+    # ingestion job; fix the job instead.
+    #
+    # MONTHLY/YEARLY are rollups that re-aggregate far less often than raw
+    # ingestion, so they get progressively looser placeholder windows (weekly /
+    # ~monthly) to avoid false-stale 503s on the aggregate layers. Retune these
+    # against the real rollup cadence once a scheduled job exists.
+    _TIMELINE_MAX_AGE_DEFAULTS: ClassVar[dict[str, float]] = {
+        "day": 48.0,
+        "month": 168.0,
+        "year": 744.0,
+    }
+    _TIMELINE_MAX_AGE_ENV: ClassVar[dict[str, str]] = {
+        "day": "TIMELINE_MAX_AGE_HOURS_DAILY",
+        "month": "TIMELINE_MAX_AGE_HOURS_MONTHLY",
+        "year": "TIMELINE_MAX_AGE_HOURS_YEARLY",
+    }
+
+    def timeline_max_age_hours(self, granularity: str) -> float:
+        """Staleness threshold (hours) for the layer backing this granularity."""
+        default = self._TIMELINE_MAX_AGE_DEFAULTS.get(granularity, 48.0)
+        raw = os.environ.get(self._TIMELINE_MAX_AGE_ENV.get(granularity, ""))
+        if raw in (None, ""):
+            return default
+        try:
+            return float(raw)
+        except ValueError:
+            return default
+
+    def timeline_allow_fallback(self) -> bool:
+        """True only when TIMELINE_ALLOW_FALLBACK is explicitly enabled.
+
+        Defaults to OFF everywhere (prod, tests, Docker). The raw h3_daily
+        fallback is a development escape hatch, never a silent production path.
+        """
+        raw = os.environ.get("TIMELINE_ALLOW_FALLBACK", "0")
+        return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+    def timeline_seasonal_gate_override(self) -> bool:
+        """True only when TIMELINE_SEASONAL_GATE_OVERRIDE is explicitly enabled.
+
+        Fail-closed escape hatch for the Sep-Dec seasonal comparability gate in
+        pipeline.timeline_validation. Using it REQUIRES an AGENT_LOG entry
+        justifying the override; the validation report records it either way.
+        """
+        raw = os.environ.get("TIMELINE_SEASONAL_GATE_OVERRIDE", "0")
+        return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
     CAVEAT_MANIFEST: ClassVar[dict[str, str]] = {
         "pseudo_label_circularity": "Labels derive partly from FIRMS/OSM/WRI features, so metrics are not independent ground truth.",
         "satellite_nunique_only": "Only satellite count is modeled, not satellite identity.",

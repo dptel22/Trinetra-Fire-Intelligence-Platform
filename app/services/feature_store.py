@@ -196,6 +196,33 @@ class FeatureStoreService:
             columns = [col[0] for col in self._conn.description] if self._conn.description else []
         return dict(zip(columns, row)) if row else None
 
+    def rows_for_cell(
+        self, h3_index: str, start_date: str | None = None, end_date: str | None = None
+    ):
+        """Return the H3-day evidence stream for one cell in date order."""
+        import pandas as pd
+
+        self.load()
+        clauses = ["d.h3_08 = ?"]
+        params: list[Any] = [h3_index]
+        if start_date:
+            clauses.append("CAST(d.acq_date AS DATE) >= CAST(? AS DATE)")
+            params.append(start_date)
+        if end_date:
+            clauses.append("CAST(d.acq_date AS DATE) <= CAST(? AS DATE)")
+            params.append(end_date)
+        with self._lock:
+            return self._connection().execute(
+                f"""
+                SELECT d.*, s.* EXCLUDE (h3_08)
+                FROM h3_daily d
+                INNER JOIN osm_wri_static s USING (h3_08)
+                WHERE {' AND '.join(clauses)}
+                ORDER BY d.acq_date
+                """,
+                params,
+            ).fetchdf()
+
     def query_bbox(
         self,
         min_lat: float,
@@ -214,6 +241,7 @@ class FeatureStoreService:
                 WHERE CAST(d.acq_date AS DATE) = CAST(? AS DATE)
                   AND s.h3_lat BETWEEN ? AND ?
                   AND s.h3_lon BETWEEN ? AND ?
+                ORDER BY s.h3_08
                 LIMIT 2500
                 """,
                 [acq_date, min_lat, max_lat, min_lon, max_lon],

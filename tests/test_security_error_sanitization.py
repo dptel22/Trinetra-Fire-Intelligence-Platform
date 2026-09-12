@@ -104,7 +104,9 @@ def test_predictions_viewport_error_sanitization(client, caplog):
 
 
 def test_cell_explanation_error_sanitization(client, caplog):
-    with patch("app.api.endpoints.classify.model_service.get_cell_detail") as mock_cell:
+    # The /explain endpoint routes through explain_single (single predict+SHAP
+    # pass); get_cell_detail is the /predictions/{cell_id} detail endpoint.
+    with patch("app.api.endpoints.classify.model_service.explain_single") as mock_cell:
         mock_cell.side_effect = RuntimeError(SENSITIVE_LEAK_STRING)
         params = {"acq_date": "2024-05-15"}
         with caplog.at_level(logging.ERROR):

@@ -50,11 +50,15 @@ def test_classify_mining_subtype():
 
 
 @pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires real serving model and parquet")
-def test_real_mining_explanation_includes_subtype():
+def test_real_mining_explanation_includes_subtype(monkeypatch):
     model_service.load_model()
     row = feature_store.get_cell("883ca83005fffff", "2026-09-08") or feature_store.get_cell("883ca83005fffff", "2026-08-01")
     assert row is not None
 
+    # Abstention may legitimately route this cell to "unclassified"; the
+    # mining-subtype explanation contract is defined against the committed
+    # class, so pin the committed path by disabling abstention here.
+    monkeypatch.setattr(settings, "UNCLASSIFIED_THRESHOLD", None)
     prediction = model_service.predict(row)
     assert prediction.predicted_class == "mining"
 
@@ -63,6 +67,25 @@ def test_real_mining_explanation_includes_subtype():
     assert explanation.mining_subtype is not None
     assert explanation.mining_subtype["subtype"] in {"underground", "surface"}
     assert isinstance(explanation.mining_subtype["nearest_km"], float)
+
+
+@pytest.mark.skipif(not (MODEL_EXISTS and PARQUET_EXISTS), reason="Requires real serving model and parquet")
+def test_abstention_serves_unclassified_without_dropping(monkeypatch):
+    """UNCLASSIFIED_THRESHOLD cells keep full inference: still returned, with
+    review flag and caveat, and explainable."""
+    model_service.load_model()
+    row = feature_store.get_cell("883ca83005fffff", "2026-09-08") or feature_store.get_cell("883ca83005fffff", "2026-08-01")
+    assert row is not None
+
+    monkeypatch.setattr(settings, "UNCLASSIFIED_THRESHOLD", 0.99)
+    prediction = model_service.predict(row)
+    assert prediction.predicted_class in {"mining", "unclassified"}
+    if prediction.predicted_class == "unclassified":
+        assert prediction.needs_review is True
+        assert prediction.caveat_flag and "UNCLASSIFIED_THRESHOLD" in prediction.caveat_flag
+        explanation = model_service.explain(row)
+        assert explanation.predicted_class == "unclassified"
+        assert explanation.feature_attributions  # full inference still attached
 
 
 def _calendar_features(acq_date: str) -> dict[str, float]:

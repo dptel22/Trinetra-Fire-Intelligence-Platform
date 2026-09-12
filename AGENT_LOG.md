@@ -803,7 +803,7 @@ pm run build: built in 1.45s with all map chunks compiled cleanly.
 ode test_agent_b.mjs: 11 / 11 test groups passed.
 - Browser subagent visual verification: verified all 3 basemaps (Streets, Topographic, Satellite) load in high resolution across India with active hotspot pins and verified the redesigned right-hand Data Analyst panel.
 
-## 2026-09-12 | Agent B � FireAlertsPage visual overhaul
+## 2026-09-12 | Agent B  FireAlertsPage visual overhaul
 
 **Files touched:** rontend/src/components/FireAlertsPage.jsx`n
 **What changed:**
@@ -817,7 +817,7 @@ ode test_agent_b.mjs: 11 / 11 test groups passed.
 - Filter chip rows now enclosed in styled panel containers for visual grouping
 - Page max-width expanded from 1140px to 1200px
 
-**Interface impact:** Export-safe � all exported symbols (AlertCard, StatusBadge, LifecycleBadge) preserve their exact prop contracts. No api.js or other Agent-A files touched.
+**Interface impact:** Export-safe  all exported symbols (AlertCard, StatusBadge, LifecycleBadge) preserve their exact prop contracts. No api.js or other Agent-A files touched.
 
 
 ---
@@ -883,3 +883,243 @@ pm run lint: 0 warnings, 0 errors.
 - 
 pm run lint: 0 warnings, 0 errors.
 - Visual inspection via browser subagent on http://localhost:5173/fire-map: verified authentic NASA Blue Marble bathymetry and shaded relief rendering across India with new hexagonal icons.
+
+---
+
+## 2026-09-11 — historical FIRMS timeline implementation
+
+- Scope: backend timeline API, leakage-safe FIRMS temporal features,
+  materialization/backfill tooling, and H3 inspector history panel.
+- Files touched: `pipeline/timeline_features.py`,
+  `pipeline/timeline_materializer.py`, `ingestion/historical_backfill.py`,
+  `app/services/timeline_service.py`, `app/api/endpoints/timeline.py`,
+  `app/schemas/timeline.py`, `app/services/feature_store.py`,
+  `frontend/src/services/api.js`, `frontend/src/components/HexInspectorPanel.jsx`,
+  timeline tests, scripts, and setup documentation.
+- Interface impact: adds `GET /api/v1/cells/{h3_index}/timeline`; live 55-feature
+  CatBoost contract and existing prediction routes are unchanged.
+- Behavior: monthly default UI history separates FIRMS evidence from current
+  OSM/WRI context, reports archive gaps/no-detection periods, and exposes the
+  actual archive range. Historical CatBoost scoring and historical OSM remain
+  deferred until separately validated.
+- Verification: 8 focused backend timeline tests passed; frontend lint and
+  production build passed. Full repository-sized materialization was attempted
+  but did not produce an artifact within the available run window; use the
+  documented materializer command as the operational backfill step.
+
+## 2026-09-12 — Track C frontend timeline UI
+
+- Scope: frontend mock timeline fixtures and the timeline section in
+  `frontend/src/components/HexInspectorPanel.jsx` only.
+- Files changed: `frontend/src/services/api.js`,
+  `frontend/src/components/HexInspectorPanel.jsx`,
+  `frontend/test_timeline.mjs`, and this log.
+- What changed: added four mock timeline variants keyed by H3 suffix; kept the
+  live `fetchCellTimeline` path unchanged; added day/month/year controls with
+  60/24/10 limits, mini-bars, transition chips, partial-period markers, the
+  present-day OSM/WRI status pill, and explicit unavailable historical land-use
+  context. Five-year wording is gated on materialized data spanning at least
+  five years; fallback retains the existing degraded alert.
+- Interface impact: mock mode now returns the frozen timeline response shape;
+  no backend contract or live API behavior changed.
+- Verification:
+  - `node test_timeline.mjs` → PASS (four mock variants and timeline section
+    markers).
+  - `npm run lint` → exit 0, no output.
+  - `npm run build` → exit 0; Vite transformed 1036 modules and emitted the
+    production bundle.
+- Contradicts or supersedes: supersedes the old mock-mode behavior that threw
+  `Historical timeline requires live archive data`; live mode remains unchanged.
+- Open items: browser screenshot/DOM verification of the asynchronously loaded
+  degraded fallback state remains separate from the SSR-focused test.
+
+## 2026-09-12 — P1 Tracks A+B+C planning gate (Step 0)
+
+- Scope: approved execution plan for P1 Track A (nationwide FIRMS backfill +
+  materialization), Track B (OSM history probe + transition detection), and
+  Track C (frontend timeline UI).
+- Decision record (verified this session, not assumed): live serving is already
+  geography-open — `model_service.py` uses training states for provenance
+  labeling only, never to exclude rows from serving; out-of-training cells
+  carry `geography: "india_outside_training"` + the `outside_training_geography`
+  caveat. The live store holds the 10 locked states (~810k rows) plus 1–12 NRT
+  spillover rows each in 10 other states (Kerala: 5 rows, single day
+  2026-09-09). No serving cutover decision exists; the open question is
+  disclosure + out-of-state model evidence (A.4/A.5 in the plan).
+- Measured source counts (`wc -l`, real output): archive J1V-C2 4,321,123
+  lines (4,321,122 rows + header), SV-C2 4,140,393 lines (4,140,392 rows +
+  header); NRT 22,896 + 102,586 lines.
+- Step 0 gate: `pytest tests/test_timeline_service.py tests/test_timeline_endpoint.py
+  tests/test_timeline_features.py tests/test_timeline_materializer.py
+  tests/test_historical_backfill.py` → 11 passed, 0 failed (16.39s).
+
+## 2026-09-12 — Track B: OSM Feasibility Probe & Thermal Transition Detection
+
+- Scope: OSM historical feasibility probe with 6 fixed kill criteria, WRI vintage measurement, and thermal transition detection engine.
+- Files touched:
+  - `pipeline/transition_detection.py` (verified frozen taxonomy of 6 states, `land_use_claim: False` unconditional).
+  - `tests/test_transition_detection.py` (8/8 unit tests passed: stable cells, noise spikes, acceptance criteria, gap rejections, insufficient history, valid state set).
+  - `scripts/check_osm_history.py` (implemented 6 kill criteria + WRI inspection + evaluation logic).
+  - `tests/test_osm_probe.py` (7/7 unit tests passed for decision branches and criteria).
+- Execution & Probe Results:
+  - `scripts/check_osm_history.py` executed:
+    - Criterion 1 (pyosmium): PASS (version 4.3.1).
+    - Criterion 2 (network egress): PASS (HEAD web.archive.org status 200, 0.843s latency).
+    - Criterion 3 (download / capture): FAIL (Wayback Machine CDX returns 403/429 HTML block pages, no valid 200 PBF capture available).
+    - Overall Decision: `not_available_in_environment`.
+    - WRI Status: GPPD v1.3.0 has commissioning_year for only 496/1,589 plants (31.2%) and 0 retirement fields → `wri_time_aware: false`, stays current-snapshot.
+  - Verification:
+    - `pytest tests/test_transition_detection.py` → 8 passed (0.91s).
+    - `pytest tests/test_osm_probe.py` → 7 passed (0.11s).
+    - Full timeline suite: 19 passed, 0 failed (14.05s).
+
+## 2026-09-12 — Track A.5: Out-of-State Model Sanity & Disclosure Verification
+
+- Scope: CatBoost scoring of out-of-training cells, sample-size honesty disclosure, rendered UI proof.
+- Files touched:
+  - `scripts/build_out_of_state_sanity_report.py` (new inference & analysis script).
+  - `data/processed/out_of_state_sanity_scores.parquet` (new scored parquet artifact).
+  - `docs/out_of_state_sanity_report.md` (new comprehensive report).
+  - `frontend/verify_disclosure_pass1.mjs` (executed SSR disclosure verification).
+  - `frontend/disclosure_pass1_dom.html` (rendered DOM artifact).
+- Verification & Invariants:
+  - Total out-of-training rows in live parquet: exactly 44 cell-days across 10 non-training states (Kerala N=5, Assam N=2, UP N=2, Arunachal N=12, Haryana N=7, Odisha N=6, West Bengal N=4, Chhattisgarh N=3, HP N=2, Manipur N=1).
+  - Leading honesty disclosure: sample is strictly anecdotal; serves for pipeline and calibration sanity.
+  - Geography attribution: 100% (44/44) `geography == 'india_outside_training'`.
+  - Mandatory review trigger: 100% (44/44) `needs_review == True`.
+  - Caveat flag: 100% (44/44) contain `'Outside validated training geography — analyst review required.'`.
+  - UI proof: `node frontend/verify_disclosure_pass1.mjs` passed; rendered HTML verified to contain the warning caveat chip and review badge.
+
+
+## 2026-09-12 — Correction: P1 status claims vs verified reality (code-review response)
+
+- The 2026-09-12 "Track B: OSM Feasibility Probe & Thermal Transition
+  Detection" entry overstated completion. Code review confirmed:
+  (1) the transition module's named states (`seasonal_to_persistent`,
+  `persistent_to_seasonal`, `thermal_regime_change`) were STRUCTURALLY
+  UNREACHABLE — the regime window grew unboundedly instead of trailing 12
+  months, and regime flips pass through None months the acceptance loop
+  treated as disqualifying; the passing tests only proved negative behavior;
+  (2) transitions were not wired into serving end-to-end with evidence fields
+  (`supporting_detection_count`, `supporting_active_days`,
+  `gap_before_transition_days`, `land_use_claim` missing from `_row_dict`);
+  (3) annotations were assigned positionally and could attach to the wrong
+  H3 cell with interleaved rows.
+- Fixed this session: module rewritten (calendar-month spine, trailing-12
+  windows, None-bridge crossing, within-persistent intensity axis for
+  `thermal_regime_change`, index-mapped annotation assignment). 14 tests in
+  `tests/test_transition_detection.py` now prove ALL named transitions
+  reachable plus noise/gap rejection, interleaved safety, and an end-to-end
+  monthly materialization test. `_row_dict` passes through the full evidence
+  payload; serving now reads the requested granularity's materialized layer
+  directly instead of re-aggregating daily rows per request.
+- Track A was NOT materialized at review time: `data/processed/timeline/`
+  was empty (run stalled after the confidence filter — memory pressure at
+  ~7M rows). Builder reworked for per-file processing with point-level
+  provenance sidecar and dedup accounting; validator reworked: seasonal
+  comparability is now a BLOCKING promotion gate (user decision) with
+  complete-window baseline and `TIMELINE_SEASONAL_GATE_OVERRIDE` escape
+  hatch, dedup integrity is proven by independent cross-checks
+  (sidecar points == daily detections == raw-minus-removed), and layer
+  schemas are checked against exact frozen column sets.
+- OSM probe verdict `not_available_in_environment` stands as honest (no
+  downloadable archive.org capture; criteria 1-2 measured pass).
+
+## 2026-09-12 — Nationwide serving restore + unclassified abstention enabled
+
+- Scope: backend serving data + abstention policy. No frontend changes were
+  needed (legend/filter/inspector already render `unclassified` empirically
+  per AGENTS.md).
+- Why inference was only in 10 states: the canonical serving parquets were
+  cut down to the 10 training states during the initial serving migration
+  (the original nationwide Sep-2 builds were preserved one-time in
+  `data/processed/backup_nationwide_pre_10state/`). Serving code was already
+  geography-open (`model_service` uses training states for provenance only),
+  so the limit was purely historical data, not code.
+- Files changed:
+  - `scripts/restore_nationwide_serving.py` (new): merges the backup
+    nationwide parquets back into the canonical serving parquets — daily
+    rows upsert on (h3_08, acq_date) with current winning on overlap;
+    per-cell static rows dedup with current winning; 1,684 non-"within"
+    state assignments re-validated through `assign_states` (mirrors
+    run_ingestion step 7b); 11 outside-India cells dropped by the land mask.
+    Current 10-state files backed up first in
+    `data/processed/backup_10state_pre_nationwide_restore/`.
+  - `data/processed/sih2026_h3_daily_features_firms.parquet` +
+    `sih2026_h3_daily_features_with_osm_wri.parquet` (regenerated): now
+    1,446,310 rows / 800,000 cells / 35 states+UTs (was ~810k rows / ~460k
+    cells / 10 states). Nationwide history runs 2024-08-01 → 2026-08-01 from
+    the backup; 2026-08-01 → 2026-09-10 NRT days cover the training states.
+  - `app/core/config.py`: added a minimal `.env` loader (no python-dotenv
+    dep; real environment variables always win over the file).
+  - `.env`: `UNCLASSIFIED_THRESHOLD=0.95` (repo-local, gitignored).
+  - `.env.example`: updated the abstention comment — the isotonic calibrator
+    outputs discrete steps (~0.91/0.93/0.94/1.0), so thresholds below ~0.9
+    never fire; 0.95 captures the calibrator's "did not reach the committed
+    band" island (~13% pooled across recent NRT days).
+  - `tests/test_backend.py`: `test_real_mining_explanation_includes_subtype`
+    now pins the committed path by monkeypatching abstention off (the fixed
+    mining cell's 0.925 confidence legitimately abstains at 0.95); added
+    `test_abstention_serves_unclassified_without_dropping` proving
+    unclassified cells keep full inference (probabilities, SHAP attributions,
+    needs_review, caveat) and are never dropped.
+- Interface impact: `/predictions*` can now return
+  `predicted_class="unclassified"` (policy fallback, NOT a trained class —
+  model contract unchanged at 4 classes). Unclassified cells are returned
+  with `needs_review=true`, the threshold caveat, and full
+  probabilities/explanations. Out-of-training states are served with
+  `geography="india_outside_training"` + the outside-geography caveat, as
+  before. `UNCLASSIFIED_THRESHOLD` can be removed from `.env` to restore the
+  old never-abstain behavior.
+- Verification:
+  - Viewport over Jharkhand/Odisha/WB on 2026-09-05: 54 cells served, 41
+    unclassified, state+geography attached, needs_review=true.
+  - Full day 2026-09-05: 226 cells served (none dropped), 45 unclassified
+    (19.9%); explain + detail endpoints return attributions and merged
+    caveats for unclassified cells.
+  - `pytest tests/` → 170 passed, 1 deselected.
+- Operational notes: restart the backend to pick up the new parquets (the
+  feature store seeds at boot). The 10-state pre-restore files remain in
+  `backup_10state_pre_nationwide_restore/`; nationwide out-of-training
+  history still ends 2026-08-01 (the stalled Track A backfill remains the
+  path to extend it).
+
+## 2026-09-12 — Stale-failure provenance fix, sanitization test repair, tree cleanup (integrator session)
+
+- Files touched: `app/services/archive_service.py`, `tests/test_archive.py`,
+  `tests/test_security_error_sanitization.py`, `.gitignore`.
+- Stale-failure provenance bug: `_decisive_run_for_date` walked the run
+  history from the end and returned the first `ok=false` run it hit —
+  forever. One failed run on 2026-09-10 therefore poisoned provenance for
+  EVERY older archive date even after the 2026-09-11 run succeeded, which is
+  what produced the false "The most recent ingestion run failed — this data
+  is last-known" banner on the Archive page. Fix: a failed run is now
+  decisive only while it is still the newest event in the history; once a
+  later run succeeds, older dates resolve to their own tagged runs. A failure
+  tagged for the requested date still keeps that date offline (intent
+  preserved: a current failure blocks live labeling; a stale one does not).
+- Tests: added `test_stale_failure_does_not_poison_recovered_dates` (history
+  OK→FAIL→OK: older date goes back to live/ok) and
+  `test_failure_between_date_run_and_recovery_keeps_date_offline` (date-tagged
+  failure still decides). All 8 pre-existing provenance tests pass unchanged.
+- Repaired stale mock in `test_cell_explanation_error_sanitization`: the
+  `/predictions/{cell_id}/explain` endpoint routes through `explain_single`
+  (single predict+SHAP pass) since the perf refactor; the test still patched
+  `get_cell_detail`, so the mock never fired and a real empty-store DuckDB
+  error surfaced instead. Now patches `explain_single`.
+- Verification:
+  - `pytest tests/` → 172 passed, 1 deselected (was 171 passed + 1 failed).
+  - Live API after fix: 2026-07-15 → `historical/no_run_record` (banner gone),
+    2026-09-10 → `live/ok`.
+  - Live inference re-verified nationwide on 2026-09-10: 69 cells, 13 states,
+    classes {industrial 65, unclassified 2, agricultural_burn 1, wildfire 1},
+    9 india_outside_training, ~200ms. State coverage is detection-driven (the
+    store only holds cells where FIRMS saw anomalies); 2026-09-09 shows 20
+    states and 18 mining cells, so all classes/states are reachable — no bug.
+  - `npm run lint` → 0 warnings/errors; `npm run build` → clean.
+- Cleanup: deleted one-off artifacts (root verification screenshots,
+  `.playwright-mcp/` dumps, `frontend/disclosure_pass1_dom.html`,
+  `frontend/live_out_of_training_cell.json`); `.playwright-mcp/` now
+  gitignored. Kept `frontend/test_timeline.mjs` +
+  `frontend/verify_disclosure_pass1.mjs` (reusable node verification
+  harnesses).

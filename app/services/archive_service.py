@@ -13,6 +13,10 @@ implausible runs — an older successful run says nothing about freshness):
 - latest run failed (ok=false)                            -> offline / failed (last-known data)
 - no run record for the date                              -> historical / no_run_record
 
+A failure is decisive only while it is still the newest event in the run
+history; once a later run succeeds, older dates resolve to their own tagged
+runs again instead of inheriting the stale failure.
+
 `demo` is never fabricated: nothing in this service generates synthetic data.
 """
 
@@ -64,14 +68,16 @@ class ArchiveService:
         self, acq_date: str, runs: list[dict[str, Any]] | None = None
     ) -> dict[str, Any] | None:
         """Newest decisive run for the date, walking the append-ordered history
-        from the end. A failed run decides even when it carries no target_date
-        (ingestion appends failures untagged): a newer failure must block live
-        labeling of older successful runs. Otherwise the newest run tagged with
-        this date decides."""
+        from the end. A failed run decides only while it is still the newest
+        event in the history (ingestion appends failures untagged, so a current
+        failure must block live labeling of everything): once a later run
+        succeeds, that failure is stale and must not poison older dates.
+        Otherwise the newest run tagged with this date decides — including a
+        failed run tagged for this date, which keeps the date offline."""
         history = runs if runs is not None else self._run_history()
+        if history and not history[-1].get("ok"):
+            return history[-1]
         for run in reversed(history):
-            if not run.get("ok"):
-                return run
             if str(run.get("target_date")) == acq_date:
                 return run
         return None

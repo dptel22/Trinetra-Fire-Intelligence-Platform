@@ -409,6 +409,81 @@ class TestProvenanceModes:
         assert archive_service.provenance_for_date(acq_date)["data_mode"] != "live"
         assert archive_service.get_archive_dates()["data_mode"] != "live"
 
+    def test_stale_failure_does_not_poison_recovered_dates(self, monkeypatch, tmp_path, available_dates):
+        """A failed run must only decide while it is the newest event: once a
+        later run succeeds, older dates resolve to their own tagged runs
+        (regression for the forever-'ingestion run failed' archive banner)."""
+        acq_date = available_dates[-1]
+        monkeypatch.setattr(
+            run_ingestion,
+            "RUN_HISTORY_PATH",
+            _write_history(
+                tmp_path,
+                [
+                    {
+                        "target_date": acq_date,
+                        "ok": True,
+                        "fetch": {"mode": "live_firms"},
+                        "plausibility_violations": [],
+                        "started_at": "2026-09-09T18:33:18.764263+00:00",
+                    },
+                    {
+                        "ok": False,
+                        "error": "FIRMS API unreachable",
+                        "at": "2026-09-10T19:00:00+00:00",
+                    },
+                    {
+                        "target_date": "2026-09-11",
+                        "ok": True,
+                        "fetch": {"mode": "live_firms"},
+                        "plausibility_violations": [],
+                        "started_at": "2026-09-11T18:33:18.764263+00:00",
+                    },
+                ],
+            ),
+        )
+        provenance = archive_service.provenance_for_date(acq_date)
+        assert provenance["data_mode"] == "live"
+        assert provenance["ingestion_status"] == "ok"
+
+    def test_failure_between_date_run_and_recovery_keeps_date_offline(
+        self, monkeypatch, tmp_path, available_dates
+    ):
+        """A failed run tagged for the date still decides after recovery."""
+        acq_date = available_dates[-1]
+        monkeypatch.setattr(
+            run_ingestion,
+            "RUN_HISTORY_PATH",
+            _write_history(
+                tmp_path,
+                [
+                    {
+                        "target_date": acq_date,
+                        "ok": True,
+                        "fetch": {"mode": "live_firms"},
+                        "plausibility_violations": [],
+                        "started_at": "2026-09-09T18:33:18.764263+00:00",
+                    },
+                    {
+                        "target_date": acq_date,
+                        "ok": False,
+                        "error": "FIRMS API unreachable",
+                        "at": "2026-09-10T19:00:00+00:00",
+                    },
+                    {
+                        "target_date": "2026-09-11",
+                        "ok": True,
+                        "fetch": {"mode": "live_firms"},
+                        "plausibility_violations": [],
+                        "started_at": "2026-09-11T18:33:18.764263+00:00",
+                    },
+                ],
+            ),
+        )
+        provenance = archive_service.provenance_for_date(acq_date)
+        assert provenance["data_mode"] == "offline"
+        assert provenance["ingestion_status"] == "failed"
+
     def test_missing_history_is_historical_not_live(self, client, monkeypatch, tmp_path, available_dates):
         monkeypatch.setattr(run_ingestion, "RUN_HISTORY_PATH", tmp_path / "does_not_exist.json")
         res = client.get("/api/v1/archive/predictions", params={"acq_date": available_dates[-1]})

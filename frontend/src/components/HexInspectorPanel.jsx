@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CLASS_COLORS,
   CLASS_LABELS,
   parseCaveatFlag,
   confidenceLabel,
   deriveClassificationAssessment,
-  humanizeAttribution
+  humanizeAttribution,
+  fetchCellTimeline
 } from '../services/api';
+import { StatusBadge } from './FireAlertsPage';
 
 /**
  * HexInspectorPanel component
@@ -25,6 +27,28 @@ export default function HexInspectorPanel({
   loadingExplanation = false
 }) {
   const [isExplainOpen, setIsExplainOpen] = useState(false);
+  const [timeline, setTimeline] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState(null);
+  const [timelineGranularity, setTimelineGranularity] = useState('month');
+
+  useEffect(() => {
+    const h3 = cell?.cell_id || cell?.h3_index;
+    if (!h3 || cell?.notFound) {
+      // eslint-disable-next-line react/set-state-in-effect
+      setTimeline(null);
+      return undefined;
+    }
+    let active = true;
+    setTimelineLoading(true);
+    setTimelineError(null);
+    const limits = { day: 60, month: 24, year: 10 };
+    fetchCellTimeline(h3, { granularity: timelineGranularity, limit: limits[timelineGranularity] })
+      .then((value) => { if (active) setTimeline(value); })
+      .catch((error) => { if (active) setTimelineError(error.message || 'Timeline unavailable'); })
+      .finally(() => { if (active) setTimelineLoading(false); });
+    return () => { active = false; };
+  }, [cell?.cell_id, cell?.h3_index, cell?.notFound, timelineGranularity]);
 
   if (!cell) {
     return (
@@ -239,6 +263,129 @@ export default function HexInspectorPanel({
           </div>
         </div>
       )}
+
+      <div style={{ borderTop: '1px solid var(--hairline-border, #2e3440)', paddingTop: '0.75rem' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #8b949e)', marginBottom: '6px' }}>
+          {timeline?.materialization_status === 'materialized' && timeline.materialized_start_date && timeline.materialized_end_date &&
+            (new Date(timeline.materialized_end_date) - new Date(timeline.materialized_start_date)) >= (5 * 365.25 * 24 * 60 * 60 * 1000)
+            ? 'Five-Year Thermal History'
+            : 'Recent Thermal History'}
+        </div>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }} aria-label="Timeline granularity">
+          {['day', 'month', 'year'].map((granularity) => (
+            <button
+              key={granularity}
+              type="button"
+              aria-pressed={timelineGranularity === granularity}
+              onClick={() => setTimelineGranularity(granularity)}
+              style={{
+                border: '1px solid var(--hairline-border, #2e3440)',
+                borderRadius: '4px',
+                padding: '3px 8px',
+                background: timelineGranularity === granularity ? 'rgba(61, 157, 232, 0.2)' : 'transparent',
+                color: timelineGranularity === granularity ? 'var(--text-primary)' : 'var(--text-muted, #8b949e)',
+                fontSize: '0.68rem',
+                textTransform: 'uppercase',
+                cursor: 'pointer'
+              }}
+            >
+              {granularity}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)', lineHeight: 1.4, marginBottom: '8px' }}>
+          Thermal evidence only. Current OSM/WRI context is not historical land-use evidence.
+        </div>
+        {!timelineLoading && !timelineError && timeline && (timeline.fallback_used || timeline.materialization_status !== 'materialized') && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'rgba(26, 18, 8, 0.96)',
+              color: '#F1C40F',
+              border: '1.5px solid #F1C40F',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              letterSpacing: '0.03em',
+              lineHeight: 1.35,
+              marginBottom: '8px'
+            }}
+          >
+            <span
+              style={{
+                width: '9px',
+                height: '9px',
+                borderRadius: '50%',
+                backgroundColor: '#F1C40F',
+                boxShadow: '0 0 8px #F1C40F',
+                display: 'inline-block',
+                flexShrink: 0,
+                animation: 'offlinePulse 1.6s ease-in-out infinite'
+              }}
+            />
+            <span>
+              DEGRADED — UNVALIDATED FALLBACK. This history is served from the raw h3_daily store
+              ({timeline.materialization_status}), not validated materialized layers. Do not read as confirmed history.
+            </span>
+          </div>
+        )}
+        {timelineLoading && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Loading history…</div>}
+        {!timelineLoading && timelineError && <div role="status" style={{ fontSize: '0.75rem', color: '#f1c40f' }}>{timelineError}</div>}
+        {!timelineLoading && !timelineError && timeline?.rows?.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {timeline.rows.slice().reverse().map((row) => (
+              <div key={`${row.period_type}-${row.period}`} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '0.72rem', fontFamily: 'monospace' }}>
+                  <span style={{ color: 'var(--text-primary)' }}>{row.period}{row.partial ? ' *' : ''}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    {row.observation_basis === 'detections' ? `${row.fire_days} active days · ${row.n_detections} detections` : 'No detections in ingested archive'}
+                  </span>
+                </div>
+                <div style={{ height: '5px', borderRadius: '3px', backgroundColor: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, Math.max(4, Number(row.n_detections || 0) * 4))}%`, height: '100%', backgroundColor: row.transition_type === 'seasonal_to_persistent' ? '#E67E22' : '#3d9de8', borderRadius: '3px' }} />
+                </div>
+                {row.transition_type && row.transition_type !== 'stable' && row.transition_type !== 'insufficient_history' && (
+                  <span style={{ alignSelf: 'flex-start', padding: '2px 6px', borderRadius: '10px', backgroundColor: 'rgba(230, 126, 34, 0.15)', color: '#E67E22', fontSize: '0.65rem' }}>
+                    {row.transition_type.replaceAll('_', ' ')} · {row.transition_confidence || 'low'}
+                  </span>
+                )}
+              </div>
+            ))}
+            {timeline.archive_range_limited && <div style={{ color: '#f1c40f', fontSize: '0.7rem' }}>Archive range is limited; this is not five-year coverage.</div>}
+          </div>
+        )}
+        {!timelineLoading && !timelineError && timeline && timeline.rows.length === 0 && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No FIRMS history is available for this cell.</div>
+        )}
+
+        <div style={{ borderTop: '1px solid var(--hairline-border, #2e3440)', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #8b949e)', marginBottom: '6px' }}>
+            Current OSM/WRI Context
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>present-day snapshot</span>
+            <StatusBadge status="LIVE" labelPrefix="Context vintage" />
+          </div>
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)', lineHeight: 1.4 }}>
+            Thermal evidence only. Current OSM/WRI context is not historical land-use evidence.
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--hairline-border, #2e3440)', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #8b949e)', marginBottom: '6px' }}>
+            Historical Land-Use Context
+          </div>
+          {timeline?.context?.historical_context_available === true ? (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Historical land-use evidence is available for this cell.</div>
+          ) : (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Cannot check historical land use in this environment</div>
+          )}
+        </div>
+      </div>
 
       {/* Probabilities Distribution Horizontal Bars */}
       {sortedProbabilities.length > 0 && (
