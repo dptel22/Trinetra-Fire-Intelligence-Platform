@@ -15,6 +15,10 @@ import {
   CLASS_COLORS,
   CLASS_LABELS,
   KNOWN_CAVEATS,
+  REGIME_LABELS,
+  REGIME_COLORS,
+  REGIME_ORDER,
+  REGIME_DESCRIPTIONS,
   parseCaveatFlag,
   confidenceLabel,
   getAvailableClasses,
@@ -415,6 +419,24 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
               >
                 {CLASS_LABELS[pClass] || pClass}
               </span>
+              {alert.thermal_regime && REGIME_LABELS[alert.thermal_regime] && (
+                <span
+                  title={alert.thermal_regime_basis || REGIME_DESCRIPTIONS[alert.thermal_regime] || ''}
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    backgroundColor: `${REGIME_COLORS[alert.thermal_regime] || '#787878'}22`,
+                    color: REGIME_COLORS[alert.thermal_regime] || '#787878',
+                    border: `1px solid ${REGIME_COLORS[alert.thermal_regime] || '#787878'}66`
+                  }}
+                >
+                  {REGIME_LABELS[alert.thermal_regime]}
+                </span>
+              )}
               {alert.is_synthetic && (
                 <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(241, 196, 15, 0.15)', color: '#a07d00', border: '1px solid rgba(241, 196, 15, 0.4)' }}>
                   SIMULATED
@@ -811,6 +833,7 @@ export default function FireAlertsPage() {
   const selectedClass = searchParams.get('class') || 'all';
 
   const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|acknowledged|confirmed|dismissed
+  const [regimeFilter, setRegimeFilter] = useState('all'); // all|persistent|new_anomaly|intermittent
   const [dateRunId, setDateRunId] = useState(null); // decisive ingestion run for the selected date
   const [truncatedTotal, setTruncatedTotal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1031,6 +1054,12 @@ export default function FireAlertsPage() {
       list = list.filter(a => lifecycleStateFor(a) === stateFilter);
     }
 
+    // Thermal-regime filter: cells whose activity features are missing have
+    // thermal_regime === null and only appear under "All".
+    if (regimeFilter !== 'all') {
+      list = list.filter(a => a.thermal_regime === regimeFilter);
+    }
+
     return list.slice().sort((a, b) => {
       if (sortBy === 'review') {
         const aRev = a.needs_review ? 1 : 0;
@@ -1046,7 +1075,7 @@ export default function FireAlertsPage() {
       }
       return 0;
     });
-  }, [alerts, effectiveSelectedClass, sortBy, stateFilter, lifecycleStateFor]);
+  }, [alerts, effectiveSelectedClass, sortBy, stateFilter, regimeFilter, lifecycleStateFor]);
 
   // Lifecycle counts over the full (class-filtered) day, not the pagination.
   const lifecycleCounts = useMemo(() => {
@@ -1488,10 +1517,48 @@ export default function FireAlertsPage() {
                 </span>
               )}
             </div>
+            {/* Thermal-Regime Filter Row: persistent (routine) vs new anomalies */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ width: '64px', fontSize: '0.66rem', color: 'var(--text-muted, #718096)', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>
+                REGIME
+              </span>
+              <button
+                type="button"
+                aria-pressed={regimeFilter === 'all'}
+                onClick={() => { setRegimeFilter('all'); setCurrentPage(1); }}
+                style={pillButtonStyle(regimeFilter === 'all')}
+              >
+                All ({alerts.length})
+              </button>
+              {REGIME_ORDER.map(regime => {
+                const count = alerts.filter(a => a.thermal_regime === regime).length;
+                const rColor = REGIME_COLORS[regime];
+                const isSelected = regimeFilter === regime;
+                return (
+                  <button
+                    key={regime} type="button"
+                    aria-pressed={isSelected}
+                    title={REGIME_DESCRIPTIONS[regime] || ''}
+                    onClick={() => { setRegimeFilter(isSelected ? 'all' : regime); setCurrentPage(1); }}
+                    style={{
+                      background: isSelected ? rColor : 'rgba(255, 255, 255, 0.03)',
+                      color: isSelected ? '#0A0E12' : 'var(--text-primary, #eceff4)',
+                      border: `1px solid ${isSelected ? rColor : 'rgba(255, 255, 255, 0.09)'}`,
+                      borderRadius: '20px', padding: '3px 11px',
+                      fontSize: '0.73rem', fontFamily: 'var(--font-heading)', fontWeight: isSelected ? 700 : 600,
+                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      boxShadow: isSelected ? `0 2px 8px ${rColor}55` : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isSelected ? '#0A0E12' : rColor }} />
+                    {REGIME_LABELS[regime]} ({count})
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {/* Loading State */}
         {loading && (
           <div style={{ padding: '5rem 2rem', textAlign: 'center', color: 'var(--text-muted, #55595E)' }} role="status">
             <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary, #eceff4)', marginBottom: '8px' }}>

@@ -42,6 +42,12 @@ class PredictionResponse(BaseModel):
     caveat_flag: str | None = None
     state: str | None = None
     geography: Geography | None = None
+    # Mechanical trailing-activity regime (NOT a model output):
+    # "persistent" | "new_anomaly" | "intermittent", or None when the
+    # activity features are missing. thermal_regime_basis states the actual
+    # feature numbers behind the label.
+    thermal_regime: str | None = None
+    thermal_regime_basis: str | None = None
     latency_ms: float
 
 

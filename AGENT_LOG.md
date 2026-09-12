@@ -1123,3 +1123,24 @@ pm run lint: 0 warnings, 0 errors.
   gitignored. Kept `frontend/test_timeline.mjs` +
   `frontend/verify_disclosure_pass1.mjs` (reusable node verification
   harnesses).
+
+## 2026-09-12 — CORS Dev Port Support, Thermal Regime Classification (Persistent vs New Anomaly), and UI Surfacing
+
+- Scope: Resolve landing page connection issues on alternate Vite dev ports and introduce systematic distinction between persistent (continuous/routine) heat sources vs acute anomalies (wildfires, disaster fires, sudden outbreaks).
+- Files touched:
+  - `app/core/config.py`: Expanded CORS origin parsing with regex support for arbitrary localhost/127.0.0.1 dev ports.
+  - `app/main.py`: Configured `allow_origin_regex` on CORSMiddleware.
+  - `app/services/thermal_regime.py` (new): Deterministic mechanical regime classification (`persistent`, `new_anomaly`, `intermittent`) using trailing activity windows (`active_days_7d`, `active_days_30d`, `active_days_90d`).
+  - `app/schemas/prediction.py`: Added `thermal_regime` and `thermal_regime_basis` fields to `PredictionResponse`.
+  - `app/services/model_service.py`: Integrated thermal regime derivation into both `predict()` and vectorized `predict_batch()`.
+  - `tests/test_thermal_regime.py` (new): 10 unit and API tests verifying regime derivations, fallback when history is missing, edge cases, and API endpoint integration.
+  - `frontend/src/services/api.js`: Exported `REGIME_LABELS`, `REGIME_COLORS`, `REGIME_DESCRIPTIONS`, and `REGIME_ORDER`.
+  - `frontend/src/components/FireAlertsPage.jsx`: Added regime status badges to hotspot cards and a dedicated multi-state REGIME filter bar with live counts.
+  - `frontend/src/components/HexInspectorPanel.jsx`: Added Thermal Regime section with qualitative badge and basis description.
+- Interface impact:
+  - `PredictionResponse` now includes optional `thermal_regime: str | null` ('persistent' | 'new_anomaly' | 'intermittent') and `thermal_regime_basis: str | null`.
+  - Frontend exports `REGIME_LABELS`, `REGIME_COLORS`, `REGIME_DESCRIPTIONS`, `REGIME_ORDER`.
+- Verification:
+  - Frontend: `oxlint` 0 warnings/0 errors; `vite build` 100% clean.
+  - Backend: Unit and endpoint tests for thermal regime passing. All CORS origins verified.
+

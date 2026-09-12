@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   CLASS_COLORS,
   CLASS_LABELS,
+  REGIME_LABELS,
+  REGIME_COLORS,
   parseCaveatFlag,
   confidenceLabel,
   deriveClassificationAssessment,
@@ -234,6 +236,37 @@ export default function HexInspectorPanel({
         >
           <span>⚠️</span>
           <span>SIMULATED DATA — Offline Demonstration Hotspot</span>
+        </div>
+      )}
+
+      {/* Thermal Regime (mechanical trailing-activity read, not a model output) */}
+      {cell.thermal_regime && REGIME_LABELS[cell.thermal_regime] && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #8b949e)' }}>
+            Thermal Regime
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                backgroundColor: `${REGIME_COLORS[cell.thermal_regime] || '#787878'}22`,
+                color: REGIME_COLORS[cell.thermal_regime] || '#787878',
+                border: `1px solid ${REGIME_COLORS[cell.thermal_regime] || '#787878'}66`
+              }}
+            >
+              {REGIME_LABELS[cell.thermal_regime]}
+            </span>
+            {cell.thermal_regime_basis && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted, #8b949e)' }}>
+                {cell.thermal_regime_basis}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

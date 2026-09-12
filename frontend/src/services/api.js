@@ -23,6 +23,30 @@ export const CLASS_LABELS = {
 export const FIRE_COLORS = CLASS_COLORS;
 export const FIRE_LABELS = CLASS_LABELS;
 
+// Thermal-regime contract (backend: app/services/thermal_regime.py).
+// Mechanical trailing-activity read, NOT a model output — `thermal_regime`
+// is null when the activity features are missing, and `thermal_regime_basis`
+// always carries the actual feature numbers behind the label.
+export const REGIME_LABELS = {
+  persistent: 'Persistent Source',
+  new_anomaly: 'New Anomaly',
+  intermittent: 'Intermittent'
+};
+
+export const REGIME_COLORS = {
+  persistent: '#3498DB',
+  new_anomaly: '#E74C3C',
+  intermittent: '#F1C40F'
+};
+
+export const REGIME_DESCRIPTIONS = {
+  persistent: 'Burning almost daily for the past month — routine/continuous heat (e.g. flares, smelters), not a new event.',
+  new_anomaly: 'Burst of activity this week after a mostly-quiet month — recent onset, potential incident.',
+  intermittent: 'Neither continuous nor a fresh burst — sporadic or seasonal activity.'
+};
+
+export const REGIME_ORDER = ['new_anomaly', 'persistent', 'intermittent'];
+
 // Default Geographic Viewport & Bounds for India.
 // Single shared geography contract (matches the ingestion INDIA_BBOX and the
 // backend fetch area exactly): west 68.03, south 6.75, east 97.42, north 37.10.

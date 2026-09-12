@@ -30,6 +30,7 @@ from app.services.explanation import (
     top_human_features,
 )
 from app.services.feature_store import feature_store
+from app.services.thermal_regime import classify_regime
 from pipeline.feature_engineering import latlng_to_h3
 
 logger = logging.getLogger(__name__)
@@ -373,6 +374,7 @@ class CatBoostModelService:
         needs_review = self._needs_review(raw_class, confidence, predicted_class) or outside_training
         caveat = self._compose_caveats(policy_caveat, needs_review, outside_training)
         lat, lon = self._coordinates(cell_features)
+        regime, regime_basis = classify_regime(cell_features)
 
         return PredictionResponse(
             cell_id=str(cell_features["h3_08"]),
@@ -387,6 +389,8 @@ class CatBoostModelService:
             caveat_flag=caveat,
             state=cell_features.get("state") if isinstance(cell_features.get("state"), str) else None,
             geography=geography,
+            thermal_regime=regime,
+            thermal_regime_basis=regime_basis,
             latency_ms=round((time.time() - started) * 1000, 2),
         )
 
@@ -634,6 +638,7 @@ class CatBoostModelService:
             needs_review = self._needs_review(raw_class, confidence, predicted_class) or outside_training
             caveat = self._compose_caveats(policy_caveat, needs_review, outside_training)
             lat, lon = self._coordinates(cell_features)
+            regime, regime_basis = classify_regime(cell_features)
 
             predictions.append(
                 PredictionResponse(
@@ -649,6 +654,8 @@ class CatBoostModelService:
                     caveat_flag=caveat,
                     state=cell_features.get("state") if isinstance(cell_features.get("state"), str) else None,
                     geography=geography,
+                    thermal_regime=regime,
+                    thermal_regime_basis=regime_basis,
                     latency_ms=row_latency,
                 )
             )

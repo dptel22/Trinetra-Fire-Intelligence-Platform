@@ -257,6 +257,10 @@ class Settings:
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
+    # Vite falls back to 5174, 5175, ... whenever 5173 is already taken, so a
+    # port-pinned allowlist silently breaks the dev origin. Any localhost dev
+    # port is allowed; production must override via CORS_ALLOW_ORIGINS.
+    _DEFAULT_CORS_ORIGIN_REGEX: ClassVar[str] = r"^http://(localhost|127\.0\.0\.1):\d+$"
 
     @property
     def CORS_ALLOW_ORIGINS(self) -> list[str]:
@@ -266,6 +270,17 @@ class Settings:
             if parsed:
                 return parsed
         return list(self._DEFAULT_CORS_ORIGINS)
+
+    @property
+    def CORS_ALLOW_ORIGIN_REGEX(self) -> str | None:
+        raw = os.environ.get("CORS_ALLOW_ORIGIN_REGEX")
+        if raw is not None:
+            return raw or None
+        if os.environ.get("CORS_ALLOW_ORIGINS"):
+            # Explicit production origins were provided: no dev-port wildcard.
+            return None
+        return self._DEFAULT_CORS_ORIGIN_REGEX
+
     TARGET_CLASSES: ClassVar[list[str]] = TARGET_CLASSES
     CAT_FEATURES: ClassVar[list[str]] = CAT_FEATURES
     MODEL_FEATURES: ClassVar[list[str]] = MODEL_FEATURES
