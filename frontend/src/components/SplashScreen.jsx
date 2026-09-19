@@ -455,16 +455,25 @@ export default function SplashScreen({ onStart }) {
     let cancelled = false;
     async function loadLiveCount() {
       try {
-        const health = await fetchHealth();
-        const date = health?.latest_acq_date;
-        if (!date) return;
+        // Get a date: prefer backend latest_acq_date, fall back to today in
+        // YYYY-MM-DD. fetchPredictionsStrict already handles mock mode internally.
+        let date = null;
+        try {
+          const health = await fetchHealth();
+          date = health?.latest_acq_date ?? null;
+        } catch { /* ignore — will use today */ }
+        if (!date) {
+          // Fall back to today's date (or yesterday if near midnight).
+          date = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+        }
         const res = await fetchPredictionsStrict(INDIA_BOUNDS, date, 5);
         const total = typeof res?.total_predictions === "number"
           ? res.total_predictions
-          : (Array.isArray(res) ? res.length : (res?.predictions?.length ?? null));
+          : (Array.isArray(res?.predictions) ? res.predictions.length
+          : (Array.isArray(res) ? res.length : null));
         if (total != null && !cancelled && countEl) {
-          const startVal = parseInt(countEl.textContent, 10) || detectionCount;
-          const duration = 900;
+          const startVal = parseInt(countEl.textContent.replace(/[^\d]/g, ""), 10) || detectionCount;
+          const duration = 1100;
           const startTime = performance.now();
           function step(now) {
             if (cancelled || !countEl) return;
@@ -476,7 +485,7 @@ export default function SplashScreen({ onStart }) {
           requestAnimationFrame(step);
         }
       } catch (err) {
-        console.warn("[SplashScreen] Live count connection failed, using local detection count:", err);
+        console.warn("[SplashScreen] Live count fetch failed, showing placement count:", err);
       }
     }
     loadLiveCount();
