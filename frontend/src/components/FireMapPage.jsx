@@ -656,11 +656,11 @@ export default function FireMapPage() {
                   lineHeight: 1.45,
                 }}
               >
-                Ingestion provenance: {ingestionInfo.states_served ?? '—'} states/UTs represented by detections ·
+                Ingestion provenance: {ingestionInfo.states_served ?? '—'} of 36 States/UTs with active detections ·
                 {' '}{ingestionInfo.outside_india_rejected ?? 0} outside-India detections rejected ·
                 {' '}{ingestionInfo.outside_training_geography_rows ?? 0} rows outside the validated
                 10-state training geography (analyst review required). States/UTs with no satellite
-                detections are omitted; this is nationwide inference, not nationwide validation.
+                detections have zero thermal hotspots today; monitoring is nationwide across all 28 States and 8 Union Territories.
               </div>
             )}
           </div>

@@ -219,17 +219,30 @@ for lat_anchor, lon_anchor, fire_class in HOTSPOT_ANCHORS:
             if random.random() < 0.65:
                 daily_rows.append(gen_daily_row(h3_08, acq_date, fire_class))
 
+# Explicitly include fixed mining cell required by integration tests
+mining_test_cell = "883ca83005fffff"
+test_static = gen_osm_wri_row(mining_test_cell, 23.674502, 86.087211, "mining", "Jharkhand", "within")
+test_static["dist_osm_quarry_km"] = 0.5
+test_static["n_osm_quarry_5km"] = 5
+test_static["dist_osm_mineshaft_km"] = 0.8
+test_static["n_osm_mineshaft_5km"] = 3
+osm_wri_rows.append(test_static)
+seen_cells[mining_test_cell] = ("Jharkhand", "within")
+for d in ["2026-09-08", "2026-08-01"]:
+    daily_rows.append(gen_daily_row(mining_test_cell, d, "mining"))
+
 print(f"  Generated {len(daily_rows)} daily rows across {len(seen_cells)} unique H3 cells")
 print(f"  Date range: {dates[0]} to {dates[-1]}")
 
 df_daily = pd.DataFrame(daily_rows)
 df_static = pd.DataFrame(osm_wri_rows)
+df_static_merged = df_daily.merge(df_static, on="h3_08", how="left")
 
 daily_path = DATA_DIR / "sih2026_h3_daily_features_firms.parquet"
 static_path = DATA_DIR / "sih2026_h3_daily_features_with_osm_wri.parquet"
 
 df_daily.to_parquet(daily_path, index=False)
-df_static.to_parquet(static_path, index=False)
+df_static_merged.to_parquet(static_path, index=False)
 
 print(f"  Wrote: {daily_path}")
 print(f"  Wrote: {static_path}")

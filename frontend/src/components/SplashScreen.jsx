@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { fetchHealth, fetchPredictionsStrict, INDIA_BOUNDS } from "../services/api";
 
 const SPLASH_CSS = `
 
@@ -56,10 +57,15 @@ const SPLASH_CSS = `
   }
   .sweep{
     position:absolute; inset:0;
-    background: conic-gradient(from 0deg, rgba(230,126,34,0.16), transparent 10%, transparent 100%);
+    background: conic-gradient(from 0deg, rgba(230,126,34,0.18), transparent 12%, transparent 100%);
     animation: rotate 6s linear infinite;
+    transform-origin: 50% 50%;
+    will-change: transform;
   }
-  @keyframes rotate{ to{ transform: rotate(360deg); } }
+  @keyframes rotate{ 
+    from{ transform: rotate(0deg); }
+    to{ transform: rotate(360deg); } 
+  }
 
   .india-wrap{
     position:absolute;
@@ -117,19 +123,24 @@ const SPLASH_CSS = `
   /* location tags: pinned to the india-wrap footprint, color-coded to match
      the app-wide classification legend (Industrial / Mining / Agricultural / Wildfire) */
   .class-orbit{position:absolute;top:50%;left:50%;width:46%;height:52.3%;transform:translate(-50%,-50%);z-index:2;pointer-events:none}
-  .class-tag{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:1.5px solid #0A0E12;transform-origin:center}
-  .class-tag.industrial{background:#E67E22;box-shadow:0 0 8px rgba(230,126,34,.65)}
-  .class-tag.mining{background:#95A5A6;box-shadow:0 0 8px rgba(149,164,166,.65)}
-  .class-tag.agricultural{background:#F1C40F;box-shadow:0 0 8px rgba(241,196,15,.65)}
-  .class-tag.wildfire{background:#E74C3C;box-shadow:0 0 8px rgba(231,76,60,.65)}
-  .class-tag.ringed::before{content:'';position:absolute;inset:-7px;border-radius:50%;border:1.5px dashed currentColor;opacity:.55}
+  .class-tag{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:1.5px solid #0A0E12;transform-origin:center;animation:pulseTag 2.6s ease-in-out infinite}
+  .class-tag.industrial{background:#E67E22;box-shadow:0 0 10px rgba(230,126,34,.75)}
+  .class-tag.mining{background:#95A5A6;box-shadow:0 0 10px rgba(149,164,166,.75)}
+  .class-tag.agricultural{background:#F1C40F;box-shadow:0 0 10px rgba(241,196,15,.75)}
+  .class-tag.wildfire{background:#E74C3C;box-shadow:0 0 10px rgba(231,76,60,.75)}
+  .class-tag.ringed::before{content:'';position:absolute;inset:-7px;border-radius:50%;border:1.5px dashed currentColor;opacity:.65;animation:spinDashed 12s linear infinite}
   .class-tag.industrial.ringed{color:#E67E22}
   .class-tag.mining.ringed{color:#95A5A6}
   .class-tag.agricultural.ringed{color:#F1C40F}
   .class-tag.wildfire.ringed{color:#E74C3C}
 
-  /* glyphs are pinned to the india-wrap footprint, not the full radar, so they sit on the landmass */
-  @keyframes float{50%{transform:translateY(-5px)}}
+  @keyframes pulseTag{
+    0%,100%{transform:scale(1);opacity:0.85}
+    50%{transform:scale(1.28);opacity:1}
+  }
+  @keyframes spinDashed{
+    to{transform:rotate(360deg)}
+  }
 
   /* staggered entrance: background pieces settle first, map next, dots and
      button/legend last, so the splash reads as one deliberate reveal */
@@ -143,8 +154,6 @@ const SPLASH_CSS = `
   @keyframes fadeIn{to{opacity:1}}
 
   @media (prefers-reduced-motion: reduce){
-    .sweep{animation:none}
-    .status-dot{animation:none}
     .brand-title,.eyebrow,.india-wrap,.class-orbit,.legend,.bottom-lockup{animation:none;opacity:1}
   }
 
@@ -445,6 +454,35 @@ export default function SplashScreen({ onStart }) {
     const countEl = root.querySelector(".status-count");
     if (countEl) countEl.textContent = String(detectionCount);
 
+    let cancelled = false;
+    async function loadLiveCount() {
+      try {
+        const health = await fetchHealth();
+        const date = health?.latest_acq_date;
+        if (!date) return;
+        const res = await fetchPredictionsStrict(INDIA_BOUNDS, date, 5);
+        const total = typeof res?.total_predictions === "number"
+          ? res.total_predictions
+          : (Array.isArray(res) ? res.length : (res?.predictions?.length ?? null));
+        if (total != null && !cancelled && countEl) {
+          const startVal = parseInt(countEl.textContent, 10) || detectionCount;
+          const duration = 900;
+          const startTime = performance.now();
+          function step(now) {
+            if (cancelled || !countEl) return;
+            const progress = Math.min(1, (now - startTime) / duration);
+            const current = Math.round(startVal + (total - startVal) * (1 - Math.pow(1 - progress, 3)));
+            countEl.textContent = current.toLocaleString();
+            if (progress < 1) requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+        }
+      } catch (err) {
+        console.warn("[SplashScreen] Live count connection failed, using local detection count:", err);
+      }
+    }
+    loadLiveCount();
+
     const btn = root.querySelector(".start-btn");
     const handleStart = () => {
       if (typeof onStart === "function") {
@@ -456,6 +494,7 @@ export default function SplashScreen({ onStart }) {
     btn?.addEventListener("click", handleStart);
 
     return () => {
+      cancelled = true;
       btn?.removeEventListener("click", handleStart);
     };
   }, [onStart, navigate]);

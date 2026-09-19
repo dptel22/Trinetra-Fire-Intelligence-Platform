@@ -228,8 +228,8 @@ function AlertActionBar({ hotspotId, onActionCompleted, disabled, disabledReason
   };
 
   const inputStyle = {
-    backgroundColor: 'var(--bg-dark, #0a0e12)',
-    color: 'var(--text-primary, #eceff4)',
+    backgroundColor: 'var(--panel-surface, #ffffff)',
+    color: 'var(--text-primary, #1B1E21)',
     border: '1px solid var(--hairline-border, #2e3440)',
     borderRadius: '4px',
     padding: '4px 8px',
@@ -349,8 +349,11 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
   const latencyMs = alert.latency_ms ?? null;
   const hasContextData = frpMax != null || frpMean != null || nDetections != null;
 
-  // Confidence gradient color
-  const confColor = confPct == null
+  // Confidence gradient color — review-flagged predictions must never display uncritical green
+  const isReviewRequired = alert.needs_review || labelQuality === 'Needs review';
+  const confColor = isReviewRequired
+    ? '#E67E22'
+    : confPct == null
     ? '#787878'
     : confPct >= 80 ? '#2ecc71'
     : confPct >= 60 ? '#F1C40F'
@@ -510,7 +513,8 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
               gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
               gap: '8px 20px',
               padding: '10px 12px',
-              backgroundColor: 'rgba(0,0,0,0.2)',
+              backgroundColor: 'var(--control-subtle, rgba(0,0,0,0.04))',
+              border: '1px solid var(--hairline-border, rgba(0,0,0,0.06))',
               borderRadius: '6px',
               fontSize: '0.78rem'
             }}
@@ -752,7 +756,7 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
               </div>
 
               {historyExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px 12px', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '8px 12px', backgroundColor: 'var(--control-subtle, rgba(0,0,0,0.04))', border: '1px solid var(--hairline-border)', borderRadius: '6px' }}>
                   {history === null && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Loading history…</div>}
                   {Array.isArray(history) && history.length === 0 && (
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>
@@ -791,26 +795,27 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
 }
 
 const pillButtonStyle = (selected) => ({
-  background: selected ? 'rgba(61, 157, 232, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-  color: selected ? '#ffffff' : 'var(--text-muted, #94a3b8)',
-  border: selected ? '1px solid rgba(61, 157, 232, 0.6)' : '1px solid rgba(255, 255, 255, 0.08)',
+  background: selected ? 'var(--accent-blue, #3d9de8)' : 'var(--control-subtle, rgba(0, 0, 0, 0.04))',
+  color: selected ? '#ffffff' : 'var(--text-primary, #1B1E21)',
+  border: selected ? '1px solid var(--accent-blue, #3d9de8)' : '1px solid var(--hairline-border, rgba(0, 0, 0, 0.08))',
   borderRadius: '20px',
   padding: '3px 11px',
   fontSize: '0.73rem',
   fontFamily: 'var(--font-heading)',
-  fontWeight: selected ? 700 : 500,
+  fontWeight: selected ? 700 : 600,
   cursor: 'pointer',
   transition: 'all 0.15s ease',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: '5px'
+  gap: '5px',
+  boxShadow: selected ? '0 2px 6px rgba(61, 157, 232, 0.35)' : 'none'
 });
 
 const smallButtonStyle = {
   padding: '5px 12px',
-  backgroundColor: 'var(--control-subtle)',
-  color: 'var(--text-primary, #ffffff)',
-  border: '1px solid var(--hairline-border, #2e3440)',
+  backgroundColor: 'var(--control-subtle, rgba(0, 0, 0, 0.04))',
+  color: 'var(--text-primary, #1B1E21)',
+  border: '1px solid var(--hairline-border, rgba(0, 0, 0, 0.1))',
   borderRadius: '4px',
   fontSize: '0.8rem',
   fontWeight: 600,
@@ -832,7 +837,8 @@ export default function FireAlertsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedClass = searchParams.get('class') || 'all';
 
-  const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|acknowledged|confirmed|dismissed
+  const [stateFilter, setStateFilter] = useState('all'); // all|new|needs_review|verified|acknowledged|confirmed|dismissed
+  const [indianStateFilter, setIndianStateFilter] = useState('all');
   const [regimeFilter, setRegimeFilter] = useState('all'); // all|persistent|new_anomaly|intermittent
   const [dateRunId, setDateRunId] = useState(null); // decisive ingestion run for the selected date
   const [truncatedTotal, setTruncatedTotal] = useState(null);
@@ -973,6 +979,7 @@ export default function FireAlertsPage() {
   const handleDateChange = (nextDate) => {
     if (!nextDate || nextDate === acqDate || !availableDates.includes(nextDate)) return;
     setAcqDate(nextDate);
+    setIndianStateFilter('all');
     setCurrentPage(1);
     loadAlertsRef.current(nextDate);
   };
@@ -1005,6 +1012,14 @@ export default function FireAlertsPage() {
 
   // ── Dynamic available classes (empirical presence in batch + active query) ─
   const availableClasses = useMemo(() => getAvailableClasses(alerts), [alerts]);
+
+  const availableIndianStates = useMemo(() => {
+    const s = new Set();
+    alerts.forEach((a) => {
+      if (a.state) s.add(a.state);
+    });
+    return Array.from(s).sort();
+  }, [alerts]);
 
   const displayedClasses = useMemo(() => {
     const order = ['industrial', 'mining', 'agricultural_burn', 'wildfire', 'unclassified'];
@@ -1048,8 +1063,14 @@ export default function FireAlertsPage() {
       ? alerts
       : alerts.filter(a => a.predicted_class === effectiveSelectedClass);
 
+    if (indianStateFilter !== 'all') {
+      list = list.filter(a => a.state === indianStateFilter);
+    }
+
     if (stateFilter === 'needs_review') {
       list = list.filter(a => a.needs_review);
+    } else if (stateFilter === 'verified') {
+      list = list.filter(a => !a.needs_review);
     } else if (stateFilter !== 'all') {
       list = list.filter(a => lifecycleStateFor(a) === stateFilter);
     }
@@ -1075,7 +1096,7 @@ export default function FireAlertsPage() {
       }
       return 0;
     });
-  }, [alerts, effectiveSelectedClass, sortBy, stateFilter, regimeFilter, lifecycleStateFor]);
+  }, [alerts, effectiveSelectedClass, sortBy, stateFilter, indianStateFilter, regimeFilter, lifecycleStateFor]);
 
   // Lifecycle counts over the full (class-filtered) day, not the pagination.
   const lifecycleCounts = useMemo(() => {
@@ -1289,20 +1310,19 @@ export default function FireAlertsPage() {
                 key={label}
                 style={{
                   padding: '12px 14px',
-                  backgroundColor: 'rgba(26, 32, 44, 0.75)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255, 255, 255, 0.07)',
-                  borderTop: `2px solid ${c}`,
+                  backgroundColor: 'var(--panel-surface, #ffffff)',
+                  border: '1px solid var(--hairline-border, rgba(0, 0, 0, 0.08))',
+                  borderTop: `3px solid ${c}`,
                   borderRadius: '8px',
-                  display: 'flex', flexDirection: 'column', gap: '3px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.64rem', color: 'var(--text-muted, #8b949e)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>{label}</span>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{icon}</span>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--text-muted, #718096)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>{label}</span>
+                  <span style={{ fontSize: '0.85rem' }}>{icon}</span>
                 </div>
-                <span style={{ fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 800, color: c, lineHeight: 1.1 }}>{value}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '1.55rem', fontWeight: 800, color: c, lineHeight: 1.1 }}>{value}</span>
               </div>
             ))}
           </div>
@@ -1314,9 +1334,9 @@ export default function FireAlertsPage() {
             marginBottom: '1.25rem',
             borderRadius: '10px',
             overflow: 'hidden',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            backgroundColor: 'rgba(20, 24, 32, 0.85)',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)'
+            border: '1px solid var(--hairline-border, rgba(0, 0, 0, 0.08))',
+            backgroundColor: 'var(--panel-surface, #ffffff)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'
           }}
         >
           {/* ── Date Navigation & Sort Header ── */}
@@ -1325,8 +1345,8 @@ export default function FireAlertsPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: '12px', flexWrap: 'wrap',
               padding: '10px 16px',
-              backgroundColor: 'rgba(255, 255, 255, 0.02)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.07)'
+              backgroundColor: 'var(--control-subtle, rgba(0, 0, 0, 0.02))',
+              borderBottom: '1px solid var(--hairline-border, rgba(0, 0, 0, 0.07))'
             }}
           >
             {/* Left: Date Stepper with aligned 64px label */}
@@ -1334,7 +1354,7 @@ export default function FireAlertsPage() {
               <span style={{ width: '64px', fontSize: '0.66rem', color: 'var(--text-muted, #718096)', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>
                 DATE
               </span>
-              <div style={{ display: 'inline-flex', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.3)', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.09)', padding: '2px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', backgroundColor: 'var(--panel-surface, #ffffff)', borderRadius: '6px', border: '1px solid var(--hairline-border)', padding: '2px' }}>
                 <button
                   type="button" onClick={handlePrevDate}
                   disabled={loading || dateIndex <= 0}
@@ -1342,7 +1362,7 @@ export default function FireAlertsPage() {
                   title="Previous observation date"
                   style={{
                     backgroundColor: 'transparent',
-                    color: 'var(--text-primary, #eceff4)',
+                    color: 'var(--text-primary)',
                     border: 'none',
                     borderRadius: '4px',
                     padding: '4px 8px',
@@ -1363,9 +1383,9 @@ export default function FireAlertsPage() {
                   onChange={(e) => handleDateChange(e.target.value)}
                   disabled={datesDesc.length === 0 || loading}
                   style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                    color: '#3d9de8',
-                    border: '1px solid rgba(61, 157, 232, 0.25)',
+                    backgroundColor: 'var(--control-subtle, rgba(0,0,0,0.04))',
+                    color: 'var(--accent-blue, #3d9de8)',
+                    border: '1px solid var(--hairline-border)',
                     borderRadius: '4px',
                     padding: '3px 8px',
                     fontSize: '0.76rem',
@@ -1377,7 +1397,7 @@ export default function FireAlertsPage() {
                 >
                   {datesDesc.length === 0 && <option value="">no dates available</option>}
                   {datesDesc.map((d) => (
-                    <option key={d} value={d} style={{ backgroundColor: '#141820', color: '#eceff4' }}>
+                    <option key={d} value={d}>
                       {d}{d === newestDate ? ' (latest)' : ''}
                     </option>
                   ))}
@@ -1389,7 +1409,7 @@ export default function FireAlertsPage() {
                   title="Next observation date"
                   style={{
                     backgroundColor: 'transparent',
-                    color: 'var(--text-primary, #eceff4)',
+                    color: 'var(--text-primary)',
                     border: 'none',
                     borderRadius: '4px',
                     padding: '4px 8px',
@@ -1407,8 +1427,36 @@ export default function FireAlertsPage() {
               )}
             </div>
 
-            {/* Right: Sort Dropdown & Reviewed Status Summary */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Right: State selector, Sort Dropdown & Reviewed Status Summary */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {availableIndianStates.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label htmlFor="alert-state-select" style={{ fontSize: '0.66rem', color: 'var(--text-muted, #718096)', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    STATE
+                  </label>
+                  <select
+                    id="alert-state-select"
+                    value={indianStateFilter}
+                    onChange={(e) => { setIndianStateFilter(e.target.value); setCurrentPage(1); }}
+                    style={{
+                      backgroundColor: 'var(--panel-surface, #ffffff)',
+                      color: 'var(--text-primary)',
+                      border: '1px solid var(--hairline-border)',
+                      borderRadius: '5px',
+                      padding: '4px 8px', fontSize: '0.74rem',
+                      fontFamily: 'var(--font-heading)', fontWeight: 600, cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="all">All States & UTs ({availableIndianStates.length} active · {alerts.length} alerts)</option>
+                    {availableIndianStates.map((st) => {
+                      const count = alerts.filter(a => a.state === st).length;
+                      return <option key={st} value={st}>{st} ({count})</option>;
+                    })}
+                  </select>
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <label htmlFor="alert-sort" style={{ fontSize: '0.66rem', color: 'var(--text-muted, #718096)', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   SORT
@@ -1418,26 +1466,26 @@ export default function FireAlertsPage() {
                   value={sortBy}
                   onChange={(e) => handleSortChange(e.target.value)}
                   style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-                    color: 'var(--text-primary, #eceff4)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--panel-surface, #ffffff)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--hairline-border)',
                     borderRadius: '5px',
-                    padding: '4px 10px', fontSize: '0.74rem',
+                    padding: '4px 8px', fontSize: '0.74rem',
                     fontFamily: 'var(--font-heading)', fontWeight: 600, cursor: 'pointer',
                     outline: 'none'
                   }}
                 >
-                  <option value="review" style={{ backgroundColor: '#141820' }}>⚠️ Unidentified First</option>
-                  <option value="conf_desc" style={{ backgroundColor: '#141820' }}>Highest Confidence</option>
-                  <option value="conf_asc" style={{ backgroundColor: '#141820' }}>Lowest Confidence</option>
+                  <option value="review">⚠️ Needs Review First</option>
+                  <option value="conf_desc">Highest Confidence</option>
+                  <option value="conf_asc">Lowest Confidence</option>
                 </select>
               </div>
 
               <div style={{
                 fontSize: '0.7rem',
-                color: 'var(--text-muted, #8b949e)',
-                backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'var(--text-muted, #718096)',
+                backgroundColor: 'var(--panel-surface, #ffffff)',
+                border: '1px solid var(--hairline-border)',
                 padding: '3px 8px',
                 borderRadius: '5px',
                 display: 'inline-flex',
@@ -1476,9 +1524,9 @@ export default function FireAlertsPage() {
                     onClick={() => handleSelectClass(cls)}
                     aria-pressed={isSelected}
                     style={{
-                      background: isSelected ? clsColor : 'rgba(255, 255, 255, 0.03)',
-                      color: isSelected ? '#0A0E12' : 'var(--text-primary, #eceff4)',
-                      border: `1px solid ${isSelected ? clsColor : 'rgba(255, 255, 255, 0.09)'}`,
+                      background: isSelected ? clsColor : 'var(--control-subtle, rgba(0, 0, 0, 0.04))',
+                      color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                      border: `1px solid ${isSelected ? clsColor : 'var(--hairline-border)'}`,
                       borderRadius: '20px', padding: '3px 11px',
                       fontSize: '0.73rem', fontFamily: 'var(--font-heading)', fontWeight: isSelected ? 700 : 600,
                       cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1486,21 +1534,22 @@ export default function FireAlertsPage() {
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isSelected ? '#0A0E12' : clsColor }} />
+                    <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isSelected ? '#ffffff' : clsColor }} />
                     {label} ({count})
                   </button>
                 );
               })}
             </div>
 
-            {/* State Filter Row */}
+            {/* Review Status Filter Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ width: '64px', fontSize: '0.66rem', color: 'var(--text-muted, #718096)', fontFamily: 'var(--font-heading)', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0 }}>
-                STATE
+                REVIEW
               </span>
               {[
                 ['all', `All (${alerts.length})`],
-                ['needs_review', `⚠️ Unidentified (${alerts.filter(a => a.needs_review).length})`]
+                ['needs_review', `⚠️ Needs Review (${alerts.filter(a => a.needs_review).length})`],
+                ['verified', `✓ Verified (${alerts.filter(a => !a.needs_review).length})`]
               ].map(([value, label]) => (
                 <button
                   key={value} type="button"
@@ -1541,9 +1590,9 @@ export default function FireAlertsPage() {
                     title={REGIME_DESCRIPTIONS[regime] || ''}
                     onClick={() => { setRegimeFilter(isSelected ? 'all' : regime); setCurrentPage(1); }}
                     style={{
-                      background: isSelected ? rColor : 'rgba(255, 255, 255, 0.03)',
-                      color: isSelected ? '#0A0E12' : 'var(--text-primary, #eceff4)',
-                      border: `1px solid ${isSelected ? rColor : 'rgba(255, 255, 255, 0.09)'}`,
+                      background: isSelected ? rColor : 'var(--control-subtle, rgba(0, 0, 0, 0.04))',
+                      color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                      border: `1px solid ${isSelected ? rColor : 'var(--hairline-border)'}`,
                       borderRadius: '20px', padding: '3px 11px',
                       fontSize: '0.73rem', fontFamily: 'var(--font-heading)', fontWeight: isSelected ? 700 : 600,
                       cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1551,7 +1600,7 @@ export default function FireAlertsPage() {
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isSelected ? '#0A0E12' : rColor }} />
+                    <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: isSelected ? '#ffffff' : rColor }} />
                     {REGIME_LABELS[regime]} ({count})
                   </button>
                 );

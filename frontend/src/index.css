@@ -1,5 +1,3 @@
-@import 'leaflet/dist/leaflet.css';
-
 /* Self-hosted fonts (Agent A): replaces the Google Fonts CDN @import so the demo
    makes zero non-localhost requests. Latin subsets in frontend/public/fonts/.
    Note: Space Grotesk 800 was dropped — Google Fonts has no such weight; the old
@@ -934,13 +932,6 @@ a:focus,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 1ms !important;
-  }
-
   .eyebrow-tag,
   .hero-main-title,
   .hero-main-subtext,
@@ -949,6 +940,23 @@ a:focus,
     opacity: 1 !important;
     transform: none !important;
   }
+}
+
+.hero-alert-ticker {
+  overflow: hidden;
+  user-select: none;
+}
+
+.marquee-track {
+  display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
+  animation: marqueeScroll 28s linear infinite;
+  will-change: transform;
+}
+
+.hero-alert-ticker:hover .marquee-track {
+  animation-play-state: paused;
 }
 
 @keyframes marqueeScroll {

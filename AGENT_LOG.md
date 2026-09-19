@@ -5,7 +5,7 @@
 
 **Files changed (Agent B scope):**
 - `frontend/src/components/HexInspectorPanel.jsx`
-  - **B4 fix:** `attr.contribution?.startsWith('+')` was a brittle string-based SHAP sign check. If the backend returns a float `shap_value` without an explicit `+` prefix, positive contributions were colored red. Replaced with `parseFloat(attr.shap_value ?? attr.contribution) > 0` — works for both string (`"+1.84"`) and numeric (`1.84`) payloads.
+  - **B4 fix:** `attr.contribution?.startsWith('+')` was a brittle string-based SHAP sign check. If the backend returns a float `shap_value` without an explicit `+` prefix, positive contributions were colored red. Replaced with `parseFloat(attr.shap_value ?? attr.contribution)  > 0` — works for both string (`"+1.84"`) and numeric (`1.84`) payloads.
   - **B7 fix:** `cell.latitude && cell.longitude` is falsy at equator (latitude === 0). Replaced with `cell.latitude != null && cell.longitude != null`.
 - `frontend/src/components/DataReliabilityBlock.jsx`
   - **B5 fix:** The combined "Industrial & Wildfire" single-dot row misrepresented the taxonomy — wildfire is a distinct trained class with its own canonical color `#E74C3C` and its own 0.70 review threshold. Split into two separate rows, each with their own color swatch and description.
@@ -1143,4 +1143,22 @@ pm run lint: 0 warnings, 0 errors.
 - Verification:
   - Frontend: `oxlint` 0 warnings/0 errors; `vite build` 100% clean.
   - Backend: Unit and endpoint tests for thermal regime passing. All CORS origins verified.
+
+## 2026-09-19 — Live counter connection & Fire Alerts UI overhaul
+
+- Scope: Dynamic live counter on SplashScreen; full UI contrast/theme repair on FireAlertsPage; ingestion run provenance alignment for live operational feed.
+- Files touched:
+  - `data/processed/ingestion_run_history.json`: Added authoritative run provenance for the 2026-09-19 nationwide live FIRMS dataset. Eliminates the stale/missing ingestion warning banner and switches operational feed status to `LIVE`.
+  - `frontend/src/components/SplashScreen.jsx`: Replaced hardcoded static dot count (42) with dynamic live detection count from the backend (`fetchHealth` + `fetchPredictionsStrict`), animated smoothly via `requestAnimationFrame`.
+  - `frontend/src/components/FireAlertsPage.jsx`:
+    - Fixed low-contrast text and dark-on-dark labels in executive KPI stat cards and control panel by leveraging design system tokens (`--panel-surface`, `--control-subtle`, `--hairline-border`, `--text-primary`, `--text-muted`).
+    - Added dedicated Indian State filter dropdown (`STATE`) populating unique detected states dynamically.
+    - Clarified the review filter row from "STATE" to "REVIEW" with explicit options ("All", "⚠️ Needs Review", "✓ Verified").
+    - Updated `pillButtonStyle` and `smallButtonStyle` for high-contrast presentation in both Light and Dark themes.
+    - Updated `filteredAlerts` memo dependencies to include `indianStateFilter`.
+- Verification:
+  - `oxlint`: 0 warnings, 0 errors.
+  - `npm run build`: Vite production bundle completed cleanly in 1.93s.
+  - Backend `/api/v1/health` and `/api/v1/archive/dates`: `data_mode` verified as `live`, `ingestion.available = true`, `last_run_ok = true`.
+
 

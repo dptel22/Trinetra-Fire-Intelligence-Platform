@@ -88,6 +88,52 @@ STATE_NAME_FIXES = {
     "Tamilnadu": "Tamil Nadu",
 }
 
+# Republic of India official administrative roster: 28 States + 8 Union Territories (36 total entities).
+INDIAN_STATES_28: list[str] = [
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+]
+
+INDIAN_UNION_TERRITORIES_8: list[str] = [
+    "Andaman and Nicobar Islands",
+    "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Jammu and Kashmir",
+    "Ladakh",
+    "Lakshadweep",
+    "Puducherry",
+]
+
+ALL_INDIA_ADMIN_ENTITIES_36: list[str] = sorted(INDIAN_STATES_28 + INDIAN_UNION_TERRITORIES_8)
+
+
 PROJECT_CRS = "EPSG:7755"
 _transformer_7755 = Transformer.from_crs("EPSG:4326", PROJECT_CRS, always_xy=True)
 _transformer_4326 = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)  # shapefile native CRS

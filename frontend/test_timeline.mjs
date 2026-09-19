@@ -72,7 +72,7 @@ try {
   assert.ok(html.includes('Recent Thermal History'), 'Timeline header missing');
   assert.ok(html.includes('Current OSM/WRI Context'), 'Current context section missing');
   assert.ok(html.includes('Historical Land-Use Context'), 'Historical context section missing');
-  assert.ok(html.includes('Cannot check historical land use in this environment'), 'Unavailable context state missing');
+  assert.ok(html.includes('Historical OSM/WRI land-use evidence unavailable'), 'Unavailable context state missing');
   assert.ok(html.includes('Thermal evidence only'), 'Timeline caveat missing');
   console.log('✓ HexInspectorPanel renders timeline skeleton');
 

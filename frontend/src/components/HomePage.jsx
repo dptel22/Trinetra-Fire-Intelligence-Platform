@@ -130,29 +130,26 @@ export default function HomePage() {
           zIndex: 90
         }}
       >
-        <div 
-          className="marquee-track"
-          style={{
-            display: 'inline-block',
-            animation: 'marqueeScroll 25s linear infinite',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          <Link to="/fire-alerts?class=industrial" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-            ⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)
-          </Link>
-          <Link to="/fire-alerts?class=mining" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-            ⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector
-          </Link>
-          <Link to="/fire-alerts?class=agricultural_burn" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-            ⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab
-          </Link>
-          <Link to="/fire-alerts?class=wildfire" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-            ⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division
-          </Link>
-          <Link to="/fire-alerts?class=unclassified" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-            ⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin
-          </Link>
+        <div className="marquee-track">
+          {[0, 1].map((copyIdx) => (
+            <React.Fragment key={copyIdx}>
+              <Link to="/fire-alerts?class=industrial" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
+                ⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)
+              </Link>
+              <Link to="/fire-alerts?class=mining" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
+                ⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector
+              </Link>
+              <Link to="/fire-alerts?class=agricultural_burn" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
+                ⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab
+              </Link>
+              <Link to="/fire-alerts?class=wildfire" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
+                ⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division
+              </Link>
+              <Link to="/fire-alerts?class=unclassified" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
+                ⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin
+              </Link>
+            </React.Fragment>
+          ))}
         </div>
       </div>
 

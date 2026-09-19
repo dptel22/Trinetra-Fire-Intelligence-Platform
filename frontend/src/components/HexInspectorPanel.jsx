@@ -415,7 +415,9 @@ export default function HexInspectorPanel({
           {timeline?.context?.historical_context_available === true ? (
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Historical land-use evidence is available for this cell.</div>
           ) : (
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>Cannot check historical land use in this environment</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', lineHeight: 1.4 }}>
+              Historical OSM/WRI land-use evidence unavailable; showing present-day context only.
+            </div>
           )}
         </div>
       </div>

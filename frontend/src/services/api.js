@@ -55,6 +55,54 @@ export const REGIME_ORDER = ['new_anomaly', 'persistent', 'intermittent'];
 // bbox alone.
 // National framing must survive the narrow map pane beside the sidebar.
 export const INDIA_CENTER = { lat: 20.5937, lon: 78.9629, zoom: 4 };
+// Official administrative roster of the Republic of India: 28 States and 8 Union Territories (36 total)
+export const INDIAN_STATES = [
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chhattisgarh',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal'
+];
+
+export const INDIAN_UNION_TERRITORIES = [
+  'Andaman and Nicobar Islands',
+  'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi',
+  'Jammu and Kashmir',
+  'Ladakh',
+  'Lakshadweep',
+  'Puducherry'
+];
+
+export const ALL_INDIA_ADMIN_ENTITIES = [
+  ...INDIAN_STATES,
+  ...INDIAN_UNION_TERRITORIES
+].sort();
+
 export const INDIA_BOUNDS = {
   min_lat: 6.75,
   max_lat: 37.10,
