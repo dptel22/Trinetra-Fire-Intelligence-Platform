@@ -1277,13 +1277,18 @@ function generateMockPredictions(bbox, _acqDate = '2025-01-26') {
       }
       const caveatFlag = caveatList.length > 0 ? caveatList.join(' | ') : null;
 
-      // Probabilities distribution
-      const otherClasses = ['industrial', 'mining', 'agricultural_burn', 'wildfire'].filter(c => c !== pClass);
+      // Probabilities distribution — must sum to 1.
+      // For unclassified, the 4 trained classes share the remaining probability.
+      // For a trained class, the other 3 trained classes share the remainder.
+      const TRAINED_CLASSES = ['industrial', 'mining', 'agricultural_burn', 'wildfire'];
+      const otherClasses = pClass === 'unclassified'
+        ? TRAINED_CLASSES
+        : TRAINED_CLASSES.filter(c => c !== pClass);
       const remainingProb = Math.max(0.01, 1 - confidence);
       const splitProb = parseFloat((remainingProb / otherClasses.length).toFixed(3));
 
       const probabilities = [
-        { class_name: pClass === 'unclassified' ? 'industrial' : pClass, probability: confidence }
+        { class_name: pClass, probability: confidence }
       ];
       otherClasses.forEach(c => {
         probabilities.push({ class_name: c, probability: splitProb });

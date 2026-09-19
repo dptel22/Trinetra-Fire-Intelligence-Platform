@@ -245,9 +245,9 @@ class Settings:
     }
     H3_RESOLUTION = int(os.environ.get("H3_RESOLUTION", "8"))
     UNCLASSIFIED_THRESHOLD: float | None = (
-        float(os.environ["UNCLASSIFIED_THRESHOLD"])
-        if os.environ.get("UNCLASSIFIED_THRESHOLD") not in (None, "")
-        else None
+        None
+        if os.environ.get("UNCLASSIFIED_THRESHOLD", "").strip().lower() in ("none", "false", "0", "off")
+        else float(os.environ.get("UNCLASSIFIED_THRESHOLD", "0.65"))
     )
     FEATURE_SCHEMA_VERSION = "v3-h3-day-catboost"
     INGEST_MAX_BATCH_SIZE = 5000

@@ -248,7 +248,7 @@ export default function HomePage() {
             <div className="hero-content-grid" style={{ gridTemplateColumns: '1fr', padding: '3.5rem 3rem 2.5rem' }}>
               {/* Hero Main Content */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.85rem' }}>
-                  <img src="/images/trinetra-emblem-dark.png" alt="" style={{ width: '22px', height: '22px', display: 'inline-block', filter: 'drop-shadow(0 0 6px rgba(255, 107, 53, 0.6))' }} />
+                  <img src="/images/trinetra-emblem-dark.png" alt="" style={{ width: '28px', height: '28px', display: 'inline-block', filter: 'drop-shadow(0 0 6px rgba(255, 107, 53, 0.6))' }} />
                   <span className="eyebrow-tag" style={{ margin: 0 }}>
                     BREAKING INTELLIGENCE · SATELLITE RADAR
                   </span>

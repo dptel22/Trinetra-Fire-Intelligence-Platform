@@ -100,7 +100,7 @@ export default function Header() {
           </button>
 
           <Link to="/home" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-            <TrinetraBrand variant="compact" size={34} theme={theme} />
+            <TrinetraBrand variant="compact" size={64} theme={theme} />
           </Link>
         </div>
 
@@ -335,7 +335,7 @@ export default function Header() {
               <line x1="3" y1="12" x2="21" y2="12" />
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
-            <TrinetraBrand variant="mark" size={30} theme="dark" />
+            <TrinetraBrand variant="mark" size={40} theme="dark" />
             <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.25rem', letterSpacing: '0.04em', color: '#FFFFFF' }}>
               TRINETRA
             </span>

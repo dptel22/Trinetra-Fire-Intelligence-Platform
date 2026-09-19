@@ -28,7 +28,6 @@ import {
 import Map, { useControl } from 'react-map-gl/maplibre';
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import { IconLayer, ScatterplotLayer } from '@deck.gl/layers';
-import { PathStyleExtension } from '@deck.gl/extensions';
 import { Protocol } from 'pmtiles';
 import { addProtocol } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -54,6 +53,7 @@ import {
   confidenceLabel,
   parseCaveatFlag,
   KNOWN_CAVEATS,
+  getAvailableClasses,
 } from '../services/api';
 
 import { useMapLocation } from '../services/mapLocation';
@@ -94,9 +94,6 @@ const INDIA_MAX_BOUNDS = [
   [INDIA_FILTER.maxLon + 7, INDIA_FILTER.maxLat + 6]  // NE (Myanmar, Tibet, Bay of Bengal)
 ];
 
-// Canonical class ordering for availableClasses (Agent B flag: raw Set spread
-// gave non-deterministic order; Object.keys(CLASS_COLORS) is the taxonomy order).
-const CLASS_ORDER = Object.keys(CLASS_COLORS);
 
 // ─── Hex→RGB util (deck.gl fill colors are [r,g,b,a] 0-255) ─────────────────
 function hexToRgb(hex) {
@@ -336,11 +333,8 @@ export default function FireMapPage() {
 
   // Available classes: only what's actually present in the loaded batch
   // (so `unclassified` toggle only appears when empirically present — per AGENTS.md),
-  // emitted in canonical taxonomy order (CLASS_ORDER), not Set insertion order.
-  const availableClasses = useMemo(() => {
-    const present = new Set(indiaFiltered.map(p => p.predicted_class));
-    return CLASS_ORDER.filter(cls => present.has(cls));
-  }, [indiaFiltered]);
+  // emitted in canonical taxonomy order via getAvailableClasses().
+  const availableClasses = useMemo(() => getAvailableClasses(indiaFiltered), [indiaFiltered]);
 
   // Detections whose cell lies outside the model's original 10-state
   // training/evaluation geography — served, but flagged for analyst review
@@ -370,7 +364,7 @@ export default function FireMapPage() {
   }, [filteredPredictions, zoomLevel]);
 
   const layers = useMemo(() => {
-    // Dashed ring under needs_review pins (visible caveat cue)
+    // Stroked ring under needs_review pins (visible caveat cue)
     const reviewRingLayer = new ScatterplotLayer({
       id: 'review-rings',
       data: displayPredictions.filter(d => d.needs_review),
@@ -384,9 +378,6 @@ export default function FireMapPage() {
       getLineColor: d => [
         ...(ICON_RGB[d.predicted_class] ?? CLASS_RGB[d.predicted_class] ?? CLASS_RGB.unclassified), 220
       ],
-      getDashArray: [4, 3],
-      dashJustified: true,
-      extensions: [new PathStyleExtension({ dash: true })],
       pickable: false,
       updateTriggers: { getRadius: [iconSize] }
     });

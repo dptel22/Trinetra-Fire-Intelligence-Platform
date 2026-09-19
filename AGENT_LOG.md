@@ -1179,4 +1179,102 @@ pm run lint: 0 warnings, 0 errors.
   - `npm run build`: Vite production bundle completed cleanly in 1.83s.
   - Live backend API: verified `/api/v1/health` (healthy, 101 detections across 18 states) and `/api/v1/predictions`.
 
+---
+
+### [2026-09-19T15:35:00+05:30] Adversarial Audit Resolution — Unclassified Detection & Full Visibility
+
+**Scope:** Adversarial verification pass across all layers (ingestion, backend, model, frontend). One genuine code fix applied; all other flagged items were confirmed already resolved.
+
+**Audit Findings (verified live):**
+- Backend live query `GET /api/v1/predictions?acq_date=2026-09-19` returns **101 total detections**:
+  `{ industrial: 67, mining: 15, agricultural_burn: 9, wildfire: 5, unclassified: 5 }`
+- `UNCLASSIFIED_THRESHOLD=0.65` is active in `.env` (line 31, uncommented). The 5 unclassified detections have confidences 0.529–0.606, correctly below the threshold.
+- `app/core/config.py` already has `float(os.environ.get("UNCLASSIFIED_THRESHOLD", "0.65"))` as the safe default — no None fallback.
+- `ICON_COLORS.unclassified` in `basemapStyles.js` is already `#787878` (matching `CLASS_COLORS`).
+- `FireMapPage.jsx` already imports and uses `getAvailableClasses(indiaFiltered)` at line 337; no `PathStyleExtension` import present.
+- `ClassificationFilters.jsx` and `Legend.jsx` dynamically check `availableClasses.includes('unclassified')` — will show Unclassified entry automatically since backend now returns it.
+
+**Code Fix Applied:**
+- `frontend/src/services/api.js` — `generateMockPredictions` probability distribution bug:
+  When `pClass === 'unclassified'`, `otherClasses` was computed by filtering `'unclassified'` from the 4 trained classes (no-op — it was never in the list), so the `probabilities` array contained 5 entries that summed to >1. Fixed by branching: `unclassified` cells now correctly spread the remaining probability across all 4 trained classes (denominator 4, not 3).
+
+**Files changed:**
+- `frontend/src/services/api.js`: Fixed mock probability distribution for `unclassified` class (line ~1280).
+
+**No changes needed to:**
+- `.env` (threshold already set)
+- `app/core/config.py` (default fallback already 0.65)
+- `frontend/src/services/basemapStyles.js` (color already aligned)
+- `frontend/src/components/FireMapPage.jsx` (getAvailableClasses already used, no dead extension imports)
+
+**Verification:**
+- `npm run lint` (oxlint): 0 warnings, 0 errors.
+- `npm run build`: Clean Vite bundle, built in 1.54s.
+- Live backend: 5 `unclassified` detections returned with `needs_review: true` and correct caveat flags.
+
+---
+
+### [2026-09-19T15:36:00+05:30] Agent A — Trinetra logo integration: TrinetraBrand component + all-page brand refresh
+
+**Files changed (Agent A scope):**
+- `frontend/public/favicon.svg` (new) — SVG favicon: satellite/thermal-radar bullseye mark, matches Trinetra brand palette.
+- `frontend/index.html` — Line 5: favicon `href` changed from inline data-URI orange circle to `/favicon.svg`.
+- `frontend/public/images/trinetra-emblem-light.png` (new) — Circular globe emblem extracted from user-supplied design sheet; transparent bg; for light backgrounds.
+- `frontend/public/images/trinetra-emblem-dark.png` (new) — Same emblem, glowing-orange variant, transparent bg; for dark backgrounds.
+- `frontend/public/images/trinetra-logo-light.png` (new) — Full horizontal lockup (emblem + TRINETRA wordmark), dark text on transparent bg.
+- `frontend/public/images/trinetra-logo-dark.png` (new) — Full horizontal lockup, white "TRI" + orange "NETRA" on transparent bg.
+- `frontend/public/images/trinetra-favicon.png` (new) — PNG fallback for the favicon.
+- `frontend/src/components/TrinetraBrand.jsx` (new) — Theme-reactive brand component. Props: `variant` (compact|mark|full), `size` (px, default 32), `theme` (explicit override), `showSubtitle`, `className`, `style`. Reads `data-theme` from `document.documentElement` via MutationObserver. Renders correct light/dark emblem asset + styled TRI|NETRA wordmark. `fontSize` set at `max(1.35, size*0.032)rem` (bumped for legibility per user feedback).
+- `frontend/src/components/Header.jsx` — Added `import TrinetraBrand`. Replaced old 24 px orange-circle brand link in nav bar (lines ~102–104) with `<TrinetraBrand variant="compact" size={34} theme={theme} />`. Replaced old white-circle mark in side drawer header (line ~338) with `<TrinetraBrand variant="mark" size={30} theme="dark" />`.
+- `frontend/src/components/SplashScreen.jsx` — CSS `.logo` block now uses `url('/images/trinetra-emblem-dark.png')` with orange `drop-shadow` glow. Brand name markup updated to two-tone TRI|NETRA span split.
+- `frontend/src/components/HomePage.jsx` — Eyebrow tag area (lines ~250–255) includes a 22 px emblem icon inline-flex with the "BREAKING INTELLIGENCE · SATELLITE RADAR" tag.
+
+**What changed:** Replaced every placeholder logo across the splash screen, landing page hero, navigation header (desktop bar + mobile side drawer), and favicon with the professionally designed Trinetra brand assets. A new reusable `TrinetraBrand.jsx` component encapsulates theme detection via MutationObserver so all placements sync automatically on dark/light toggle. No Agent B files were modified.
+
+**Interface impact:** `TrinetraBrand` is a new component — no existing contract changed. Header brand slot renders `TrinetraBrand` instead of an inline div — visual change only.
+
+**Verification:** `npm run lint` (oxlint): 0 errors, 1 pre-existing warning in `FireMapPage.jsx` (`CLASS_ORDER` unused, not touched). JSX structure confirmed clean across all changed files.
+
+**Blockers / questions:** none.
+
+### [2026-09-19T16:17:42+05:30] Integrator — Independent re-verification: Unclassified Detection & Full Visibility plan
+
+**Scope:** Adversarial re-verification of every item in the "Unclassified Detection & Full Visibility" implementation plan against the working tree and live backend (nothing taken on trust from the 15:35 entry). No functional code changed.
+
+**Findings (each independently verified):**
+- `.env:31` — `UNCLASSIFIED_THRESHOLD=0.65` active. `app/core/config.py` — default fallback is 0.65 with explicit `none/false/0/off` opt-out (uncommitted working-tree change).
+- `app/services/model_service.py` — `_apply_confidence_policy` (L312) and `predict_batch` (L635) honor the threshold; `_needs_review` returns True for every `unclassified` row.
+- Live `GET /api/v1/predictions` (India bbox, `acq_date=2026-09-19`): **101 total** — `{industrial: 67, mining: 15, agricultural_burn: 9, wildfire: 5, unclassified: 5}`. All 5 unclassified rows have `needs_review: true`, `calibrated: true`, and the verbatim caveat `Low confidence below configured UNCLASSIFIED_THRESHOLD=0.650`.
+- `basemapStyles.js` — `ICON_COLORS.unclassified` already `#787878`, matching `CLASS_COLORS` (the plan's `#6E22C7` claim was stale). Fixed the one remaining stale "purple hexagon" comment (L156).
+- `FireMapPage.jsx` — `getAvailableClasses` imported and used (L337); no `PathStyleExtension` anywhere (dead import already removed).
+- `api.js` — mock generator spreads the remainder for `unclassified` cells across all 4 trained classes; top probability entry is labeled `unclassified` (L1283–1298).
+
+**Files changed:** `frontend/src/services/basemapStyles.js` (comment-only: purple → gray, L156); `AGENT_LOG.md` (this entry).
+
+**Verification run:**
+- `.venv\Scripts\python.exe -m pytest tests/test_backend.py -v` → 14 passed in 3.82s (incl. `test_abstention_serves_unclassified_without_dropping`).
+- `npm --prefix frontend run lint` → 0 warnings, 0 errors.
+- `npm --prefix frontend run build` → clean Vite build in 1.05s.
+- `node frontend/test_agent_b.mjs` → 11/11 PASS.
+
+**Contradicts or supersedes:** Corrects the plan's estimate that 6 detections transition at 0.65 (actual: 5 — the 6th listed confidence 0.6647 is above threshold) and the plan's stale claims that `ICON_COLORS.unclassified` was still `#6E22C7` and that `PathStyleExtension` was still imported.
+
+
+---
+
+### [2026-09-19T18:25:00+05:30] Integrator — Pre-Commit Final Polish & Brand Sizing
+
+**Files changed:**
+- `AGENT_LOG.md` (this entry)
+- `app/core/config.py` — `UNCLASSIFIED_THRESHOLD` default fallback set to 0.65.
+- `frontend/public/favicon.svg` & `frontend/public/images/*` — Optimized Trinetra emblem and logo assets.
+- `frontend/src/components/TrinetraBrand.jsx` — Sizing refinement: `size` prop directly controls emblem px, with proportional font scaling.
+- `frontend/src/components/Header.jsx` & `frontend/src/components/HomePage.jsx` — Updated Trinetra brand integration.
+- `frontend/src/services/api.js` — Fixed mock probability distribution for `unclassified` predictions.
+- `frontend/src/services/basemapStyles.js` — Updated `ICON_COLORS.unclassified` to `#787878` and removed stale comments.
+
+**Verification:**
+- `npm --prefix frontend run lint` (oxlint): 0 errors, 0 warnings.
+- `node frontend/test_agent_b.mjs`: 11/11 test groups PASSED.
+- `.venv\Scripts\python.exe -m pytest tests/test_backend.py -v`: 14/14 tests PASSED.
 

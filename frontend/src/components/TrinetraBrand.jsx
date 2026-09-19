@@ -21,22 +21,18 @@ export default function TrinetraBrand({
   className = '',
   style = {}
 }) {
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    if (explicitTheme) return explicitTheme;
+  const [inferredTheme, setInferredTheme] = useState(() => {
     return document.documentElement.getAttribute('data-theme') || 
            localStorage.getItem('trinetra_theme') || 
            'light';
   });
 
   useEffect(() => {
-    if (explicitTheme) {
-      setCurrentTheme(explicitTheme);
-      return;
-    }
+    if (explicitTheme) return;
 
     const observer = new MutationObserver(() => {
       const active = document.documentElement.getAttribute('data-theme') || 'light';
-      setCurrentTheme(active);
+      setInferredTheme(active);
     });
 
     observer.observe(document.documentElement, {
@@ -46,6 +42,8 @@ export default function TrinetraBrand({
 
     return () => observer.disconnect();
   }, [explicitTheme]);
+
+  const currentTheme = explicitTheme || inferredTheme;
 
   const isDark = currentTheme === 'dark';
   const emblemSrc = isDark ? '/images/trinetra-emblem-dark.png' : '/images/trinetra-emblem-light.png';
@@ -101,27 +99,32 @@ export default function TrinetraBrand({
   }
 
   // Default: variant === 'compact' (emblem mark + styled vector typography)
+  // `size` directly controls the emblem image px — text is derived proportionally
+  const emblemPx = size;
+  const wordmarkFs = Math.max(1.25, size * 0.030); // rem — kept proportional but emblem leads
+  const subtitleFs = Math.max(0.68, size * 0.016); // rem
+
   return (
     <div 
       className={`trinetra-brand-compact ${className}`}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '0.75rem',
+        gap: '0.6rem',
         textDecoration: 'none',
         ...style
       }}
     >
-      {/* High-res circular emblem mark */}
+      {/* High-res circular emblem mark — height matched to text column */}
       <div 
         style={{
-          width: `${size}px`,
-          height: `${size}px`,
+          width: `${emblemPx}px`,
+          height: `${emblemPx}px`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          filter: isDark ? 'drop-shadow(0 0 10px rgba(255, 107, 53, 0.4))' : 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.12))',
+          filter: isDark ? 'drop-shadow(0 0 12px rgba(255, 107, 53, 0.45))' : 'drop-shadow(0 2px 8px rgba(0, 0, 0, 0.12))',
           transition: 'filter 0.25s ease'
         }}
       >
@@ -138,13 +141,13 @@ export default function TrinetraBrand({
       </div>
 
       {/* Stylized Wordmark + Subtitle */}
-      <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-        <div style={{ display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', lineHeight: 1.1 }}>
           <span 
             style={{
               fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              fontSize: `${Math.max(1.05, size * 0.038)}rem`,
+              fontWeight: 850,
+              fontSize: `${wordmarkFs}rem`,
               color: isDark ? '#FFFFFF' : '#1E293B',
               letterSpacing: '0.04em',
               transition: 'color 0.25s ease'
@@ -155,8 +158,8 @@ export default function TrinetraBrand({
           <span 
             style={{
               fontFamily: 'var(--font-heading)',
-              fontWeight: 800,
-              fontSize: `${Math.max(1.05, size * 0.038)}rem`,
+              fontWeight: 850,
+              fontSize: `${wordmarkFs}rem`,
               background: 'linear-gradient(135deg, #FF6B35 0%, #E65100 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
@@ -171,11 +174,11 @@ export default function TrinetraBrand({
         {showSubtitle && (
           <span 
             style={{
-              fontSize: `${Math.max(0.72, size * 0.024)}rem`,
+              fontSize: `${subtitleFs}rem`,
               color: isDark ? '#94A3B8' : '#475569',
-              fontWeight: 500,
-              letterSpacing: '0.02em',
-              marginTop: '2px',
+              fontWeight: 550,
+              letterSpacing: '0.03em',
+              marginTop: '3px',
               transition: 'color 0.25s ease'
             }}
           >

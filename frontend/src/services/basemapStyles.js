@@ -153,7 +153,7 @@ export function buildBasemapStyle(id) {
 //   mining: dark slate hexagon with heavy excavator digging rock rubble
 //   agricultural_burn: emerald green hexagon with perspective crop furrows, wheat & flame
 //   wildfire: red hexagon with fir trees & roaring flame
-//   unclassified: purple hexagon with crosshair reticle & question mark
+//   unclassified: gray (#787878) hexagon with crosshair reticle & question mark
 
 const ICON_SIZE = 80;
 
@@ -180,7 +180,7 @@ export const ICON_COLORS = {
   mining: '#333A44',
   agricultural_burn: '#0E8A38',
   wildfire: '#E62325',
-  unclassified: '#6E22C7'
+  unclassified: '#787878'
 };
 
 function getGlyph(cls, fill) {

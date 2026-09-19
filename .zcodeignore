@@ -1,0 +1,150 @@
+# Data directories - large files never committed
+data/raw/**
+data/processed/**
+data/archive/**
+!data/sample/**
+data/DL_FIRE_*
+data/*.zip
+*.duckdb*
+/*.parquet
+notebooks/eda/*.parquet
+
+# Agent/IDE temp
+/check_data_v2.py
+/check_settings.py
+.qwen/
+.zcode/
+.claude/
+.mimosa/
+.scratch-requirements-repro/
+
+
+# Model artifacts - use GitHub Releases instead of committing binaries
+*.pkl
+*.joblib
+*.xgb
+*.model
+*.cbm
+
+# Exception: the PS26162 v3 inference bundle is the served contract
+# (model + calibrators + schemas) and is tracked despite the binary policy.
+!models/PS26162_catboost_final/inference_bundle/*.cbm
+!models/PS26162_catboost_final/inference_bundle/*.joblib
+
+# Large model output CSVs (>1 MB) - go in GitHub Release assets
+models/**/deployment_tiered_predictions.csv
+
+# CatBoost training info directories (tfevents, tsv logs) - not useful in git
+models/**/ablation_catboost_info/
+models/**/diagnostic_catboost_info/
+models/**/final_catboost_info/
+*.tfevents
+
+# Model backup directories created by download script
+models/PS26162_catboost_final_backup_*/
+models/kaggle_download_staging/
+models/catboost_hotspot_classifier_v3.cbm
+
+# Model release zips - attached to GitHub Releases, not committed
+models/*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.venv-pinned/
+venv-pinned/
+.env
+.env.local
+.env.*.local
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb.json
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+.next/
+out/
+.vite/
+.oxlintcache
+.vite-cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+.agents/logs/
+
+# Docker
+.docker/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Testing
+.nyc_output/
+coverage/
+
+# Misc
+*.tmp
+*.temp
+.cache/
+# PMTiles basemap build artifact (regenerate per docs/PMTILES_BUILD.md)
+frontend/public/tiles/*.pmtiles
+frontend/public/tiles/data/
+
+# Playwright MCP page dumps
+.playwright-mcp/
+.audit_pytest_tmp/
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+bower_components/
+jspm_packages/
+site-packages/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+test-results/
+allure-results/
+allure-report/
+cdk.out/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）
