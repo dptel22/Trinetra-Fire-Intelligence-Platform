@@ -168,12 +168,12 @@ export default function HomePage() {
                 // Only update if we got real items
                 if (items.length >= 1) setTickerItems(items);
               }
-            } catch (_predErr) {
+            } catch {
               // Stay on fallback ticker — not a critical failure
             }
           }
         }
-      } catch (_healthErr) {
+      } catch {
         if (!cancelled) {
           setLandingStatus(deriveLandingStatus(null, getApiMode()));
         }
