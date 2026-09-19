@@ -89,11 +89,9 @@ const SPLASH_CSS = `
 
     .content{position:relative;z-index:10;height:100%;pointer-events:none}
 
-  /* corner lockup: fixed spacing unit, not viewport-% guesswork */
-  .brand-title{position:absolute;top:2rem;left:2rem;display:flex;align-items:center;gap:0.75rem;text-align:left}
-  .logo{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FF8F5E,#FF6B35 70%);box-shadow:0 0 22px rgba(255,107,53,.35);flex-shrink:0;position:relative}
-  .logo::after{content:'';position:absolute;inset:9px;border:1px solid rgba(10,14,18,.5);border-radius:50%}
-  .brand-name{color:#EAEDF0;font-size:26px;font-weight:600;letter-spacing:4px;line-height:1;text-shadow:0 6px 30px rgba(0,0,0,.6)}
+  .brand-title{position:absolute;top:2rem;left:2rem;display:flex;align-items:center;gap:0.85rem;text-align:left}
+  .logo{width:38px;height:38px;background:url('/images/trinetra-emblem-dark.png') center/contain no-repeat;filter:drop-shadow(0 0 14px rgba(255,107,53,.55));flex-shrink:0}
+  .brand-name{color:#EAEDF0;font-size:26px;font-weight:700;letter-spacing:4px;line-height:1;text-shadow:0 6px 30px rgba(0,0,0,.6)}
   .eyebrow{position:absolute;top:2.4rem;right:2rem;color:#8B95A1;font-size:11px;letter-spacing:3px;text-transform:uppercase}
 
   /* bottom lockup: tagline stacked above button on a shared column, no collision at any width */
@@ -368,7 +366,7 @@ const SPLASH_MARKUP = `
     <div class="class-orbit" aria-label="Fire and thermal source classifications"></div>
   </div>
 
-      <div class="content"><div class="brand-title"><div class="logo"></div><div class="brand-name">TRINETRA</div></div><div class="eyebrow">Industrial Fire Intelligence</div><div class="legend"><span class="legend-label">Classifies</span><span class="legend-item"><i class="legend-dot industrial"></i>Industrial</span><span class="legend-item"><i class="legend-dot mining"></i>Mining</span><span class="legend-item"><i class="legend-dot agricultural"></i>Agricultural</span><span class="legend-item"><i class="legend-dot wildfire"></i>Wildfire</span></div><div class="bottom-lockup"><div class="tagline">Detect the Heat. Identify the Source.</div><div class="status"><span class="status-dot"></span><span class="status-text">Live · <span class="status-count">—</span> thermal detections</span></div><button class="start-btn">Start <span class="arrow">→</span></button></div></div>
+      <div class="content"><div class="brand-title"><div class="logo"></div><div class="brand-name"><span style="color:#FFFFFF">TRI</span><span style="background:linear-gradient(135deg,#FF6B35 0%,#E65100 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">NETRA</span></div></div><div class="eyebrow">Industrial Fire Intelligence</div><div class="legend"><span class="legend-label">Classifies</span><span class="legend-item"><i class="legend-dot industrial"></i>Industrial</span><span class="legend-item"><i class="legend-dot mining"></i>Mining</span><span class="legend-item"><i class="legend-dot agricultural"></i>Agricultural</span><span class="legend-item"><i class="legend-dot wildfire"></i>Wildfire</span></div><div class="bottom-lockup"><div class="tagline">Detect the Heat. Identify the Source.</div><div class="status"><span class="status-dot"></span><span class="status-text">Live · <span class="status-count">—</span> thermal detections</span></div><button class="start-btn">Start <span class="arrow">→</span></button></div></div>
 `;
 
 // Location tags color-coded to the app-wide classification legend:

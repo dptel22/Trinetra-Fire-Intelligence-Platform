@@ -1161,4 +1161,22 @@ pm run lint: 0 warnings, 0 errors.
   - `npm run build`: Vite production bundle completed cleanly in 1.93s.
   - Backend `/api/v1/health` and `/api/v1/archive/dates`: `data_mode` verified as `live`, `ingestion.available = true`, `last_run_ok = true`.
 
+## 2026-09-19 — Website current-state overhaul (Live bottom anomaly ticker, dynamic Announcements, Tutorial, Docs upload)
+
+- Scope:
+  - Live anomaly ticker ribbon on `HomePage.jsx` (with live detections from backend, state label, thermal regime, and confidence; rendered both top and sticky bottom).
+  - Standalone dynamic `AnnouncementsPage.jsx` (`/announcements`) with live satellite ingest, model status, alert activity, category filters, and pinned editorial posts.
+  - Comprehensive `TutorialPage.jsx` (`/tutorial`) with 8 interactive guide sections and embedded full documentation viewer.
+  - Header & Drawer navigation links for Announcements, Tutorial, and Documentation.
+- Files touched:
+  - `frontend/src/components/HomePage.jsx`: Added dynamic live ticker data pipeline (`fetchPredictionsStrict`) and sticky bottom anomaly ribbon.
+  - `frontend/src/components/AnnouncementsPage.jsx`: New component for `/announcements` with live health/prediction telemetry cards and category filter tabs.
+  - `frontend/src/components/TutorialPage.jsx`: New component for `/tutorial` with system overview, taxonomy cards, hex inspector guide, limitations, shortcuts, and 9 documentation accordions.
+  - `frontend/src/App.jsx`: Added routes for `/announcements` and `/tutorial`.
+  - `frontend/src/components/Header.jsx`: Added top nav links and side drawer navigation rows for Announcements and Tutorial & Documentation.
+- Verification:
+  - `npm run lint` (oxlint): 0 errors.
+  - `npm run build`: Vite production bundle completed cleanly in 1.83s.
+  - Live backend API: verified `/api/v1/health` (healthy, 101 detections across 18 states) and `/api/v1/predictions`.
+
 

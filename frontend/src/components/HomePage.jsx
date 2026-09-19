@@ -4,13 +4,62 @@ import Header from './Header';
 import {
   CLASS_LABELS,
   FIRE_COLORS,
+  INDIA_BOUNDS,
   KNOWN_CAVEATS,
   PRIMARY_CLASSES,
   assessIngestionFreshness,
   fetchHealth,
+  fetchPredictionsStrict,
   getApiMode,
   onApiModeChange
 } from '../services/api';
+
+// Rough lat/lon→state region label for the ticker ribbon.
+// Purely display-only — not used for any analysis or filtering.
+const STATE_BBOX = [
+  { name: 'Gujarat',          minLat: 20.1, maxLat: 24.7, minLon: 68.2, maxLon: 74.5 },
+  { name: 'Rajasthan',        minLat: 23.0, maxLat: 30.2, minLon: 69.5, maxLon: 78.3 },
+  { name: 'Punjab',           minLat: 29.5, maxLat: 32.5, minLon: 73.9, maxLon: 76.9 },
+  { name: 'Haryana',         minLat: 27.7, maxLat: 30.9, minLon: 74.5, maxLon: 77.6 },
+  { name: 'Uttar Pradesh',    minLat: 23.9, maxLat: 30.4, minLon: 77.1, maxLon: 84.7 },
+  { name: 'Madhya Pradesh',   minLat: 21.1, maxLat: 26.9, minLon: 74.0, maxLon: 82.8 },
+  { name: 'Maharashtra',      minLat: 15.6, maxLat: 22.1, minLon: 72.6, maxLon: 80.9 },
+  { name: 'Odisha',           minLat: 17.8, maxLat: 22.6, minLon: 81.4, maxLon: 87.5 },
+  { name: 'West Bengal',      minLat: 21.5, maxLat: 27.2, minLon: 85.8, maxLon: 89.9 },
+  { name: 'Jharkhand',        minLat: 21.9, maxLat: 25.4, minLon: 83.3, maxLon: 87.9 },
+  { name: 'Chhattisgarh',     minLat: 17.8, maxLat: 24.1, minLon: 80.2, maxLon: 84.4 },
+  { name: 'Andhra Pradesh',   minLat: 12.6, maxLat: 19.9, minLon: 76.8, maxLon: 84.8 },
+  { name: 'Telangana',        minLat: 15.8, maxLat: 19.9, minLon: 77.2, maxLon: 81.4 },
+  { name: 'Karnataka',        minLat: 11.6, maxLat: 18.5, minLon: 74.0, maxLon: 78.6 },
+  { name: 'Tamil Nadu',       minLat: 8.1,  maxLat: 13.6, minLon: 76.2, maxLon: 80.4 },
+  { name: 'Kerala',           minLat: 8.2,  maxLat: 12.8, minLon: 74.8, maxLon: 77.4 },
+  { name: 'Assam',            minLat: 24.1, maxLat: 28.2, minLon: 89.7, maxLon: 96.0 },
+  { name: 'Himachal Pradesh', minLat: 30.4, maxLat: 33.2, minLon: 75.6, maxLon: 79.0 },
+  { name: 'Uttarakhand',      minLat: 28.7, maxLat: 31.5, minLon: 77.6, maxLon: 81.0 },
+  { name: 'Bihar',            minLat: 24.3, maxLat: 27.5, minLon: 83.3, maxLon: 88.2 },
+];
+
+function regionLabel(lat, lon) {
+  const match = STATE_BBOX.find(
+    (s) => lat >= s.minLat && lat <= s.maxLat && lon >= s.minLon && lon <= s.maxLon
+  );
+  return match ? match.name : `${lat.toFixed(1)}°N ${lon.toFixed(1)}°E`;
+}
+
+// Confidence bucket label
+function confLabel(c) {
+  if (c >= 0.85) return 'HIGH';
+  if (c >= 0.65) return 'MEDIUM';
+  return 'LOW';
+}
+
+const FALLBACK_TICKER = [
+  { text: '⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)', cls: 'industrial' },
+  { text: '⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector', cls: 'mining' },
+  { text: '⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab', cls: 'agricultural_burn' },
+  { text: '⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division', cls: 'wildfire' },
+  { text: '⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin', cls: 'unclassified' },
+];
 
 // oxlint-disable-next-line react/only-export-components -- deterministic status mapping is covered by the landing-page test.
 export function deriveLandingStatus(health, apiMode, today = new Date().toLocaleDateString('en-CA')) {
@@ -54,6 +103,7 @@ export function deriveLandingStatus(health, apiMode, today = new Date().toLocale
 export default function HomePage() {
   const aboutRef = useRef(null);
   const [landingStatus, setLandingStatus] = useState(null);
+  const [tickerItems, setTickerItems] = useState(FALLBACK_TICKER);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -83,9 +133,50 @@ export default function HomePage() {
     let cancelled = false;
 
     const refreshStatus = async () => {
-      const health = await fetchHealth();
-      if (!cancelled) {
-        setLandingStatus(deriveLandingStatus(health, getApiMode()));
+      try {
+        const health = await fetchHealth();
+        if (!cancelled) {
+          setLandingStatus(deriveLandingStatus(health, getApiMode()));
+
+          // Build live ticker from real predictions
+          const date = health?.latest_acq_date;
+          if (date) {
+            try {
+              const res = await fetchPredictionsStrict(INDIA_BOUNDS, date, 5);
+              const preds = Array.isArray(res?.predictions)
+                ? res.predictions
+                : Array.isArray(res)
+                ? res
+                : [];
+              if (preds.length > 0 && !cancelled) {
+                // Sort by confidence desc, take top 12
+                const top = [...preds]
+                  .filter((p) => p.predicted_class && p.predicted_class !== 'unclassified')
+                  .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+                  .slice(0, 12);
+                const items = top.map((p) => {
+                  const stateOrRegion = p.state || regionLabel(p.latitude, p.longitude);
+                  const regimeTag = p.thermal_regime === 'new_anomaly' ? ' · NEW ANOMALY' : (p.thermal_regime === 'continuous' ? ' · PERSISTENT' : '');
+                  const confPct = p.confidence != null ? ` · ${confLabel(p.confidence)} (${(p.confidence * 100).toFixed(0)}%)` : '';
+                  return {
+                    text: `🔥 ${CLASS_LABELS[p.predicted_class]?.toUpperCase() ?? p.predicted_class.toUpperCase()} DETECTED — ${stateOrRegion} (${p.latitude.toFixed(2)}°N, ${p.longitude.toFixed(2)}°E)${regimeTag}${confPct}`,
+                    cls: p.predicted_class,
+                    lat: p.latitude,
+                    lon: p.longitude,
+                  };
+                });
+                // Only update if we got real items
+                if (items.length >= 1) setTickerItems(items);
+              }
+            } catch (_predErr) {
+              // Stay on fallback ticker — not a critical failure
+            }
+          }
+        }
+      } catch (_healthErr) {
+        if (!cancelled) {
+          setLandingStatus(deriveLandingStatus(null, getApiMode()));
+        }
       }
     };
 
@@ -131,23 +222,18 @@ export default function HomePage() {
         }}
       >
         <div className="marquee-track">
-          {[0, 1].map((copyIdx) => (
+          {/* Duplicate ticker ×3 to ensure seamless CSS loop regardless of item count */}
+          {[0, 1, 2].map((copyIdx) => (
             <React.Fragment key={copyIdx}>
-              <Link to="/fire-alerts?class=industrial" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-                ⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)
-              </Link>
-              <Link to="/fire-alerts?class=mining" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-                ⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector
-              </Link>
-              <Link to="/fire-alerts?class=agricultural_burn" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-                ⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab
-              </Link>
-              <Link to="/fire-alerts?class=wildfire" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-                ⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division
-              </Link>
-              <Link to="/fire-alerts?class=unclassified" style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}>
-                ⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin
-              </Link>
+              {tickerItems.map((item, i) => (
+                <Link
+                  key={`${copyIdx}-${i}`}
+                  to={`/fire-alerts${item.cls ? `?class=${item.cls}` : ''}`}
+                  style={{ color: 'inherit', textDecoration: 'none', marginRight: '3.5rem' }}
+                >
+                  {item.text}
+                </Link>
+              ))}
             </React.Fragment>
           ))}
         </div>
@@ -161,10 +247,12 @@ export default function HomePage() {
 
             <div className="hero-content-grid" style={{ gridTemplateColumns: '1fr', padding: '3.5rem 3rem 2.5rem' }}>
               {/* Hero Main Content */}
-              <div className="hero-left-content" style={{ maxWidth: '100%', width: '100%' }}>
-                <span className="eyebrow-tag">
-                  BREAKING INTELLIGENCE · SATELLITE RADAR
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.85rem' }}>
+                  <img src="/images/trinetra-emblem-dark.png" alt="" style={{ width: '22px', height: '22px', display: 'inline-block', filter: 'drop-shadow(0 0 6px rgba(255, 107, 53, 0.6))' }} />
+                  <span className="eyebrow-tag" style={{ margin: 0 }}>
+                    BREAKING INTELLIGENCE · SATELLITE RADAR
+                  </span>
+                </div>
                 <h1 className="hero-main-title">
                   Not all hotspots are the same. We tell you which kind you're looking at.
                 </h1>
@@ -402,7 +490,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        </div>
       </section>
 
       <section
@@ -599,6 +686,79 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Moving Anomaly Ticker at the bottom of the landing page */}
+      <div 
+        className="bottom-anomaly-ticker-ribbon"
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          width: '100%',
+          backgroundColor: 'var(--panel-surface, #0F141C)',
+          borderTop: '2px solid var(--accent-ember, #FF6B35)',
+          boxShadow: '0 -4px 25px rgba(0, 0, 0, 0.7)',
+          zIndex: 900,
+          padding: '0.65rem 1.25rem',
+          display: 'flex',
+          alignItems: 'center',
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          userSelect: 'none'
+        }}
+      >
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            backgroundColor: '#FF6B35',
+            color: '#0A0E12',
+            padding: '4px 10px',
+            borderRadius: '4px',
+            fontFamily: 'var(--font-heading)',
+            fontWeight: 900,
+            fontSize: '0.78rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            flexShrink: 0,
+            marginRight: '1.25rem',
+            boxShadow: '0 0 10px rgba(255, 107, 53, 0.4)'
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0A0E12', display: 'inline-block' }} />
+          LIVE ANOMALIES
+        </div>
+
+        <div className="marquee-track" style={{ display: 'inline-flex', alignItems: 'center' }}>
+          {[0, 1, 2].map((copyIdx) => (
+            <React.Fragment key={copyIdx}>
+              {tickerItems.map((item, i) => (
+                <Link
+                  key={`bottom-${copyIdx}-${i}`}
+                  to={`/fire-alerts${item.cls ? `?class=${item.cls}` : ''}`}
+                  style={{
+                    color: item.cls === 'industrial' ? '#E67E22' : item.cls === 'mining' ? '#BDC3C7' : item.cls === 'agricultural_burn' ? '#F1C40F' : '#E74C3C',
+                    textDecoration: 'none',
+                    marginRight: '3.5rem',
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>●</span>
+                  {item.text}
+                </Link>
+              ))}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

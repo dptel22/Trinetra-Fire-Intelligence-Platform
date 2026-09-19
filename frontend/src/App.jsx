@@ -6,6 +6,8 @@ import HomePage from './components/HomePage';
 const FireMapPage = lazy(() => import('./components/FireMapPage'));
 const FireAlertsPage = lazy(() => import('./components/FireAlertsPage'));
 const ArchivePage = lazy(() => import('./components/ArchivePage'));
+const AnnouncementsPage = lazy(() => import('./components/AnnouncementsPage'));
+const TutorialPage = lazy(() => import('./components/TutorialPage'));
 
 function RouteLoading() {
   return (
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/fire-map" element={<FireMapPage />} />
         <Route path="/fire-alerts" element={<FireAlertsPage />} />
         <Route path="/archive" element={<ArchivePage />} />
+        <Route path="/announcements" element={<AnnouncementsPage />} />
+        <Route path="/tutorial" element={<TutorialPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

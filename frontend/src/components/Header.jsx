@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import QuickSearchModal from './QuickSearchModal';
 import AnnouncementsModal from './AnnouncementsModal';
 import FeedbackModal from './FeedbackModal';
+import TrinetraBrand from './TrinetraBrand';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -98,30 +99,8 @@ export default function Header() {
             </svg>
           </button>
 
-          <Link to="/home" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div 
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--accent-ember)',
-                boxShadow: '0 0 12px rgba(255, 107, 53, 0.7)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}
-            >
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#FFFFFF' }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                TRINETRA
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                Industrial Fire Intelligence
-              </span>
-            </div>
+          <Link to="/home" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+            <TrinetraBrand variant="compact" size={34} theme={theme} />
           </Link>
         </div>
 
@@ -168,10 +147,9 @@ export default function Header() {
               <span>Quick Search</span>
             </a>
 
-            {/* Announcements */}
-            <a 
-              href="#announcements" 
-              onClick={(e) => { e.preventDefault(); setShowAnnouncements(true); }}
+            {/* Announcements Full Page Link */}
+            <Link 
+              to="/announcements"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -215,7 +193,31 @@ export default function Header() {
                 )}
               </div>
               <span>Announcements</span>
-            </a>
+            </Link>
+
+            {/* Tutorial & Guide */}
+            <Link 
+              to="/tutorial"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                fontSize: '1.05rem',
+                fontFamily: 'var(--font-heading)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'opacity 0.2s ease'
+              }}
+              className="header-opt-link"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3D9DE8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              <span>Tutorial</span>
+            </Link>
 
             {/* Feedback */}
             <a 
@@ -333,20 +335,7 @@ export default function Header() {
               <line x1="3" y1="12" x2="21" y2="12" />
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
-            <div 
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                backgroundColor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
-              }}
-            >
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#D74E26' }} />
-            </div>
+            <TrinetraBrand variant="mark" size={30} theme="dark" />
             <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.25rem', letterSpacing: '0.04em', color: '#FFFFFF' }}>
               TRINETRA
             </span>
@@ -446,16 +435,16 @@ export default function Header() {
             <span>HISTORICAL ARCHIVE</span>
           </div>
 
-          {/* Item 6: TUTORIALS */}
+          {/* Item 6: TUTORIAL & GUIDE */}
           <div 
-            onClick={() => { closeDrawer(); setShowTutorials(true); }}
+            onClick={() => handleNav('/tutorial')}
             className="drawer-item-row"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
             </svg>
-            <span>TUTORIALS</span>
+            <span>TUTORIAL & DOCUMENTATION</span>
           </div>
 
           {/* Item 7: FAQS */}
@@ -485,7 +474,7 @@ export default function Header() {
 
           {/* Item 9: ANNOUNCEMENTS */}
           <div 
-            onClick={() => { closeDrawer(); setShowAnnouncements(true); }}
+            onClick={() => handleNav('/announcements')}
             className="drawer-item-row"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
