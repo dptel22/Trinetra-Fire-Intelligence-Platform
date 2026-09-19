@@ -12,14 +12,14 @@ const TAXONOMY = [
 ];
 
 const SECTIONS = [
-  { id: 'overview',        title: 'What is Trinetra?',              icon: '🛰️' },
-  { id: 'map',             title: 'Reading the Map',                icon: '🗺️' },
-  { id: 'classes',         title: 'Understanding Classifications',  icon: '🔶' },
-  { id: 'inspector',       title: 'Using the Hex Inspector',        icon: '🔍' },
-  { id: 'alerts',          title: 'Fire Alerts & Archive',          icon: '🚨' },
-  { id: 'limitations',     title: 'Known Limitations',              icon: '⚠️' },
-  { id: 'quickref',        title: 'Quick Reference',                icon: '⌨️' },
-  { id: 'docs',            title: 'Documentation',                  icon: '📄' },
+  { id: 'overview',        title: 'What is Trinetra?' },
+  { id: 'map',             title: 'Reading the Map' },
+  { id: 'classes',         title: 'Understanding Classifications' },
+  { id: 'inspector',       title: 'Using the Hex Inspector' },
+  { id: 'alerts',          title: 'Fire Alerts & Archive' },
+  { id: 'limitations',     title: 'Known Limitations' },
+  { id: 'quickref',        title: 'Quick Reference' },
+  { id: 'docs',            title: 'Documentation' },
 ];
 
 /* ─── Docs accordion entries ─── */
@@ -331,7 +331,7 @@ export default function TutorialPage() {
 
           {/* 1. Overview */}
           <section id="overview" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>🛰️ What is Trinetra?</h2>
+            <h2 style={h2Style}>What is Trinetra?</h2>
             <p style={bodyStyle}>
               <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Trinetra Fire Intelligence Platform</strong> is a full-stack system built for SIH 2026 (PS26162) that detects and classifies industrial fires, mining activity, agricultural burns, and wildfires across India using NASA FIRMS VIIRS thermal satellite data fused with OSM and WRI power-plant context.
             </p>
@@ -339,7 +339,7 @@ export default function TutorialPage() {
               Every thermal anomaly detected by the VIIRS 375m I-Band sensor is aggregated into an H3 Resolution 8 hexagonal cell (~0.74 km²), enriched with present-day land-use context from OpenStreetMap and WRI, and classified by a calibrated CatBoost model into one of four fire classes.
             </p>
             <div style={infoBoxStyle}>
-              📡 <strong>Data flow:</strong> NASA FIRMS → H3 aggregation → OSM/WRI enrichment → CatBoost inference → FastAPI → React/MapLibre/Deck.gl frontend
+              <strong>Data flow:</strong> NASA FIRMS → H3 aggregation → OSM/WRI enrichment → CatBoost inference → FastAPI → React/MapLibre/Deck.gl frontend
             </div>
             {/* Architecture diagram */}
             <div style={{ marginTop: '1.25rem', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -356,7 +356,7 @@ export default function TutorialPage() {
 
           {/* 2. Map */}
           <section id="map" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>🗺️ Reading the Map</h2>
+            <h2 style={h2Style}>Reading the Map</h2>
             <p style={bodyStyle}>The main map at <strong style={{ color: 'var(--text-primary, #eceff4)' }}>/fire-map</strong> renders H3 Resolution-8 hexagonal cells. Each hex represents one (cell, date) prediction.</p>
             <ul style={{ ...bodyStyle, paddingLeft: '1.25rem', marginTop: '0.6rem' }}>
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Zoom in</strong> to see individual cells. At low zoom, cells are coalesced.</li>
@@ -366,7 +366,7 @@ export default function TutorialPage() {
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Basemap:</strong> Blue Marble raster tiles (offline, included). Full vector basemap requires building <code style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: '1px 5px', fontSize: '0.8em' }}>india.pmtiles</code> locally.</li>
             </ul>
             <div style={infoBoxStyle}>
-              💡 The hard server-side cap is <strong>2,500 predictions per request</strong>. Large bounding boxes are tiled client-side (2×2 tiles). If the map appears sparse at wide zoom, this is expected.
+              The hard server-side cap is <strong>2,500 predictions per request</strong>. Large bounding boxes are tiled client-side (2×2 tiles). If the map appears sparse at wide zoom, this is expected.
             </div>
           </section>
 
@@ -374,7 +374,7 @@ export default function TutorialPage() {
 
           {/* 3. Classifications */}
           <section id="classes" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>🔶 Understanding Classifications</h2>
+            <h2 style={h2Style}>Understanding Classifications</h2>
             <p style={bodyStyle}>The model predicts one of four trained classes. Color coding is locked — never changed:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.85rem' }}>
               {TAXONOMY.map((t) => (
@@ -388,7 +388,7 @@ export default function TutorialPage() {
               ))}
             </div>
             <div style={warnBoxStyle}>
-              ⚠️ <strong>Model honesty:</strong> Confidence shown is the calibrated model probability — not an accuracy claim. Mining results have lower labeled support and should always be read cautiously. Agricultural burn is always flagged for analyst review.
+              <strong>Model honesty:</strong> Confidence shown is the calibrated model probability — not an accuracy claim. Mining results have lower labeled support and should always be read cautiously. Agricultural burn is always flagged for analyst review.
             </div>
           </section>
 
@@ -396,7 +396,7 @@ export default function TutorialPage() {
 
           {/* 4. Inspector */}
           <section id="inspector" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>🔍 Using the Hex Inspector</h2>
+            <h2 style={h2Style}>Using the Hex Inspector</h2>
             <p style={bodyStyle}>Click any hex on the map to open the <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Hex Inspector Panel</strong> on the right sidebar.</p>
             <ul style={{ ...bodyStyle, paddingLeft: '1.25rem', marginTop: '0.6rem' }}>
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Predicted Class</strong> — with confidence bar and calibration state badge.</li>
@@ -409,7 +409,7 @@ export default function TutorialPage() {
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Class Distribution</strong> — probability bars for all four classes.</li>
             </ul>
             <div style={infoBoxStyle}>
-              💡 "Historical OSM/WRI land-use evidence unavailable; showing present-day context only." — this is by design, not an error. OSM and WRI are present-day snapshots, not multi-year land-use databases.
+              "Historical OSM/WRI land-use evidence unavailable; showing present-day context only." — this is by design, not an error. OSM and WRI are present-day snapshots, not multi-year land-use databases.
             </div>
           </section>
 
@@ -417,7 +417,7 @@ export default function TutorialPage() {
 
           {/* 5. Alerts */}
           <section id="alerts" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>🚨 Fire Alerts & Archive</h2>
+            <h2 style={h2Style}>Fire Alerts & Archive</h2>
             <p style={bodyStyle}>The <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Fire Alerts page</strong> (/fire-alerts) is the analyst review queue for predictions flagged with <code style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: '1px 5px', fontSize: '0.8em' }}>needs_review=true</code>.</p>
             <ul style={{ ...bodyStyle, paddingLeft: '1.25rem', marginTop: '0.6rem' }}>
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Filter</strong> by class, date, thermal regime, or review status.</li>
@@ -429,7 +429,7 @@ export default function TutorialPage() {
               The <strong style={{ color: 'var(--text-primary, #eceff4)' }}>Archive page</strong> (/archive) shows all historical predictions with provenance labels, date range filtering, and the same review actions.
             </p>
             <div style={warnBoxStyle}>
-              ⚠️ Agricultural burn predictions always appear in the alerts queue because their review threshold is set above 1.0. This is intentional — it does not indicate a model failure.
+              Agricultural burn predictions always appear in the alerts queue because their review threshold is set above 1.0. This is intentional — it does not indicate a model failure.
             </div>
           </section>
 
@@ -437,7 +437,7 @@ export default function TutorialPage() {
 
           {/* 6. Limitations */}
           <section id="limitations" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>⚠️ Known Limitations</h2>
+            <h2 style={h2Style}>Known Limitations</h2>
             <ul style={{ ...bodyStyle, paddingLeft: '1.25rem' }}>
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Agricultural burn always in review:</strong> confidence threshold is set above 1.0 by design — every agricultural burn prediction is flagged. This is a model-honesty feature.</li>
               <li><strong style={{ color: 'var(--text-primary, #eceff4)' }}>Mining: thin labeled support.</strong> Mining results must always be read cautiously — the verbatim caveat is always displayed.</li>
@@ -454,7 +454,7 @@ export default function TutorialPage() {
 
           {/* 7. Quick Reference */}
           <section id="quickref" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>⌨️ Quick Reference</h2>
+            <h2 style={h2Style}>Quick Reference</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '1rem 1.1rem', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -509,7 +509,7 @@ export default function TutorialPage() {
 
           {/* 8. Docs */}
           <section id="docs" className="tut-section" style={sectionStyle}>
-            <h2 style={h2Style}>📄 Documentation</h2>
+            <h2 style={h2Style}>Documentation</h2>
             <p style={{ ...bodyStyle, marginBottom: '1rem' }}>Full project documentation from the <code style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: '1px 5px', fontSize: '0.8em' }}>docs/</code> directory. Click any section to expand.</p>
             {DOCS.map((doc) => <DocAccordion key={doc.id} doc={doc} />)}
           </section>

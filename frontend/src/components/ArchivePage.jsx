@@ -416,7 +416,7 @@ export default function ArchivePage() {
               color: '#6b5200'
             }}
           >
-            ⚠ {perDateWarning}
+            {perDateWarning}
           </div>
         )}
 
@@ -434,7 +434,7 @@ export default function ArchivePage() {
               color: '#6b5200'
             }}
           >
-            ⚠ Archive-wide summary is unavailable ({summaryError}). Per-day browsing below is unaffected.
+            Archive-wide summary is unavailable ({summaryError}). Per-day browsing below is unaffected.
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -620,7 +620,7 @@ export default function ArchivePage() {
                   Raw evidence parts: {(runManifest.rawArchive?.parts || []).map((p) => `${p.source}/${p.acq_date} (${p.rows} rows)`).join(', ') || 'none captured for this date'}
                 </div>
                 {(runManifest.plausibilityViolations || []).length > 0 && (
-                  <div role="alert" style={{ color: '#7a5c00' }}>⚠ Plausibility warnings: {runManifest.plausibilityViolations.join('; ')}</div>
+                  <div role="alert" style={{ color: '#7a5c00' }}>Plausibility warnings: {runManifest.plausibilityViolations.join('; ')}</div>
                 )}
               </div>
             ) : (

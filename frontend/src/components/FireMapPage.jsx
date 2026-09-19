@@ -545,7 +545,7 @@ export default function FireMapPage() {
                     )}
                     {caveats.length > 0 && (
                       <div className="firemap-tooltip-caveat">
-                        ⚠️ {caveats[0]}
+                        {caveats[0]}
                       </div>
                     )}
                     {(() => {

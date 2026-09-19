@@ -232,10 +232,10 @@ export default function FeedbackModal({ isOpen, onClose }) {
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
                   {[
-                    { id: 'misclassification', label: 'Thermal Misclassification', icon: '🎯' },
-                    { id: 'industrial_flare', label: 'Unlisted Industrial Flare', icon: '🏭' },
-                    { id: 'feature_request', label: 'Feature Suggestion', icon: '💡' },
-                    { id: 'bug_report', label: 'Platform / Interface Bug', icon: '🐛' }
+                    { id: 'misclassification', label: 'Thermal Misclassification' },
+                    { id: 'industrial_flare', label: 'Unlisted Industrial Flare' },
+                    { id: 'feature_request', label: 'Feature Suggestion' },
+                    { id: 'bug_report', label: 'Platform / Interface Bug' }
                   ].map(cat => {
                     const active = category === cat.id;
                     return (
@@ -261,7 +261,6 @@ export default function FeedbackModal({ isOpen, onClose }) {
                           transition: 'all 0.15s ease'
                         }}
                       >
-                        <span>{cat.icon}</span>
                         <span>{cat.label}</span>
                       </button>
                     );

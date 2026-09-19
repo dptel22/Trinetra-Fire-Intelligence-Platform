@@ -111,63 +111,28 @@ export default function Header() {
             <a 
               href="#search" 
               onClick={(e) => { e.preventDefault(); setShowSearch(true); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                color: 'var(--text-primary)',
-                textDecoration: 'none',
-                fontSize: '1.05rem',
-                fontFamily: 'var(--font-heading)',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'opacity 0.2s ease'
-              }}
-              className="header-opt-link"
+              title="Quick Search"
+              aria-label="Quick Search"
+              className="header-hover-reveal"
             >
-              <div 
-                style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #3D9DE8 0%, #1E6091 100%)',
-                  border: '1.5px solid #FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(61, 157, 232, 0.5)',
-                  flexShrink: 0
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </div>
-              <span>Quick Search</span>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span className="header-hover-text">Quick Search</span>
             </a>
 
             {/* Announcements Full Page Link */}
             <Link 
               to="/announcements"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                color: 'var(--text-primary)',
-                textDecoration: 'none',
-                fontSize: '1.05rem',
-                fontFamily: 'var(--font-heading)',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'opacity 0.2s ease'
-              }}
-              className="header-opt-link"
+              title="Announcements"
+              aria-label="Announcements"
+              className="header-hover-reveal"
             >
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="#F1C40F" stroke="#F1C40F" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                  <path d="M3 11l18-5v12L3 13v-2z" />
-                  <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#F1C40F" strokeWidth="2" />
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 {unreadAnnouncements > 0 && (
                   <span
@@ -192,7 +157,7 @@ export default function Header() {
                   </span>
                 )}
               </div>
-              <span>Announcements</span>
+              <span className="header-hover-text">Announcements</span>
             </Link>
 
             {/* Tutorial & Guide */}
@@ -478,8 +443,8 @@ export default function Header() {
             className="drawer-item-row"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 11l18-5v12L3 13v-2z" />
-              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#FFFFFF" strokeWidth="2" />
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
             <span>ANNOUNCEMENTS {unreadAnnouncements > 0 ? `(${unreadAnnouncements})` : ''}</span>
           </div>

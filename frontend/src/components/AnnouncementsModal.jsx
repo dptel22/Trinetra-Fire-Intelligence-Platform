@@ -139,9 +139,9 @@ export default function AnnouncementsModal({ isOpen, onClose, onClearBadge }) {
                   flexShrink: 0
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#F1C40F" stroke="#F1C40F" strokeWidth="1">
-                  <path d="M3 11l18-5v12L3 13v-2z" />
-                  <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" fill="none" stroke="#F1C40F" strokeWidth="2" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F1C40F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
               </div>
               <div>
@@ -220,7 +220,7 @@ export default function AnnouncementsModal({ isOpen, onClose, onClearBadge }) {
               </button>
             ) : (
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                ✓ All caught up
+                All caught up
               </span>
             )}
           </div>

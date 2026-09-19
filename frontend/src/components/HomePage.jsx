@@ -54,11 +54,11 @@ function confLabel(c) {
 }
 
 const FALLBACK_TICKER = [
-  { text: '⚠️ ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)', cls: 'industrial' },
-  { text: '⚠️ ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector', cls: 'mining' },
-  { text: '⚠️ ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab', cls: 'agricultural_burn' },
-  { text: '⚠️ ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division', cls: 'wildfire' },
-  { text: '⚠️ ALERT — Unclassified thermal detection under analyst review in Korba Basin', cls: 'unclassified' },
+  { text: 'ALERT — New thermal anomaly detected near Jamnagar Petrochemical Complex (Confidence: HIGH)', cls: 'industrial' },
+  { text: 'ALERT — Thermal flare activity flagged in Singrauli Coalfield Mining Sector', cls: 'mining' },
+  { text: 'ALERT — Agricultural stubble burning cluster detected in Sangrur Region, Punjab', cls: 'agricultural_burn' },
+  { text: 'ALERT — High-intensity canopy wildfire anomaly active near Shimla Forest Division', cls: 'wildfire' },
+  { text: 'ALERT — Unclassified thermal detection under analyst review in Korba Basin', cls: 'unclassified' },
 ];
 
 // oxlint-disable-next-line react/only-export-components -- deterministic status mapping is covered by the landing-page test.
@@ -159,7 +159,7 @@ export default function HomePage() {
                   const regimeTag = p.thermal_regime === 'new_anomaly' ? ' · NEW ANOMALY' : (p.thermal_regime === 'continuous' ? ' · PERSISTENT' : '');
                   const confPct = p.confidence != null ? ` · ${confLabel(p.confidence)} (${(p.confidence * 100).toFixed(0)}%)` : '';
                   return {
-                    text: `🔥 ${CLASS_LABELS[p.predicted_class]?.toUpperCase() ?? p.predicted_class.toUpperCase()} DETECTED — ${stateOrRegion} (${p.latitude.toFixed(2)}°N, ${p.longitude.toFixed(2)}°E)${regimeTag}${confPct}`,
+                    text: `${CLASS_LABELS[p.predicted_class]?.toUpperCase() ?? p.predicted_class.toUpperCase()} DETECTED — ${stateOrRegion} (${p.latitude.toFixed(2)}°N, ${p.longitude.toFixed(2)}°E)${regimeTag}${confPct}`,
                     cls: p.predicted_class,
                     lat: p.latitude,
                     lon: p.longitude,

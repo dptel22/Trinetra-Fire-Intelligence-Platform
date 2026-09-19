@@ -16,13 +16,11 @@
     "@deck.gl/layers": "^9",
     "@deck.gl/mapbox": "^9",
     "h3-js": "^4.5.0",
-    "leaflet": "^1.9.4",
     "lucide-react": "^1.41.0",
     "maplibre-gl": "^5",
     "pmtiles": "^4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-leaflet": "^5.0.0",
     "react-map-gl": "^8",
     "react-router-dom": "^7.18.3",
     "recharts": "^3.10.1"

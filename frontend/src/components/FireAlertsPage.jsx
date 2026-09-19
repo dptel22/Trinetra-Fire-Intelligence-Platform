@@ -465,7 +465,7 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
                     : (labelQuality === 'Needs review' ? 'rgba(231, 76, 60, 0.4)' : 'rgba(120, 120, 120, 0.4)')}`
                 }}
               >
-                {alert.needs_review ? '⚠ Review' : labelQuality}
+                {alert.needs_review ? 'Review' : labelQuality}
               </span>
             </div>
 
@@ -541,7 +541,7 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Calibrated</span>
                 <span style={{ color: alert.calibrated ? '#2ecc71' : 'var(--text-muted, #8b949e)', fontWeight: 700 }}>
-                  {alert.calibrated ? '✓ Yes' : 'No'}
+                  {alert.calibrated ? 'Yes' : 'No'}
                 </span>
               </div>
             )}
@@ -571,7 +571,7 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
               }}
             >
               <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#a06a00', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                ⚠ Model Caveats
+                Model Caveats
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {[...caveats, ...(canonicalCaveat && !caveats.includes(canonicalCaveat) ? [canonicalCaveat] : [])].map((c, i) => (
@@ -1190,7 +1190,7 @@ export default function FireAlertsPage() {
                     cursor: 'help'
                   }}
                 >
-                  {sourceLabel ? `📦 ${sourceLabel.replace(/^duckdb:/, '')}` : '📦 Stored Features'}
+                  {sourceLabel ? sourceLabel.replace(/^duckdb:/, '') : 'Stored Features'}
                 </span>
               )}
             </div>
@@ -1281,7 +1281,7 @@ export default function FireAlertsPage() {
             }}
           >
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f1c40f', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              ⚠ Quality Notice:
+              Quality Notice:
             </span>
             {allWarnings.map((w, i) => (
               <span key={i} style={{ fontSize: '0.78rem', color: '#e2d59a', lineHeight: 1.4 }}>{w}</span>
@@ -1300,12 +1300,12 @@ export default function FireAlertsPage() {
             }}
           >
             {[
-              { label: 'Total Detections', value: alerts.length, color: '#3d9de8', icon: '📡' },
-              { label: 'Needs Review', value: alerts.filter(a => a.needs_review).length, color: '#e74c3c', icon: '⚠️' },
-              { label: 'High Confidence', value: alerts.filter(a => a.confidence >= 0.8).length, color: '#2ecc71', icon: '🎯' },
-              { label: 'Unreviewed', value: lifecycleCounts.new, color: '#94a3b8', icon: '📥' },
-              { label: 'Reviewed', value: reviewedCount, color: '#F1C40F', icon: '✅' }
-            ].map(({ label, value, color: c, icon }) => (
+              { label: 'Total Detections', value: alerts.length, color: '#3d9de8' },
+              { label: 'Needs Review', value: alerts.filter(a => a.needs_review).length, color: '#e74c3c' },
+              { label: 'High Confidence', value: alerts.filter(a => a.confidence >= 0.8).length, color: '#2ecc71' },
+              { label: 'Unreviewed', value: lifecycleCounts.new, color: '#94a3b8' },
+              { label: 'Reviewed', value: reviewedCount, color: '#F1C40F' }
+            ].map(({ label, value, color: c }) => (
               <div
                 key={label}
                 style={{
@@ -1320,7 +1320,6 @@ export default function FireAlertsPage() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.66rem', color: 'var(--text-muted, #718096)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>{label}</span>
-                  <span style={{ fontSize: '0.85rem' }}>{icon}</span>
                 </div>
                 <span style={{ fontFamily: 'monospace', fontSize: '1.55rem', fontWeight: 800, color: c, lineHeight: 1.1 }}>{value}</span>
               </div>
@@ -1475,7 +1474,7 @@ export default function FireAlertsPage() {
                     outline: 'none'
                   }}
                 >
-                  <option value="review">⚠️ Needs Review First</option>
+                  <option value="review">Needs Review First</option>
                   <option value="conf_desc">Highest Confidence</option>
                   <option value="conf_asc">Lowest Confidence</option>
                 </select>
@@ -1548,8 +1547,8 @@ export default function FireAlertsPage() {
               </span>
               {[
                 ['all', `All (${alerts.length})`],
-                ['needs_review', `⚠️ Needs Review (${alerts.filter(a => a.needs_review).length})`],
-                ['verified', `✓ Verified (${alerts.filter(a => !a.needs_review).length})`]
+                ['needs_review', `Needs Review (${alerts.filter(a => a.needs_review).length})`],
+                ['verified', `Verified (${alerts.filter(a => !a.needs_review).length})`]
               ].map(([value, label]) => (
                 <button
                   key={value} type="button"

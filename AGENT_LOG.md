@@ -1276,5 +1276,70 @@ pm run lint: 0 warnings, 0 errors.
 **Verification:**
 - `npm --prefix frontend run lint` (oxlint): 0 errors, 0 warnings.
 - `node frontend/test_agent_b.mjs`: 11/11 test groups PASSED.
-- `.venv\Scripts\python.exe -m pytest tests/test_backend.py -v`: 14/14 tests PASSED.
 
+---
+
+### [2026-09-19T18:50:00+05:30] Integrator — Quick Search & Announcement Header Icon Refresh
+
+**Files changed:**
+- `frontend/src/components/Header.jsx`: Replaced gradient circle wrapper on Quick Search link with a clean 22px magnifying glass SVG; removed text label next to the Quick Search icon for a clean icon button layout in the header navbar; updated Announcement link in navbar and side drawer to use a clean bell SVG (`<path d="M18 8A6 6 0 0 0 6 8..."/>`).
+- `frontend/src/components/AnnouncementsModal.jsx`: Updated modal header badge icon from megaphone SVG to bell SVG.
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** Replaced the Quick Search icon with a standalone magnifying glass SVG, removed the "Quick Search" text label next to the icon in the header navbar per user request, and changed all Announcement icons (header navbar link, side drawer item, and modal badge) from a megaphone to a bell icon.
+
+**Interface impact:** None. Visual & icon update only.
+
+
+
+---
+
+### [2026-09-19T18:52:00+05:30] Integrator — Complete Emoji Removal Across All Frontend Components
+
+**Files changed:**
+- `AGENT_LOG.md` (this entry)
+- `frontend/src/components/TutorialPage.jsx` — Removed emojis from `SECTIONS` sidebar menu array, section `<h2>` headings, data flow badge, and note boxes.
+- `frontend/src/components/HomePage.jsx` — Removed warning emojis from `FALLBACK_TICKER` items and fire emoji from live ticker formatting.
+- `frontend/src/components/HexInspectorPanel.jsx` — Removed warning emojis from offline data notice and caveat chips.
+- `frontend/src/components/FireMapPage.jsx` — Removed warning emoji from tooltip caveat line.
+- `frontend/src/components/FireAlertsPage.jsx` — Removed emojis from stat card arrays, quality badges, review filter pills, and dropdown options.
+- `frontend/src/components/FeedbackModal.jsx` — Removed category emojis.
+- `frontend/src/components/ArchivePage.jsx` — Removed warning emojis from notices and plausibility warnings.
+- `frontend/src/components/AnnouncementsPage.jsx` & `frontend/src/components/AnnouncementsModal.jsx` — Removed emojis from status lines and pinned badges.
+- `frontend/src/components/QuickSearchModal.jsx` — Removed empty search emoji.
+- `frontend/src/components/ClassificationFilters.jsx` — Removed checkmark symbol from active filter labels.
+
+**Verification:**
+- `npm --prefix frontend run lint` (oxlint): 0 errors, 0 warnings across 29 files.
+- `node frontend/test_agent_b.mjs`: 11 / 11 test groups PASSED.
+
+---
+
+### [2026-09-19T18:54:00+05:30] Integrator — Header Navigation Hover Reveal & Persistent Label Configuration
+
+**Files changed:**
+- `frontend/src/components/Header.jsx`: Configured Quick Search and Announcements to render icons by default with smooth CSS text reveal on hover (`.header-hover-reveal` and `.header-hover-text`); kept Tutorial and Feedback text labels (`Tutorial` and `Feedback`) permanently visible.
+- `frontend/src/index.css`: Added `.header-hover-reveal` and `.header-hover-text` transition styles for smooth expand/fade text reveal.
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** Quick Search and Announcements now display strictly as icon buttons by default that smoothly expand to reveal their text labels on mouse hover. Tutorial and Feedback maintain their text labels continuously visible in the navbar per user directive.
+
+**Interface impact:** None. UI layout and interaction refinement only.
+
+
+
+
+
+### [2026-09-19T19:30:00+05:30] Integrator — Hero Alert Ticker Slowed Down
+
+**Files changed:**
+- `frontend/src/index.css`: `.marquee-track` marquee animation duration increased to 85s per loop for smooth, relaxed reading speed.
+- `frontend/src/services/basemapStyles.js`: Updated all 5 deck.gl/MapLibre map marker pin SVGs (`getGlyph`) and `ICON_COLORS` to match the exact clean category card SVGs from `HomePage.jsx` and the locked taxonomy palette (`#E67E22`, `#95A5A6`, `#F1C40F`, `#E74C3C`, `#787878`).
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** Replaced all 5 map marker pin SVGs in `basemapStyles.js` with the clean, high-contrast category card icons shown in the homepage classification cards, and slowed down the breaking intelligence marquee ticker to 85s per loop for a calm, comfortable reading speed.
+
+**Interface impact:** None. Visual map pin rendering and ticker speed refinement only.
+
+
+**Interface impact:** None. CSS-only timing change.

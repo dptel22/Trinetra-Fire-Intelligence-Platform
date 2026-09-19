@@ -91,7 +91,7 @@ export default function ClassificationFilters({
                   opacity: active ? 1 : 0.4
                 }}
               />
-              <span>{active ? '✓ ' : ''}{label}</span>
+              <span>{label}</span>
             </button>
           );
         })}

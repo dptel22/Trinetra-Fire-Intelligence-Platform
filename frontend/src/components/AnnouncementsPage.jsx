@@ -147,7 +147,7 @@ function AnnouncementCard({ ann, index }) {
         </span>
         {ann.pinned && (
           <span style={{ fontSize: '0.65rem', color: 'var(--text-muted, #8b949e)', fontWeight: 600, letterSpacing: '0.06em' }}>
-            📌 PINNED
+            PINNED
           </span>
         )}
         {ann.isLive && (
@@ -208,7 +208,7 @@ export default function AnnouncementsPage() {
         categoryLabel: 'Model Status',
         badgeColor: '#FF6B35',
         isLive: true,
-        summary: `CatBoost classifier is loaded and serving predictions. Calibrators: ${health?.calibrators_loaded ? '✓ Active' : '✗ Not loaded'}. Schema: ${health?.schema_version ?? '—'}.`,
+        summary: `CatBoost classifier is loaded and serving predictions. Calibrators: ${health?.calibrators_loaded ? 'Active' : 'Not loaded'}. Schema: ${health?.schema_version ?? '—'}.`,
         details: [
           `Model path: ${health?.model_path?.split(/[\\/]/).slice(-3).join('/') ?? '—'}`,
           `Review thresholds — Wildfire: ${health?.review_thresholds?.wildfire ?? '—'} · Industrial: ${health?.review_thresholds?.industrial ?? '—'} · Mining: ${health?.review_thresholds?.mining ?? '—'}`,
@@ -236,7 +236,7 @@ export default function AnnouncementsPage() {
             `Coverage: ${ing.coverage_status ?? '—'} · Scope: ${ing.serving_scope ?? '—'}`,
             `Outside-India detections rejected: ${ing.outside_india_rejected ?? 0}`,
             `Outside 10-state training geography (analyst review): ${ing.outside_training_geography_rows ?? 0}`,
-            ing.gap_filled ? '⚠️ Gap-fill applied for a missing day.' : 'No gap-fill applied.',
+            ing.gap_filled ? 'Gap-fill applied for a missing day.' : 'No gap-fill applied.',
           ],
         });
       }
@@ -438,7 +438,7 @@ export default function AnnouncementsPage() {
         {activeCategory === 'all' && !loadingLive && (
           <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted, #8b949e)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              📌 Editorial &amp; Release Notes
+              Editorial &amp; Release Notes
             </div>
           </div>
         )}

@@ -234,7 +234,6 @@ export default function HexInspectorPanel({
             gap: '8px'
           }}
         >
-          <span>⚠️</span>
           <span>SIMULATED DATA — Offline Demonstration Hotspot</span>
         </div>
       )}
@@ -290,7 +289,7 @@ export default function HexInspectorPanel({
                   lineHeight: 1.3
                 }}
               >
-                ⚠️ {caveat}
+                {caveat}
               </div>
             ))}
           </div>
