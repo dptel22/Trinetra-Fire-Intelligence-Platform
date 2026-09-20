@@ -5,10 +5,32 @@ from threading import Lock
 from typing import Any
 
 import duckdb
+from fastapi import HTTPException
 
 from app.core.config import settings
 
 STATIC_COLUMNS = [col for col in settings.MODEL_FEATURES if col not in settings.H3_DAILY_FEATURES]
+
+
+class FeatureStoreUnavailableError(HTTPException):
+    """The serving parquets are missing, so the feature store cannot be seeded.
+
+    Raised (as HTTP 503) instead of a bare ``FileNotFoundError`` so that a fresh
+    clone boots in a visibly degraded, fail-closed mode: the API starts,
+    ``/health`` reports the missing store, and every data-backed route answers
+    503 with the remediation. No prediction is ever invented. Each request
+    re-attempts ``load()``, so the store recovers as soon as the parquets appear.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(
+            status_code=503,
+            detail=(
+                f"Serving data store is not loaded: {reason}. "
+                "Run `python scripts/fetch_serving_data.py` (or an ingestion run) to provide it."
+            ),
+        )
+        self.reason = reason
 
 
 class FeatureStoreService:
@@ -27,6 +49,8 @@ class FeatureStoreService:
     def __init__(self, db_path: str = settings.DUCKDB_PATH):
         self.db_path = db_path
         self.loaded = False
+        # Last seed failure (missing parquets); None while loaded or never attempted.
+        self.load_error: str | None = None
         self._lock = Lock()
         self._conn = None
         # Provenance side-map: h3_08 -> (state, state_assignment_method).
@@ -123,7 +147,12 @@ class FeatureStoreService:
         with self._lock:
             if self.loaded:
                 return
-            self._seed_tables()
+            try:
+                self._seed_tables()
+            except FileNotFoundError as err:
+                self.load_error = str(err)
+                raise FeatureStoreUnavailableError(str(err)) from err
+            self.load_error = None
 
     def reload(self) -> None:
         """Force a re-seed from the parquets (after ingestion updates them)."""

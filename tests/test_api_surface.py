@@ -21,6 +21,12 @@ from app.main import app
 from app.services.audit_service import audit_service
 from app.services.feature_store import feature_store
 from app.services.model_service import model_service
+from tests.conftest import serving_data_present
+
+requires_serving_data = pytest.mark.skipif(
+    not serving_data_present(),
+    reason="serving parquets absent; run `python scripts/fetch_serving_data.py`",
+)
 
 
 @pytest.fixture
@@ -40,10 +46,14 @@ def test_health_v1_and_root_parity(client):
     data_root = res_root.json()
     data_v1 = res_v1.json()
 
-    assert data_root["status"] == "healthy"
-    assert data_v1["status"] == "healthy"
-    assert data_root["database"] == "connected"
-    assert data_v1["database"] == "connected"
+    if serving_data_present():
+        assert data_root["status"] == "healthy"
+        assert data_v1["status"] == "healthy"
+        assert data_root["database"] == "connected"
+        assert data_v1["database"] == "connected"
+    else:  # fresh clone: degraded (fail-closed) but the contract is still identical
+        assert data_root["status"] == data_v1["status"] == "degraded"
+        assert data_root["database"] == data_v1["database"] == "unavailable"
     assert data_root["model_loaded"] is True
     assert data_v1["model_loaded"] is True
     assert data_root["schema_version"] == data_v1["schema_version"]
@@ -81,6 +91,7 @@ def _a_real_store_cell() -> tuple[str, str]:
     return str(row["h3_08"]), str(pd.to_datetime(row["acq_date"]).date())
 
 
+@requires_serving_data
 def test_audit_override_records_real_prediction(client):
     """BACK-1.3: Verify audit override resolves and stores real prediction + confidence."""
     # Real cell from the serving store (cell cases are picked from live data —
@@ -118,6 +129,7 @@ def test_audit_override_records_real_prediction(client):
     assert matching[0]["model_prediction"] == data["model_prediction"]
 
 
+@requires_serving_data
 def test_vectorization_numerical_parity_vs_reference_loop():
     """BACK-1.4: Parity test asserting vectorized batch produces identical results to loop path (~1e-9)."""
     # Fetch real rows from the serving store on its newest ingested date

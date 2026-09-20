@@ -31,3 +31,17 @@ os.environ.setdefault("DUCKDB_PATH", os.path.join(_TEST_DATA_DIR, "feature_store
 os.environ.setdefault("AUDIT_DB_PATH", os.path.join(_TEST_DATA_DIR, "audit_log.duckdb"))
 os.environ.setdefault("INGESTION_DB_PATH", os.path.join(_TEST_DATA_DIR, "ingestion.duckdb"))
 os.environ.setdefault("RAW_ARCHIVE_DIR", os.path.join(_TEST_DATA_DIR, "archive", "firms"))
+
+
+def serving_data_present() -> bool:
+    """True when both serving parquets exist (fresh clones do not ship them).
+
+    Data-backed tests use ``pytest.mark.skipif(not serving_data_present(), ...)``
+    so ``pytest -m "not live"`` is green (with visible skips) before
+    ``python scripts/fetch_serving_data.py`` has been run.
+    """
+    from pathlib import Path
+
+    from app.core.config import settings
+
+    return Path(settings.H3_DAILY_PARQUET).exists() and Path(settings.OSMWRI_PARQUET).exists()

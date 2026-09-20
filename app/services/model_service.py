@@ -29,7 +29,7 @@ from app.services.explanation import (
     humanize_feature,
     top_human_features,
 )
-from app.services.feature_store import feature_store
+from app.services.feature_store import FeatureStoreUnavailableError, feature_store
 from app.services.thermal_regime import classify_regime
 from pipeline.feature_engineering import latlng_to_h3
 
@@ -481,6 +481,8 @@ class CatBoostModelService:
     def health(self) -> dict[str, Any]:
         try:
             latest_acq_date = feature_store.latest_acq_date()
+        except FeatureStoreUnavailableError:
+            latest_acq_date = None  # degraded boot: reported via /health `database`, not a per-probe stack trace
         except Exception:
             logger.warning("health(): could not read latest acq_date (store not seeded?)", exc_info=True)
             latest_acq_date = None

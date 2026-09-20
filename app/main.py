@@ -4,10 +4,11 @@ import os
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.api_router import api_router
+from app.api.api_router import api_router, require_feature_store
+from app.api.endpoints.health import build_health_payload
 from app.core.config import settings
 from app.schemas.prediction import (
     CellPredictionDetailResponse,
@@ -15,7 +16,7 @@ from app.schemas.prediction import (
     HealthResponse,
     ViewportPredictionsResponse,
 )
-from app.services.feature_store import feature_store
+from app.services.feature_store import FeatureStoreUnavailableError, feature_store
 from app.services.model_service import model_service
 
 logger = logging.getLogger("uvicorn.startup")
@@ -64,7 +65,12 @@ def _background_ingestion() -> None:
 async def lifespan(app: FastAPI):
     print(f"[STARTUP] Initializing {settings.PROJECT_NAME} (v{settings.VERSION})...")
     _route_ingestion_logs_into_uvicorn()
-    feature_store.load()
+    try:
+        feature_store.load()
+    except FeatureStoreUnavailableError as err:
+        # Fresh clone without the serving parquets: boot degraded (fail-closed)
+        # instead of crashing. /health reports it; data routes answer 503.
+        logger.error("[STARTUP] Serving data store unavailable; booting in degraded mode. %s", err.detail)
     model_service.load_model()
     threading.Thread(target=_background_ingestion, name="firms-ingestion", daemon=True).start()
     yield
@@ -102,16 +108,9 @@ def root():
 
 @app.get("/health", response_model=HealthResponse)
 def health_check():
-    from ingestion.run_ingestion import ingestion_provenance
+    return build_health_payload()
 
-    return {
-        "status": "healthy",
-        "database": "connected",
-        **model_service.health(),
-        "ingestion": ingestion_provenance(),
-    }
-
-@app.get("/predictions", response_model=ViewportPredictionsResponse)
+@app.get("/predictions", response_model=ViewportPredictionsResponse, dependencies=[Depends(require_feature_store)])
 def get_predictions_root(
     min_lat: float = Query(..., ge=-90.0, le=90.0),
     max_lat: float = Query(..., ge=-90.0, le=90.0),
@@ -129,7 +128,7 @@ def _map_cell_lookup_error(err: ValueError) -> HTTPException:
     return HTTPException(status_code=status, detail=str(err))
 
 
-@app.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse)
+@app.get("/predictions/{cell_id}/explain", response_model=ExplanationResponse, dependencies=[Depends(require_feature_store)])
 def get_prediction_cell_explanation_root(cell_id: str, acq_date: str = Query(...)):
     try:
         detail = model_service.get_cell_detail(cell_id, acq_date)
@@ -141,7 +140,7 @@ def get_prediction_cell_explanation_root(cell_id: str, acq_date: str = Query(...
     except Exception:
         raise HTTPException(status_code=500, detail="Cell explanation failed due to an internal server error.")
 
-@app.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse)
+@app.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse, dependencies=[Depends(require_feature_store)])
 def get_prediction_cell_detail_root(cell_id: str, acq_date: str = Query(...)):
     try:
         return model_service.get_cell_detail(cell_id, acq_date)

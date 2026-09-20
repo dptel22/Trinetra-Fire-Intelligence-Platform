@@ -104,6 +104,7 @@ class ViewportPredictionsResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     database: str
+    database_detail: str | None = None
     model_loaded: bool
     schema_version: str
     schema_hash: str

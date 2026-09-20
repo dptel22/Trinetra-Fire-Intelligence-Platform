@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.timeline import TimelineResponse
+from app.services.feature_store import FeatureStoreUnavailableError
 from app.services.timeline_service import (
     TimelineDateError,
     TimelineMaterializationError,
@@ -58,5 +59,7 @@ def get_cell_timeline(
                 "fallback_used": False,
             },
         ) from exc
+    except FeatureStoreUnavailableError:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Timeline query failed due to an internal server error.") from exc

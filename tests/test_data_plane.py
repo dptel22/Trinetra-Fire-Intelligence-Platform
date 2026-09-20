@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.services.feature_store import FeatureStoreService
 from ingestion.aggregate import DAILY_COLUMNS
+from tests.conftest import serving_data_present
 from ingestion.run_ingestion import (
     BACKUP_DIR,
     RUN_HISTORY_PATH,
@@ -361,6 +362,10 @@ def test_get_cell_is_safe_under_concurrent_reload(tmp_path, monkeypatch):
 
 
 @requires_default_duckdb
+@pytest.mark.skipif(
+    not serving_data_present(),
+    reason="serving parquets absent; run `python scripts/fetch_serving_data.py`",
+)
 def test_legacy_alias_unknown_cell_matches_v1_404_body():
     from fastapi.testclient import TestClient
 
