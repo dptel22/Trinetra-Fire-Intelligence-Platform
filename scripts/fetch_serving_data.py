@@ -21,6 +21,7 @@ import argparse
 import hashlib
 import ipaddress
 import json
+import re
 import shutil
 import socket
 import sys
@@ -101,6 +102,39 @@ def _sha256_stream(handle) -> str:
     return h.hexdigest()
 
 
+_NAME_KEYS = ("name", "file", "filename", "path")
+_HASH_KEYS = ("sha256", "hash", "checksum")
+
+
+def _normalize_manifest(manifest) -> list[tuple[str, str]]:
+    """Return ``[(file_name, sha256_hex_lowercase), ...]`` from a release manifest.
+
+    Accepts the canonical ``{"name": ..., "sha256": ...}`` shape and the
+    ``{"file": ..., "Hash": ...}`` shape emitted by PowerShell ``Get-FileHash``
+    (the shape the published ``serving-data-2026-09-09`` release actually ships).
+    Keys are matched case-insensitively; a top-level ``{"files": [...]}``
+    wrapper is unwrapped. Raises ``ValueError`` on any malformed entry so the
+    caller refuses to extract unverified data.
+    """
+    entries = manifest.get("files", manifest) if isinstance(manifest, dict) else manifest
+    if not isinstance(entries, list) or not entries:
+        raise ValueError(f"manifest has no file entries: {manifest!r}")
+    normalized: list[tuple[str, str]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError(f"malformed manifest entry: {entry!r}")
+        lowered = {str(k).lower(): v for k, v in entry.items()}
+        name = next((lowered[k] for k in _NAME_KEYS if isinstance(lowered.get(k), str) and lowered[k]), None)
+        digest = next((lowered[k] for k in _HASH_KEYS if isinstance(lowered.get(k), str) and lowered[k]), None)
+        if not name or not digest:
+            raise ValueError(f"malformed manifest entry: {entry!r}")
+        digest = digest.strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError(f"manifest entry for '{name}' has a non-SHA256 digest: {entry!r}")
+        normalized.append((name, digest))
+    return normalized
+
+
 def download(url: str, dest: Path) -> None:
     _validate_url(url)
     print(f"Downloading {url}")
@@ -150,20 +184,20 @@ def main() -> int:
                 return 1
             manifest = json.loads(zf.read(manifest_members[0]))
 
-            entries = manifest.get("files", manifest) if isinstance(manifest, dict) else manifest
+            try:
+                entries = _normalize_manifest(manifest)
+            except ValueError as err:
+                print(f"ERROR: {err}", file=sys.stderr)
+                return 1
             verified = 0
-            for entry in entries:
-                name, expected = (entry.get("name"), entry.get("sha256")) if isinstance(entry, dict) else (None, None)
-                if not name or not expected:
-                    print(f"ERROR: malformed manifest entry: {entry}", file=sys.stderr)
-                    return 1
+            for name, expected in entries:
                 members = [n for n in names if Path(n).name == name]
                 if not members:
                     print(f"ERROR: manifest lists '{name}' but it is not in the ZIP", file=sys.stderr)
                     return 1
                 with zf.open(members[0]) as f:
                     actual = _sha256_stream(f)
-                if actual != expected.lower():
+                if actual != expected:
                     print(
                         f"ERROR: SHA256 mismatch for {name}\n  expected {expected}\n  actual   {actual}",
                         file=sys.stderr,
@@ -173,8 +207,7 @@ def main() -> int:
                 verified += 1
 
             extracted = 0
-            for entry in entries:
-                name = entry["name"]
+            for name, _expected in entries:
                 member = next(n for n in names if Path(n).name == name)
                 target = out_dir / Path(name).name
                 with zf.open(member) as src, target.open("wb") as dst:
