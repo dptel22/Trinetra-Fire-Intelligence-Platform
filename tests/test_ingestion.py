@@ -68,6 +68,18 @@ REAL_STATIC_PARQUET = Path(settings.OSMWRI_PARQUET)
 REAL_ARTIFACTS = REAL_DAILY_PARQUET.exists() and REAL_STATIC_PARQUET.exists()
 
 
+def _raw_inputs_present() -> bool:
+    """OSM PBF + WRI CSV + state shapefile are external inputs (never redistributed)."""
+    try:
+        validate_raw_inputs()
+    except RawInputError:
+        return False
+    return True
+
+
+RAW_INPUTS = _raw_inputs_present()
+
+
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
@@ -447,6 +459,10 @@ def _copy_parquet_slice(src: Path, dst: Path, n: int) -> None:
 
 
 @pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")
+@pytest.mark.skipif(
+    not RAW_INPUTS,
+    reason="raw ingestion inputs (OSM PBF, WRI CSV, state shapefile) absent; see data/README.md",
+)
 def test_run_ingestion_end_to_end_schema_and_store_contract(tmp_path, monkeypatch):
     daily_path = tmp_path / "sih2026_h3_daily_features_firms.parquet"
     static_path = tmp_path / "sih2026_h3_daily_features_with_osm_wri.parquet"
