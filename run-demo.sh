@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT_DIR"
-# The maintained app lives under backend/; the top-level frontend/ is the
-# legacy tree and must not be used for the demo launcher.
+# The FastAPI app package lives at the repo root (app/); frontend/ is the
+# only frontend tree.
 FRONTEND_DIR="$ROOT_DIR/frontend"
 LOG_DIR="$ROOT_DIR/.demo-logs"
 mkdir -p "$LOG_DIR"

@@ -72,7 +72,7 @@ flowchart LR
 
 ### P2 — simplification candidates
 
-delete: stale legacy demo documentation that still describes removed XGBoost/Postgres paths; replace with one current judge walkthrough. [docs/demo-script.md]
+delete: stale legacy demo documentation that still describes removed XGBoost/Postgres paths; replace with one current judge walkthrough. [docs/archive/research/demo-script.md]
 
 delete: unused frontend `fetchArchiveRuns` import. [frontend/src/components/FireAlertsPage.jsx]
 

@@ -7,14 +7,16 @@
 > contradicts this one, this one wins — or both are wrong and the registry is
 > the tiebreaker.
 >
-> **Last verified:** 2026-09-10 on the current checkout.
+> **Last verified:** 2026-09-10; **docs refresh 2026-09-20** (abstention default,
+> basemap sources, timeline/thermal-regime capabilities, env-var contract, repo
+> name). Section-level claims carry their own dates.
 
 ## 1. Project Identity
 
 Team project for Smart India Hackathon 2026, problem statement PS26162 /
 SIH26162 (recorded project context: Software category, submission window
 closes 20 Sep 2026) [C-32]. Internal product name: **Trinetra Fire
-Intelligence Platform**. Repository: `dptel22/SIH_2026`, branch `main`.
+Intelligence Platform**. Repository: `dptel22/Trinetra-Fire-Intelligence-Platform`, branch `main`.
 
 ## 2. Official Problem Statement
 
@@ -153,8 +155,14 @@ a model output, never an accuracy claim. Review gate (raw class): wildfire
 0.70 / industrial 0.70 / mining 0.85 / agricultural_burn 1.01 — so
 agricultural_burn is mechanically always `needs_review=true` [C-07]. Cells
 outside the training geography are also force-flagged for review [C-18
-remediation note]. Abstention (`unclassified`) is env-gated and OFF by
-default [C-06].
+remediation note]. Abstention (`unclassified`) fires when calibrated confidence is below
+`UNCLASSIFIED_THRESHOLD` — **default 0.65, enabled by default**; set the env
+var to `off`/`none`/`false`/`0` to disable (`app/core/config.py:247-250`,
+applied in `app/services/model_service.py:310-313`). Isotonic calibration
+saturates this bundle's confidences, so the threshold rarely fires in
+practice — the frontend shows the `unclassified` entry only when the served
+batch actually contains one. (Updated from "default-off" 2026-09-19; was
+[C-06] — registry row C-06 updated same day.)
 
 ## 13. Explainability
 
@@ -180,21 +188,22 @@ Storage: **DuckDB (3 files) + Parquet only**; no Postgres/Redis/WebSocket
 
 React 19 + Vite; MapLibre GL via `react-map-gl/maplibre` + deck.gl layers via
 `MapboxOverlay` + PMTiles protocol + h3-js v4.5.0 [C-25]. Pages: splash, home,
-fire map, fire alerts (analyst review), archive. Honesty machinery: mock rows
+fire map, fire alerts (analyst review), archive, announcements, tutorial. Honesty machinery: mock rows
 carry `is_synthetic: true` + OfflineBanner + "SIMULATED" labels; LIVE/
 HISTORICAL/DEMO/OFFLINE status pills; strict endpoints throw rather than mock
-[C-27]. Shipped basemap: Blue Marble raster tiles; the vector PMTiles pack is
-optional and currently **not built** in this checkout [C-26]. Known wart:
-code reads `VITE_API_URL` while `.env.example` documents `VITE_API_BASE_URL`
-— the default (`http://localhost:8000`) works, but the env-var name mismatch
-is real and unresolved.
+[C-27]. Basemaps (sources per `docs/PMTILES_BUILD.md` table, verified
+2026-09-20): Blue Marble (NASA GIBS, remote, zoom ≤ 8), Satellite HD (Esri,
+remote, zoom 19), Streets/Topo (local OpenMapTiles PMTiles archive — built
+2026-09-19, ~2.0 GB, gitignored — with remote raster fallbacks when absent).
+The frontend reads `VITE_API_URL`; `.env.example` documents the same name
+(mismatch resolved 2026-09-20).
 
 ## 16. Demo Mode
 
 Frontend mock mode: curated real-place centers expanded via H3 grid disks,
 every row visibly synthetic; used only when the live backend is unreachable
 [C-27]. The judge path is `docs/HACKATHON_JUDGE_RUNBOOK.md` (`setup.ps1 -Mode
-demo`, `verify.ps1`, dev server) [C-29]. The old `docs/demo-script.md` is
+demo`, `verify.ps1`, dev server) [C-29]. The old `docs/archive/research/demo-script.md` is
 deprecated [C-34].
 
 ## 17. Live Mode
@@ -233,10 +242,15 @@ Verified 2026-09-10 on this checkout [C-23, C-24, C-35]:
 3. **Thin classes** [C-12]: mining (4,886) and agricultural_burn (1,762)
    validation rows are scarce; ag-burn is always routed to review [C-07].
 4. **No independent ground truth**; no field validation of any prediction.
-5. **Vector PMTiles basemap not built** in this checkout [C-26].
-6. **`VITE_API_URL` / `VITE_API_BASE_URL` env-name mismatch** (works only via
-   the localhost default).
-7. **No frontend unit tests**; CI covers backend lint/tests only [C-24].
+5. **No basemap raster tiles are shipped in-repo**: Blue Marble and
+   Satellite HD are remote services; only Streets (and partially Topo) are
+   offline-capable via the locally built PMTiles archive (see
+   `docs/PMTILES_BUILD.md` asset table).
+6. ~~`VITE_API_URL` / `VITE_API_BASE_URL` env-name mismatch~~ — **resolved
+   2026-09-20**: `.env.example` now documents `VITE_API_URL`.
+7. **No frontend unit tests**; `lint` + `build` are its verification hooks
+   and now run in CI (`frontend.yml`), alongside backend pytest/lint and a
+   fresh-clone Docker build check (added 2026-09-20) [C-24 amended].
 8. **Legacy GEO-001 defect**: a prior artifact labeled 3,051 outside-India
    rows as Tamil Nadu; fixed in store staging and absent from the current
    artifact [C-19].
@@ -245,7 +259,8 @@ Verified 2026-09-10 on this checkout [C-23, C-24, C-35]:
 
 Judges may probe: pseudo-label validity (C-10), coverage claims (C-18),
 calibration trustworthiness outside training geography, single-model
-abstention default-off (C-06), and demo reproducibility on a fresh machine
+abstention default-ON at 0.65 (updated C-06 2026-09-20), and demo
+reproducibility on a fresh machine
 (C-29: runbook inputs verified present, but a full fresh-setup run was not
 re-executed today).
 
@@ -257,6 +272,8 @@ re-executed today).
 | H3-8 cell-day aggregation + leakage-safe history | IMPLEMENTED [C-14, C-17] |
 | CatBoost model + calibration + thresholds + SHAP | IMPLEMENTED [C-01–C-09] |
 | Backend API incl. archive/alerts/audit | IMPLEMENTED [C-20–C-22] |
+| Historical timeline (materializer, validation, transitions, timeline endpoint) | IMPLEMENTED 2026-09-12→20 (see AGENT_LOG; nationwide backfill in progress) |
+| Thermal regimes + transition states (mechanical, non-model) | IMPLEMENTED (`app/services/thermal_regime.py`, `pipeline/transition_detection.py`) |
 | Frontend map + honesty UI + alerts + archive | IMPLEMENTED [C-25–C-27] |
 | Mock/demo mode (visibly flagged) | IMPLEMENTED [C-27] |
 | Vector PMTiles offline basemap | PARTIALLY IMPLEMENTED (build doc + deps ready; archive absent) [C-26] |

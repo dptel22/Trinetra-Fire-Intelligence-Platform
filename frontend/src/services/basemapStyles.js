@@ -1,13 +1,14 @@
-// Basemap styles + per-class fire icons (Agent A — map engine).
+// Basemap styles + per-class fire icons (map engine).
 //
-// Three switchable basemaps:
-//   bluemarble — NASA Blue Marble Web-Mercator raster tiles
-//                (public/tiles/bluemarble/{z}/{x}/{y}.jpg)
-//                + admin boundaries / place labels from the local PMTiles archive.
-//   streets    — light OpenMapTiles-schema vector style from the local PMTiles archive.
-//   topographic— earth-tone vector style from the same archive.
+// Four switchable basemaps (asset sources per docs/PMTILES_BUILD.md):
+//   bluemarble  — NASA GIBS Blue Marble raster (REMOTE, zoom ≤ 8)
+//                 + admin boundaries / place labels from the local PMTiles archive.
+//   satellite   — Esri World Imagery raster (REMOTE, zoom 19).
+//   streets     — light OpenMapTiles-schema vector style from the local PMTiles archive.
+//   topographic — earth-tone vector style from the same archive + Mapzen/AWS
+//                 terrarium hillshade (remote).
 // When the optional PMTiles archive is missing, Streets and Topographic use
-// public raster fallbacks instead of rendering an empty background.
+// remote public raster fallbacks instead of rendering an empty background.
 //
 // Text labels use self-hosted Noto Sans glyph pages in public/fonts/glyphs/
 // (fontstack names on disk have no spaces: NotoSansRegular / NotoSansBold).
@@ -18,9 +19,9 @@
 const PMTILES_URL = import.meta.env?.VITE_PMTILES_URL ?? null;
 
 // True when the offline vector archive is configured via VITE_PMTILES_URL.
-// When false the map runs on the local Blue Marble raster tiles and public
-// Streets/Topographic raster fallbacks — the UI surfaces the missing local pack
-// instead of failing silently (docs/PMTILES_BUILD.md).
+// When false the map runs on the remote GIBS Blue Marble raster and the
+// remote Streets/Topographic raster fallbacks — the UI surfaces the missing
+// local pack instead of failing silently (docs/PMTILES_BUILD.md).
 export const PMTILES_AVAILABLE = Boolean(PMTILES_URL);
 
 const GLYPHS_URL = '/fonts/glyphs/{fontstack}/{range}.pbf';

@@ -50,7 +50,7 @@ During interactive testing and analyst review, three interrelated issues were id
 |---|---|---|---|
 | `frontend/src/components/HexInspectorPanel.jsx` | 411–421 | Line 418: `<div ...>Cannot check historical land use in this environment</div>` | Change text to: `"Historical OSM/WRI land-use evidence unavailable; showing present-day context only."` |
 | `frontend/src/components/HexInspectorPanel.jsx` | 400–410 | Line 407: `"Thermal evidence only. Current OSM/WRI context is not historical land-use evidence."` | Retain, matches model honesty guidelines. |
-| `docs/FRONTEND_HISTORICAL_AUDIT_PLAN.md` | 99–103 | Item 6: "Historical land-use context text is confusing... Fix: phrase as 'Historical OSM/WRI land-use evidence unavailable; showing present-day context only.'" | Confirms plan alignment. |
+| `docs/archive/internal/FRONTEND_HISTORICAL_AUDIT_PLAN.md` | 99–103 | Item 6: "Historical land-use context text is confusing... Fix: phrase as 'Historical OSM/WRI land-use evidence unavailable; showing present-day context only.'" | Confirms plan alignment. |
 
 ### C. Nationwide Ingestion & 28 States + 8 Union Territories
 | File | Lines Checked | Finding / Role | Action Needed |

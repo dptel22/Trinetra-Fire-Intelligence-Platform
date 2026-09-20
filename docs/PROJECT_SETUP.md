@@ -10,7 +10,7 @@ NASA FIRMS -> ingestion -> H3 cell/day features -> OSM/WRI enrichment
            -> FastAPI -> React/MapLibre/Deck.gl/PMTiles
 ```
 
-The prediction unit is `(h3_08, acq_date)`. H3 resolution is 8. Trained classes are `industrial`, `mining`, `agricultural_burn`, and `wildfire`; `unclassified` is optional abstention, not a fifth trained class.
+The prediction unit is `(h3_08, acq_date)`. H3 resolution is 8. Trained classes are `industrial`, `mining`, `agricultural_burn`, and `wildfire`; `unclassified` is optional abstention, not a fifth trained class. Abstention is ON by default with a calibrated-confidence floor of 0.65; disable it via `UNCLASSIFIED_THRESHOLD=off` (`app/core/config.py:247-250`).
 
 ## Repository map
 
@@ -71,7 +71,13 @@ If the serving parquets are not already present, download the pinned release bun
 .\scripts\setup.ps1 -Mode demo -DownloadServingData
 ```
 
-Release: `https://github.com/dptel22/SIH_2026/releases/tag/serving-data-2026-09-09`. The ZIP contains both serving parquets and `SHA256SUMS.json`.
+One-command path (downloads the ZIP, SHA256-verifies it, extracts into `data/processed/`):
+
+```powershell
+python scripts/fetch_serving_data.py
+```
+
+Release: `https://github.com/dptel22/Trinetra-Fire-Intelligence-Platform/releases/tag/serving-data-2026-09-09`. The ZIP contains both serving parquets and `SHA256SUMS.json`.
 
 ## Demo and live modes
 
@@ -84,11 +90,17 @@ data/processed/sih2026_h3_daily_features_with_osm_wri.parquet
 
 If those files are absent, the frontend may use its explicitly marked mock/offline mode for UI work. The backend never fabricates predictions.
 
-For a reproducible demo with real backend predictions, download the pinned serving-data release directly:
+For a reproducible demo with real backend predictions, download the pinned serving-data release with the one-command fetch script:
+
+```powershell
+python scripts/fetch_serving_data.py
+```
+
+Or download the same ZIP manually and expand it:
 
 ```powershell
 Invoke-WebRequest `
-  -Uri https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip `
+  -Uri https://github.com/dptel22/Trinetra-Fire-Intelligence-Platform/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip `
   -OutFile $env:TEMP\sih2026-serving-data-v1.zip
 Expand-Archive $env:TEMP\sih2026-serving-data-v1.zip -DestinationPath data/processed -Force
 ```
@@ -183,7 +195,7 @@ npm ci
 npm run dev
 ```
 
-The frontend uses React/Vite, MapLibre GL, `react-map-gl/maplibre`, Deck.gl, `h3-js`, and `pmtiles`. Configure `VITE_API_BASE_URL=http://localhost:8000/api/v1`.
+The frontend uses React/Vite, MapLibre GL, `react-map-gl/maplibre`, Deck.gl, `h3-js`, and `pmtiles`. Configure `VITE_API_URL=http://localhost:8000` — the client appends `/api/v1/...` itself, so do not include the `/api/v1` suffix.
 
 The optional basemap must be exactly:
 
@@ -225,7 +237,7 @@ Acceptance requires: model loaded; non-null latest date when data exists; predic
 | CORS error | Set `CORS_ALLOW_ORIGINS=http://localhost:5173` |
 | DuckDB lock | Stop uvicorn before data-plane tests |
 | Model mismatch | Restore the tracked bundle and use Python 3.12 |
-| Offline banner | Check port 8000, `/health`, and `VITE_API_BASE_URL` |
+| Offline banner | Check port 8000, `/health`, and `VITE_API_URL` |
 
 ## Artifact inventory
 
@@ -245,7 +257,7 @@ processed serving parquets, or runtime databases. Use these paths instead:
 
 | File | Download or regeneration path |
 | --- | --- |
-| Serving parquets | [Direct release ZIP](https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip) or `./scripts/setup.ps1 -Mode demo -DownloadServingData` |
+| Serving parquets | `python scripts/fetch_serving_data.py`, [direct release ZIP](https://github.com/dptel22/Trinetra-Fire-Intelligence-Platform/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip), or `./scripts/setup.ps1 -Mode demo -DownloadServingData` |
 | India PMTiles | Generate locally with [`docs/PMTILES_BUILD.md`](PMTILES_BUILD.md) from an India `.osm.pbf`; then set `VITE_PMTILES_URL=/tiles/india.pmtiles` |
 | Raw FIRMS data | Download through the NASA FIRMS API using `FIRMS_MAP_KEY`, or regenerate via `ingestion.run_ingestion` |
 | Runtime DuckDB files | Generated automatically under `data/` when the backend starts or ingestion runs |

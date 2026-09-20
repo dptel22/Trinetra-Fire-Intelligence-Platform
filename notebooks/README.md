@@ -10,18 +10,17 @@ notebooks/
 │   ├── data-eda.ipynb                        # FIRMS corpus EDA
 │   ├── osi-wri-data.ipynb                    # OSM/WRI enrichment provenance
 │   │                                           # (ingestion/osm_wri_load.py ports this)
-│   ├── sih2026_h3_daily_*.parquet            # notebook-era parquet artifacts (historical)
-│   ├── sih2026_h3_daily_labeled.parquet      # historical labeled artifact
 │   ├── state_class_heatmap.png               # label-evidence artifact
 │   ├── state_evidence_table.csv              # per-state label evidence (copied to docs/)
 │   └── Jupyter Notebook — generated with runcell.pdf   # exported output (evidence record)
 └── training/
-    └── si-catboost-training.ipynb            # CatBoost training provenance
+    └── sih-catboost-training.ipynb           # CatBoost training provenance
 ```
 
 An earlier version of this README listed `01_eda_fire_data.ipynb`,
-`01_xgboost_baseline.ipynb`, and an `ml-pipeline/` promotion target — none of
-those exist. The notebooks above are the real ones.
+`01_xgboost_baseline.ipynb`, and an `ml-pipeline/` promotion target, plus
+notebook-era parquet artifacts in `eda/` — none of those exist in the current
+tree. The notebooks above are the real ones.
 
 ## Promotion rule
 
@@ -34,8 +33,9 @@ bundle comes from `training/sih-catboost-training.ipynb` (tracked at
 
 ## Hygiene
 
-- Strip outputs before commit: `nbstripout` or "Clear All Outputs" in Jupyter
-  (CI runs an advisory output-strip check).
+- Strip outputs before commit: `nbstripout` or "Clear All Outputs" in Jupyter.
+  CI runs an output-strip check but it is **advisory** (`continue-on-error`)
+  — it will not block a merge, so do not rely on it as a gate.
 - Committed output cells with images/data are the #1 cause of merge conflicts.
 - Use small test datasets in notebooks; do not commit large derived parquets
   when a script can regenerate them.

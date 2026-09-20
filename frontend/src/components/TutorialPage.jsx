@@ -55,7 +55,7 @@ Then open **http://localhost:5173**
 \`\`\`powershell
 .\\scripts\\setup.ps1 -Mode demo -DownloadServingData
 \`\`\`
-Download: https://github.com/dptel22/SIH_2026/releases/tag/serving-data-2026-09-09
+Download: https://github.com/dptel22/Trinetra-Fire-Intelligence-Platform/releases/tag/serving-data-2026-09-09
     `,
   },
   {

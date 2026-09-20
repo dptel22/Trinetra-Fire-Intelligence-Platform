@@ -1,20 +1,25 @@
 # 🛰️ PS26162 — Trinetra Fire Intelligence Platform (SIH 2026, NTRO)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 End-to-end platform that ingests NASA FIRMS (VIIRS) thermal hotspots across India,
 classifies each H3 resolution-8 cell-day into one of four fire classes with a CatBoost
 model, and serves the results to a MapLibre/Deck.gl dashboard with honest confidence
 caveats and an analyst audit trail.
 
-> **Client:** NTRO · **Problem statement:** SIH 2026, PS26162 · **Serving data
-> refreshed:** 2026-09-10 (20 states/UTs, 2024-08-01 → 2026-09-10)
+> **Client:** NTRO · **Problem statement:** SIH 2026, PS26162 · **Serving data:**
+> nationwide archive backfill **in progress** as of 2026-09-20 — the pinned
+> clone-and-run snapshot is the `serving-data-2026-09-09` release (see
+> [`docs/RELEASES.md`](docs/RELEASES.md))
 >
 > Current-state reference: [`docs/CURRENT_PROJECT_TRUTH.md`](docs/CURRENT_PROJECT_TRUTH.md) ·
 > Claim→evidence registry: [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md) ·
 > Backend API reference: [`BACKEND_DOCUMENTATION.md`](BACKEND_DOCUMENTATION.md) ·
 > Frontend contract: [`FRONTEND_INTEGRATION_GUIDE.md`](FRONTEND_INTEGRATION_GUIDE.md) ·
-> Judge demo: [`docs/HACKATHON_JUDGE_RUNBOOK.md`](docs/HACKATHON_JUDGE_RUNBOOK.md)
+> Judge demo: [`docs/HACKATHON_JUDGE_RUNBOOK.md`](docs/HACKATHON_JUDGE_RUNBOOK.md) ·
+> Third-party attributions: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 
-Complete Windows clone-and-run guide, AI-agent setup instructions, artifact inventory,
+Complete Windows clone-and-run guide, artifact inventory,
 map/PMTiles setup, demo/live modes, and verification: [`docs/PROJECT_SETUP.md`](docs/PROJECT_SETUP.md).
 
 ---
@@ -24,46 +29,67 @@ map/PMTiles setup, demo/live modes, and verification: [`docs/PROJECT_SETUP.md`](
 | Layer | Tech | Role |
 |---|---|---|
 | **Ingestion** | `ingestion/` (FIRMS pull + OSM/WRI static merge) | Pull VIIRS detections, build cell-day features |
-| **Backend** | FastAPI (`app/`) + DuckDB + CatBoost | Serve `/api/v1` predictions, SHAP, audit |
+| **Backend** | FastAPI (`app/`) + DuckDB + CatBoost | Serve `/api/v1` predictions, timeline, SHAP, audit |
 | **Model** | CatBoost multiclass (4 classes, 55 features, 2 categoricals) | Classify each `(h3_08, acq_date)` cell-day |
 | **Frontend** | React 19 + Vite, MapLibre GL + Deck.gl + pmtiles | Interactive India fire map + honesty UI |
 
 **Prediction unit:** one `(h3_08, acq_date)` cell-day — an H3 resolution-8 hexagon
 (~0.7 km²) aggregated over one UTC acquisition date.
 
-**Classes:** `industrial`, `mining`, `agricultural_burn`, `wildfire` (plus
-`unclassified` when optional abstention thresholding is enabled).
+**Classes:** `industrial`, `mining`, `agricultural_burn`, `wildfire` — plus the
+`unclassified` fallback: abstention is **on by default** (calibrated confidence
+below 0.65 → `unclassified`; env `UNCLASSIFIED_THRESHOLD`, set it to
+`off`/`none`/`false`/`0` to disable). It is not a fifth trained class.
 
 **Model artifacts** live in `models/PS26162_catboost_final/inference_bundle/`
 (the served contract — tracked in git):
 `catboost_hotspot_classifier.cbm`, `calibrators.joblib`, `feature_schema.json`,
 `review_thresholds.json`, `runtime_versions.json`.
 
-## 2. Repository layout
+**Derived (mechanical, not model output):** per-cell thermal regimes
+(`persistent` / `new_anomaly` / `intermittent`) and thermal transition states,
+computed from FIRMS history — kept strictly separate from model predictions
+throughout the docs and UI.
+
+## 2. The application
+
+| Route | What it shows |
+|---|---|
+| `/home` | Overview dashboard |
+| `/fire-map` | The main map: per-class detection layers, hex inspector, filters, legend |
+| `/fire-alerts` | Analyst review workflow (alert lifecycle) |
+| `/archive` | Historical archive browsing + provenance |
+| `/announcements` | Product announcements |
+| `/tutorial` | Guided usage walkthrough |
+
+Mock/demo data mode is always visibly flagged (OfflineBanner), never silent.
+
+## 3. Repository layout
 
 ```text
-SIH_2026/
+Trinetra-Fire-Intelligence-Platform/
 ├── app/                          # FastAPI backend (the /api/v1 service)
-│   ├── api/endpoints/            # predictions, health, audit routes
+│   ├── api/endpoints/            # health, classify/predictions, archive, evidence, timeline, alerts, audit
 │   ├── core/config.py            # Settings, MODEL_FEATURES, TARGET_CLASSES, paths
 │   ├── schemas/                  # Pydantic request/response models
-│   ├── services/                 # model_service, feature_store, explanation, audit
+│   ├── services/                 # model_service, feature_store, explanation, thermal_regime, audit
 │   └── main.py                   # App entrypoint
-├── ingestion/                    # Live FIRMS pull + OSM/WRI static features + state
-├── pipeline/                     # H3 aggregation + feature engineering
+├── ingestion/                    # Live FIRMS pull + OSM/WRI static features + state assignment
+├── pipeline/                     # H3 aggregation, feature engineering, timeline materialization, transitions
 ├── models/
 │   └── PS26162_catboost_final/inference_bundle/   # .cbm + calibrators + thresholds (tracked)
 ├── data/                         # Runtime DuckDB + processed parquets (gitignored)
 ├── frontend/                     # Vite + React + MapLibre/Deck.gl dashboard
 ├── tests/                        # pytest suite (backend + data-plane)
-├── notebooks/                    # EDA + experiment provenance
-├── docs/                         # Architecture, decisions, agent briefs
+├── notebooks/                    # EDA + training provenance
+├── docs/                         # Current docs (docs/archive/ = historical research & process material)
 ├── Dockerfile / docker-compose.yml
 ├── requirements.txt / pyproject.toml / uv.lock
-└── *.md                          # README, AGENTS/CLAUDE, docs & integration guides
+├── LICENSE (MIT) / THIRD_PARTY_NOTICES.md
+└── AGENTS.md / AGENT_LOG.md / CONTRIBUTING.md
 ```
 
-## 3. Architecture & data flow
+## 4. Architecture & data flow
 
 ![Trinetra End-to-End System Architecture](diagram.png)
 
@@ -80,6 +106,8 @@ NASA FIRMS (VIIRS) ──> ingestion/ ──> data/processed/*.parquet
 - The backend seeds an in-process **DuckDB** feature store from processed parquets.
 - SHAP is computed **on demand** per cell (CatBoost native TreeSHAP), never in list views.
 - Audit overrides are append-only in `data/audit_log.duckdb`.
+- Historical timeline layers are materialized under `data/processed/timeline/`
+  by `pipeline/` (see `docs/superpowers/plans/2026-09-20-nationwide-archive-backfill.md`).
 
 ### Review thresholds (served from `inference_bundle/review_thresholds.json`)
 
@@ -93,14 +121,34 @@ NASA FIRMS (VIIRS) ──> ingestion/ ──> data/processed/*.parquet
 The backend fails loudly at startup if the configured `.cbm` does not match the
 55-feature / 4-class contract; it never invents fallback predictions.
 
-## 4. Prerequisites
+## 5. Supported environments
+
+| Path | Status |
+|---|---|
+| **Windows + PowerShell + Python 3.12 + Node** | Primary development/demo path (see `docs/PROJECT_SETUP.md`) |
+| **Docker** (`docker compose up backend`) | Canonical container path; builds from a fresh clone (degraded data mode until data is fetched) |
+| Linux/macOS via the bash tooling (`run-demo.sh`) | Supported for the API + dev server; PMTiles guide includes both bash and PowerShell commands |
+
+Prerequisites:
 
 - **Python 3.12** (see [`.python-version`](.python-version))
-- **Node.js 18+** (Vite 8 requires a recent runtime)
+- **Node.js 20.19+ / 22+** (required by Vite 8)
 - Docker (optional — container path)
 - A **NASA FIRMS map key** (free Tier-1): https://firms.modaps.eosdis.nasa.gov/api/area/
 
-## 5. Environment setup
+## 6. Quick start
+
+### Suggested reading order
+
+Problem → architecture → run it → data → model → API → reproduce artifacts → limitations:
+
+1. This README → 2. [`docs/architecture.md`](docs/architecture.md) →
+3. [`docs/PROJECT_SETUP.md`](docs/PROJECT_SETUP.md) → 4. [`data/README.md`](data/README.md) +
+   [`docs/RELEASES.md`](docs/RELEASES.md) → 5. [`models/README.md`](models/README.md) +
+   [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md) →
+6. [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) → 7. [`docs/CURRENT_PROJECT_TRUTH.md`](docs/CURRENT_PROJECT_TRUTH.md) (canonical current state) → 8. `docs/WHOLE_SYSTEM_AUDIT.md` + `docs/CURRENT_PROJECT_TRUTH.md` §21 (limitations and known risks)
+
+### Environment setup
 
 Copy the template and add your keys:
 
@@ -110,9 +158,10 @@ copy .env.example .env
 ```
 
 `.env` is gitignored. `.env.example` documents every variable the pipeline/backend
-reads (mirror the real names — notably `FIRMS_MAP_KEY`, not `FIRMS_API_KEY`).
+reads (notably `FIRMS_MAP_KEY`, not `FIRMS_API_KEY`) and matches the real names —
+including `VITE_API_URL` for the frontend (no `/api/v1` suffix; the SPA appends it).
 
-## 6. Backend — run it
+## 7. Backend — run it
 
 ```powershell
 python -m venv .venv
@@ -138,10 +187,18 @@ Before the API returns predictions you need the two processed parquets (gitignor
 `data/processed/`:
 `data/processed/sih2026_h3_daily_features_firms.parquet`
 `data/processed/sih2026_h3_daily_features_with_osm_wri.parquet`
-They are produced by `ingestion/` from a FIRMS pull. If you only need the UI to render,
-start the frontend in mock/demo mode — it is visibly flagged (OfflineBanner), never silent.
 
-## 7. Frontend — run it
+On a fresh clone, fetch the pinned release snapshot (SHA256-verified):
+
+```powershell
+python scripts/fetch_serving_data.py
+```
+
+or produce them with `ingestion/` from a FIRMS pull. Without them the backend starts
+fail-closed (`/health` reports the missing store) and the frontend runs in mock/demo
+mode — visibly flagged (OfflineBanner), never silent.
+
+## 8. Frontend — run it
 
 ```powershell
 cd frontend
@@ -152,22 +209,21 @@ npm run dev        # Vite dev server (default :5173)
 - `npm run lint` — oxlint
 - `npm run build` — production build
 - `npm run preview` — serve the production build
-- The frontend expects the backend at `http://localhost:8000/api/v1` (set
-  `VITE_API_URL` in `frontend/.env` if you run it elsewhere — note the code
-  reads `VITE_API_URL`, while root `.env.example` documents `VITE_API_BASE_URL`;
-  that naming mismatch is a known issue).
+- The frontend expects the backend at `http://localhost:8000/api/v1` — set
+  `VITE_API_URL` (base only) in `frontend/.env` if you run it elsewhere.
 
 Frontend notes:
 - The map is **MapLibre GL** via `react-map-gl/maplibre` with **deck.gl**
   per-class detection icon layers via `@deck.gl/mapbox` `MapboxOverlay`,
-  `h3-js` v4.5.0, and self-hosted base tiles (shipped: NASA Blue Marble raster;
-  the OpenMapTiles PMTiles pack is an optional local build — see
-  [`docs/PMTILES_BUILD.md`](docs/PMTILES_BUILD.md)).
+  `h3-js` v4.5.0, and basemaps documented per-mode in
+  [`docs/PMTILES_BUILD.md`](docs/PMTILES_BUILD.md): Blue Marble (NASA GIBS,
+  remote, zoom ≤ 8), Satellite HD (Esri, remote, zoom 19), and the fully
+  offline Streets/Topo vector styles enabled by the local PMTiles archive.
 - `frontend/src/services/api.js` implements the full contract: 2500-cap 2×2 bbox tiling,
   `CORS` via config defaults, `unclassified` shown only when the batch actually contains
   it, and backend `caveat_flag` text rendered verbatim (never a fabricated accuracy number).
 
-## 8. Docker — run it
+## 9. Docker — run it
 
 ```powershell
 docker compose up backend        # builds + boots the API on :8000
@@ -175,15 +231,21 @@ docker compose up backend        # builds + boots the API on :8000
 docker build -t sih2026-backend .
 ```
 
-- The image bakes in `models/PS26162_catboost_final/inference_bundle/` and the processed
-  parquets, and on first boot seeds a writable volume. A `./app:/app/app` mount gives
-  dev-mode reload; `./data/processed:/data:ro` lets fresh host parquets shadow the baked ones.
+- The build is **self-contained from a fresh clone**: without the serving
+  parquets it produces a degraded-mode image (API boots, `/health` reports the
+  missing store) — run `python scripts/fetch_serving_data.py` first to bake in
+  real data.
+- The image bakes in `models/PS26162_catboost_final/inference_bundle/` and, when
+  present, the processed parquets, and on first boot seeds a writable volume. A
+  `./app:/app/app` mount gives dev-mode reload; `./data/processed:/data:ro` lets
+  fresh host parquets shadow the baked ones.
 - The compose file has a single `backend` service (legacy Postgres/Redis/ml-worker services
   were removed in the 2026-09-02 cleanup).
 
-## 9. API summary
+## 10. API summary
 
 Base path `http://localhost:8000/api/v1` (root prediction aliases also exposed without the prefix).
+Full route-by-route reference: [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md).
 
 | Endpoint | Purpose |
 | :--- | :--- |
@@ -218,7 +280,7 @@ Example `PredictionResponse` (detail):
 
 One `acq_date` per request (no date ranges); `zoom` optional (default 8, range 1–20).
 
-## 10. Tests
+## 11. Tests & CI
 
 ```powershell
 python -m pytest -m "not live"   # default addopts — offline suite
@@ -226,30 +288,38 @@ python -m pytest -m live         # live FIRMS calls (opt-in, burns transactions)
 ```
 
 `pyproject.toml` sets `addopts = "-m 'not live'"` so the offline suite is the default
-and live API calls are an explicit marker (135 passed, 1 deselected on 2026-09-10).
+and live API calls are an explicit marker. Latest verification counts live in
+[`AGENT_LOG.md`](AGENT_LOG.md) (re-run with every meaningful change).
+
 There is **no frontend test script** — `lint` and `build` are the verification
-hooks there (both green on 2026-09-10).
+hooks. CI (`.github/workflows/`): backend pytest + notebook-strip check (`test.yml`),
+Ruff + advisory mypy on Python 3.12 (`lint.yml`), frontend oxlint + build
+(`frontend.yml`), and a fresh-clone Docker build + `/health` smoke run (`docker.yml`).
 
-## 11. Contributing & agent conventions
+## 12. Contributing & agent conventions
 
-- [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md) — shared agent context (frontend
-  Owner A/B split, locked taxonomy, logging protocol).
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution workflow.
+- [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md) — shared agent context
+  (locked taxonomy, logging protocol); historical per-agent briefs are in
+  [`docs/archive/internal/`](docs/archive/internal/).
 - [`AGENT_LOG.md`](AGENT_LOG.md) — append-only change log (read it before commits).
-- [`docs/`](docs/) — architecture, decisions, and the `AGENT_A_PROMPT` / `AGENT_B_PROMPT` briefs.
+- [`docs/README.md`](docs/README.md) — the documentation map (current docs vs
+  [`docs/archive/`](docs/archive/README.md)).
 
-## 12. Git & large artifacts
+## 13. Git & artifacts
 
 - Secrets (`.env`), runtime DBs (`*.duckdb*`), processed/source parquets, and raw model
   outputs are **gitignored** — never commit them.
 - The **served model bundle** `models/PS26162_catboost_final/inference_bundle/` IS tracked
-  (it is the deployed contract). Other `.cbm`/`.joblib` binaries are ignored.
-- To reproduce serving data from scratch, run the ingestion pipeline inside `ingestion/`;
-  to redistribute the model, attach it to a GitHub Release.
+  (it is the deployed contract).
+- Everything else large (serving snapshots, the PMTiles basemap, timeline layers)
+  is distributed via **GitHub Releases** — policy and current status:
+  [`docs/RELEASES.md`](docs/RELEASES.md). To reproduce serving data from scratch,
+  run the ingestion pipeline inside `ingestion/`.
 
-## 13. License
+## 14. License & attribution
 
-**No license has been chosen yet.** There is no `LICENSE` file and no license
-field in `pyproject.toml`; absent a license, default copyright applies (all
-rights reserved by the project team). This is an open decision, recorded
-honestly rather than papered over.
+Distributed under the [MIT License](LICENSE). Third-party data, tiles, fonts, and
+libraries keep their own licenses — sources and required attributions are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (NASA FIRMS/GIBS, OpenStreetMap/Geofabrik,
+Esri, Mapzen/AWS terrain, WRI, Noto Sans, Inter, and the main JS/Python dependencies).

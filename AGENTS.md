@@ -99,7 +99,7 @@ your ownership list, stop and log a note flagging it instead of editing it.
 
 Agent A imports from `api.js` and renders Agent B's components inside
 `FireMapPage.jsx`; Agent B never opens `FireMapPage.jsx`. Per-agent task lists:
-`docs/AGENT_A_PROMPT.md`, `docs/AGENT_B_PROMPT.md`.
+`docs/archive/internal/AGENT_A_PROMPT.md`, `docs/archive/internal/AGENT_B_PROMPT.md`.
 
 ## Worktrees
 

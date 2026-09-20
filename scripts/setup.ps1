@@ -43,7 +43,7 @@ $static = 'data/processed/sih2026_h3_daily_features_with_osm_wri.parquet'
 if (-not (Test-Path $daily) -or -not (Test-Path $static)) {
     if ($Mode -eq 'demo') {
         if ($DownloadServingData) {
-            $releaseUrl = 'https://github.com/dptel22/SIH_2026/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip'
+            $releaseUrl = 'https://github.com/dptel22/Trinetra-Fire-Intelligence-Platform/releases/download/serving-data-2026-09-09/sih2026-serving-data-v1.zip'
             $zip = Join-Path $env:TEMP 'sih2026-serving-data-v1.zip'
             Invoke-WebRequest -Uri $releaseUrl -OutFile $zip
             Expand-Archive -LiteralPath $zip -DestinationPath 'data/processed' -Force
