@@ -24,7 +24,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date as _date, timedelta
+from datetime import date as _date
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 

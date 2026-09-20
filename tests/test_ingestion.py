@@ -17,13 +17,12 @@ Live smoke test: mark `live` (deselected by default via pyproject addopts;
 run explicitly with `pytest -m live`).
 """
 
-import json
 import math
 import sys
 import threading
 from pathlib import Path
+from typing import ClassVar
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -32,14 +31,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.services.feature_store import FeatureStoreService
 from ingestion.aggregate import (
-    AggregationValidationError,
     DAILY_COLUMNS,
+    AggregationValidationError,
     build_daily_frame,
     cast_daily_dtypes,
 )
 from ingestion.firms_pull import (
-    IngestionError,
     NRT_COLUMNS,
+    IngestionError,
     _parse_csv,
     fetch_firms,
     harmonize_points,
@@ -48,18 +47,16 @@ from ingestion.firms_pull import (
 )
 from ingestion.osm_wri_load import (
     OFFSHORE_TOLERANCE_KM,
-    OSM_COLUMNS,
     OUTSIDE_INDIA_STATE,
-    RawInputError,
     SERVING_STATES,
     WRI_COLUMNS,
+    RawInputError,
     assign_states,
     compute_osm_features,
     compute_wri_features,
     validate_raw_inputs,
 )
 from ingestion.run_ingestion import (
-    RUN_HISTORY_PATH,
     run_ingestion,
 )
 
@@ -99,7 +96,7 @@ def mocked_firms(monkeypatch):
 
     class _Resp:
         status_code = 200
-        headers = {"Content-Length": "128"}
+        headers: ClassVar[dict[str, str]] = {"Content-Length": "128"}
 
         def __init__(self, text):
             self.text = text
@@ -167,7 +164,7 @@ def test_fetch_firms_empty_day_is_valid(monkeypatch):
 
     class _EmptyResp:
         status_code = 200
-        headers = {"Content-Length": "0"}
+        headers: ClassVar[dict[str, str]] = {"Content-Length": "0"}
         text = ""
 
     monkeypatch.setattr(fp, "_get", lambda url: _EmptyResp())
@@ -182,7 +179,7 @@ def test_fetch_firms_bad_key_fails_loud(monkeypatch):
 
     class _BadResp:
         status_code = 200
-        headers = {}
+        headers: ClassVar[dict[str, str]] = {}
         text = "Invalid MAP_KEY. Please check your key."
 
     monkeypatch.setattr(fp, "_get", lambda url: _BadResp())
@@ -315,7 +312,7 @@ def test_validate_raw_inputs_fail_loud(monkeypatch, tmp_path):
 def test_validate_raw_inputs_ok():
     try:
         validate_raw_inputs()  # must not raise when raw inputs exist
-    except Exception as exc:
+    except RawInputError as exc:
         pytest.skip(f"Raw inputs absent in demo setup: {exc}")
 
 
@@ -537,7 +534,6 @@ def test_reload_is_safe_under_concurrent_queries(tmp_path, monkeypatch):
     """Watch-item: a reload must never expose a half-swapped table pair."""
     daily_path = tmp_path / "daily.parquet"
     static_path = tmp_path / "static.parquet"
-    real_daily = pd.read_parquet(REAL_DAILY_PARQUET).head(2000)
     real_static = pd.read_parquet(REAL_STATIC_PARQUET).head(2000)
     _copy_parquet_slice(REAL_DAILY_PARQUET, daily_path, 2000)
     _copy_parquet_slice(REAL_STATIC_PARQUET, static_path, 2000)

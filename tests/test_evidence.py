@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings
 from app.main import app
-from ingestion import raw_archive
 from ingestion.raw_archive import write_raw_observations
 
 MODEL_EXISTS = Path(settings.MODEL_PATH).exists()

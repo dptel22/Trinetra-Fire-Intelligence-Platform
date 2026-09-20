@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pandas as pd
 
+from app.core.config import settings
+from app.services.feature_store import feature_store
 from pipeline.timeline_features import build_timeline_features
 from pipeline.transition_detection import annotate_transitions
-from app.services.feature_store import feature_store
-from app.core.config import settings
 
 
 class TimelineDateError(ValueError):
@@ -35,8 +35,8 @@ class TimelineService:
     MAX_LIMIT = 500
 
     # Materialized parquet layer that backs each request granularity.
-    LAYER_NAMES: dict[str, str] = {"day": "daily", "month": "monthly", "year": "yearly"}
-    REQUIRED_LAYERS: dict[str, str] = {
+    LAYER_NAMES: ClassVar[dict[str, str]] = {"day": "daily", "month": "monthly", "year": "yearly"}
+    REQUIRED_LAYERS: ClassVar[dict[str, str]] = {
         "daily": "h3_timeline_daily.parquet",
         "monthly": "h3_timeline_monthly.parquet",
         "yearly": "h3_timeline_yearly.parquet",
@@ -141,12 +141,12 @@ class TimelineService:
         if not materialized_at:
             return None
         try:
-            timestamp = datetime.fromisoformat(str(materialized_at).replace("Z", "+00:00"))
+            timestamp = datetime.fromisoformat(str(materialized_at))
         except ValueError:
             return None
         if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=timezone.utc)
-        return (datetime.now(timezone.utc) - timestamp).total_seconds() / 3600.0
+            timestamp = timestamp.replace(tzinfo=UTC)
+        return (datetime.now(UTC) - timestamp).total_seconds() / 3600.0
 
     @staticmethod
     def _materialization_meta(resolution: dict[str, Any], status: str, fallback_used: bool) -> dict[str, Any]:

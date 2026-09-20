@@ -6,13 +6,13 @@ from pathlib import Path
 import duckdb
 
 from app.core.config import settings
-from app.schemas.audit import AnalystOverrideRequest, AuditLogEntry, AuditLogResponse
 from app.schemas.alerts import (
     AlertActionRequest,
     AlertEvent,
     AlertState,
     AlertStatesResponse,
 )
+from app.schemas.audit import AnalystOverrideRequest, AuditLogEntry, AuditLogResponse
 
 # Model version string — bump this when a new trained artifact is deployed
 MODEL_VERSION = settings.VERSION

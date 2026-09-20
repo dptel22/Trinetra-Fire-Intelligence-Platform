@@ -9,16 +9,11 @@ Covers:
 
 from __future__ import annotations
 
-import os
-from unittest.mock import patch
-
-import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.services.audit_service import audit_service
 from app.services.feature_store import feature_store
 from app.services.model_service import model_service
 from tests.conftest import serving_data_present
@@ -173,7 +168,7 @@ def test_vectorization_numerical_parity_vs_reference_loop():
         b_probs = {p.class_name: p.probability for p in b_pred.probabilities}
         l_probs = {p.class_name: p.probability for p in l_pred.probabilities}
         assert set(b_probs.keys()) == set(l_probs.keys())
-        for cls in b_probs:
-            assert abs(b_probs[cls] - l_probs[cls]) < 1e-6, (
-                f"Row {i} class {cls} probability divergence: batch={b_probs[cls]} vs loop={l_probs[cls]}"
+        for cls, b_val in b_probs.items():
+            assert abs(b_val - l_probs[cls]) < 1e-6, (
+                f"Row {i} class {cls} probability divergence: batch={b_val} vs loop={l_probs[cls]}"
             )

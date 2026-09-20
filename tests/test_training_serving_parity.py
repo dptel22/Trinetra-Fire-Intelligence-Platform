@@ -200,10 +200,9 @@ def test_training_serving_feature_values_parity(h3, acq_date, case):
             continue  # both NULL: identical, no tolerance needed
 
         # Known NULL-vs-0.0 fill divergence on lag/rolling columns (AGENT_LOG 09-03).
-        if (t_is_na and s_val == 0.0) or (t_val == 0.0 and s_is_na):
-            if col in KNOWN_LAG_COLUMNS:
-                known_lag_divergence.append(f"{col}: training={t_val}, serving={s_val}")
-                continue
+        if ((t_is_na and s_val == 0.0) or (t_val == 0.0 and s_is_na)) and col in KNOWN_LAG_COLUMNS:
+            known_lag_divergence.append(f"{col}: training={t_val}, serving={s_val}")
+            continue
 
         if t_is_na != s_is_na:
             unexpected.append(f"Nullness mismatch on {col}: training={t_val}, serving={s_val}")

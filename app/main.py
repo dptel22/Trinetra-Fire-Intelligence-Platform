@@ -137,7 +137,7 @@ def get_prediction_cell_explanation_root(cell_id: str, acq_date: str = Query(...
         raise
     except ValueError as ve:
         raise _map_cell_lookup_error(ve)
-    except Exception:
+    except Exception:  # noqa: BLE001 — API boundary: sanitized 500
         raise HTTPException(status_code=500, detail="Cell explanation failed due to an internal server error.")
 
 @app.get("/predictions/{cell_id}", response_model=CellPredictionDetailResponse, dependencies=[Depends(require_feature_store)])
@@ -148,7 +148,7 @@ def get_prediction_cell_detail_root(cell_id: str, acq_date: str = Query(...)):
         raise
     except ValueError as ve:
         raise _map_cell_lookup_error(ve)
-    except Exception:
+    except Exception:  # noqa: BLE001 — API boundary: sanitized 500
         raise HTTPException(status_code=500, detail="Cell detail query failed due to an internal server error.")
 
 if __name__ == "__main__":

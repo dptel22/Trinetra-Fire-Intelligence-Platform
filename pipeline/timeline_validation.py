@@ -14,9 +14,10 @@ import hashlib
 import json
 import logging
 import shutil
-from datetime import date
+from collections.abc import Callable
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -162,7 +163,7 @@ def check_utc_dates(staging: Path, report: dict[str, Any]) -> bool:
     daily = pd.read_parquet(staging / "h3_timeline_daily_full.parquet", columns=["acq_date"])
     dates = pd.to_datetime(daily["acq_date"], errors="coerce")
     ok = dates.notna().all()
-    in_range = bool(dates.min().date() >= date(2019, 9, 1) and dates.max().date() <= date.today()) if ok else False
+    in_range = bool(dates.min().date() >= date(2019, 9, 1) and dates.max().date() <= datetime.now(UTC).date()) if ok else False
     report["utc_dates"] = {
         "unparseable": int(dates.isna().sum()),
         "min": str(dates.min().date()) if ok else None,
@@ -173,8 +174,9 @@ def check_utc_dates(staging: Path, report: dict[str, Any]) -> bool:
 
 
 def check_state_counts_and_land_mask(staging: Path, report: dict[str, Any]) -> bool:
-    from ingestion.osm_wri_load import OUTSIDE_INDIA_STATE, assign_states
     from h3 import cell_to_latlng
+
+    from ingestion.osm_wri_load import OUTSIDE_INDIA_STATE, assign_states
 
     daily = pd.read_parquet(staging / "h3_timeline_daily_full.parquet", columns=["h3_08", "n_detections"])
     cells = daily.groupby("h3_08", as_index=False)["n_detections"].sum()
@@ -211,7 +213,7 @@ def check_archive_gaps(staging: Path, report: dict[str, Any]) -> bool:
     diffs = daily.groupby("h3_08")["acq_date"].diff().dt.days
     gap_events = diffs[diffs > 31]  # >30-day hole between observed days
     report["archive_gaps"] = {
-        "gap_events_over_30d": int(len(gap_events)),
+        "gap_events_over_30d": len(gap_events),
         "cells_with_gap_over_30d": int(daily.loc[gap_events.index, "h3_08"].nunique()) if len(gap_events) else 0,
         "largest_gap_days": int(diffs.max() - 1) if len(diffs) else 0,
     }
@@ -261,7 +263,7 @@ def seasonal_comparability(staging: Path, report: dict[str, Any]) -> bool:
     if live_path.exists():
         live = pd.read_parquet(live_path, columns=["acq_date"])
         live_years = pd.to_datetime(live["acq_date"]).dt.year
-        current_year = date.today().year
+        current_year = datetime.now(UTC).date().year
         candidates = sorted({y for y in live_years.unique()
                              if y < current_year and _complete_sep_dec_year(live, int(y))}, reverse=True)
         baseline_year = int(candidates[0]) if candidates else None

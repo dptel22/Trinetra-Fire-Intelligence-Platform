@@ -1,6 +1,14 @@
 from fastapi import APIRouter, Depends
 
-from app.api.endpoints import alerts, archive, audit, classify, evidence, health, timeline
+from app.api.endpoints import (
+    alerts,
+    archive,
+    audit,
+    classify,
+    evidence,
+    health,
+    timeline,
+)
 from app.services.feature_store import feature_store
 
 

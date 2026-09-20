@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 import pandas as pd
 import pytest
@@ -148,15 +149,15 @@ class TestIngestionHook:
 
         class _Resp:
             status_code = 200
-            headers = {"Content-Length": "128"}
+            headers: ClassVar[dict[str, str]] = {"Content-Length": "128"}
 
             def __init__(self, text):
                 self.text = text
 
         monkeypatch.setattr(fp, "_get", lambda url: _Resp(_firms_csv("N20" if "NOAA20" in url else "N")))
 
-        from ingestion.run_ingestion import run_ingestion
         from ingestion.osm_wri_load import RawInputError
+        from ingestion.run_ingestion import run_ingestion
 
         try:
             stats = run_ingestion(
@@ -182,8 +183,8 @@ class TestIngestionHook:
 
     def test_override_run_skips_raw_archive(self, tmp_path, real_slice_env):
         daily_path, static_path = real_slice_env
-        from ingestion.run_ingestion import run_ingestion
         from ingestion.osm_wri_load import RawInputError
+        from ingestion.run_ingestion import run_ingestion
 
         # Override points must be post-harmonize (like harmonize_points output):
         # normalized daynight enum + the NRT fire-type flags.

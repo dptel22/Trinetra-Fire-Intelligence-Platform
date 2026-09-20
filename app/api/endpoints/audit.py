@@ -32,7 +32,7 @@ def record_analyst_override(request: AnalystOverrideRequest):
             try:
                 detail = model_service.get_cell_detail(cell_id, acq_date)
                 model_prediction = f"{detail.predicted_class} (confidence: {detail.confidence:.4f})"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — best-effort enrichment; the override is still recorded as 'unresolved'
                 logger.warning("Could not resolve model prediction for hotspot %s: %s", request.hotspot_id, exc)
                 model_prediction = "unresolved"
 

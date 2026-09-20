@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -29,9 +29,10 @@ def build_materialized_layers(daily: pd.DataFrame, output_dir: str | Path) -> di
     features.to_parquet(paths["daily"], index=False)
     for granularity in ("month", "year"):
         frame = TimelineService._period_frame(features, granularity)
-        frame["period"] = frame["period_start"].map(
-            lambda value: str(value.year) if granularity == "year" else f"{value.year:04d}-{value.month:02d}"
-        )
+        if granularity == "year":
+            frame["period"] = frame["period_start"].map(lambda value: str(value.year))
+        else:
+            frame["period"] = frame["period_start"].map(lambda value: f"{value.year:04d}-{value.month:02d}")
         frame.to_parquet(paths["monthly" if granularity == "month" else "yearly"], index=False)
 
     _write_manifest(output, features, paths)
@@ -43,7 +44,7 @@ def _write_manifest(output: Path, features: pd.DataFrame, paths: dict[str, Path]
     manifest_path = output / settings.TIMELINE_MANIFEST_FILE
     manifest = {
         "materialization_version": settings.TIMELINE_MATERIALIZATION_VERSION,
-        "materialized_at": datetime.now(timezone.utc).isoformat(),
+        "materialized_at": datetime.now(UTC).isoformat(),
         "materialized_start_date": features["acq_date"].min().date().isoformat(),
         "materialized_end_date": features["acq_date"].max().date().isoformat(),
         "layers": {name: path.name for name, path in paths.items()},

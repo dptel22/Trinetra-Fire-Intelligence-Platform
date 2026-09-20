@@ -195,8 +195,8 @@ def _annotate_cell(group: pd.DataFrame) -> list[dict[str, Any]]:
                     a, b = supporting
                     _accept(
                         c, a, b, f"{last}_to_{r}",
-                        f"month {str(calendar[c])}: trailing-12 regime {last} -> {r}, "
-                        f"evidence months {str(calendar[a])}/{str(calendar[b])}",
+                        f"month {calendar[c]!s}: trailing-12 regime {last} -> {r}, "
+                        f"evidence months {calendar[a]!s}/{calendar[b]!s}",
                     )
             elif (
                 has_class
@@ -207,7 +207,7 @@ def _annotate_cell(group: pd.DataFrame) -> list[dict[str, Any]]:
                 a, b = supporting
                 _accept(
                     c, a, b, "class_change",
-                    f"month {str(calendar[c])}: dominant class "
+                    f"month {calendar[c]!s}: dominant class "
                     f"{class_cal[c - 1]} -> {class_cal[c]}",
                 )
         last = r
@@ -229,7 +229,7 @@ def _annotate_cell(group: pd.DataFrame) -> list[dict[str, Any]]:
             continue
         _accept(
             c, c, c + 1, "thermal_regime_change",
-            f"month {str(calendar[c])}: persistent-run detection volume stepped "
+            f"month {calendar[c]!s}: persistent-run detection volume stepped "
             f"{prior_mean:.1f}/mo -> {recent_mean:.1f}/mo (6-month means)",
         )
         break  # one intensity annotation per persistent run
@@ -251,6 +251,6 @@ def annotate_transitions(monthly_frame: pd.DataFrame) -> pd.DataFrame:
         ann_df = pd.DataFrame(_annotate_cell(ordered), index=ordered.index)
         for col in _BASE:
             out.loc[ann_df.index, col] = ann_df[col]
-    assert bool((out["land_use_claim"] == False).all())  # noqa: E712 — hard guarantee
+    assert bool((out["land_use_claim"] == False).all())
     assert set(out["transition_state"].unique()) <= TRANSITION_STATES
     return out

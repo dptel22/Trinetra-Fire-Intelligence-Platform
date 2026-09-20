@@ -78,7 +78,7 @@ class TestArchiveDates:
         assert body["data_mode"] in {"live", "historical", "demo", "offline"}
 
     def test_dates_offline_when_store_empty(self, client, monkeypatch):
-        monkeypatch.setattr(feature_store, "available_dates", lambda: [])
+        monkeypatch.setattr(feature_store, "available_dates", list)
         res = client.get("/api/v1/archive/dates")
         assert res.status_code == 200
         body = res.json()
@@ -121,7 +121,7 @@ class TestArchivePredictions:
         assert any(states), "state provenance missing on archived predictions"
         assert "Outside India" not in set(states), "outside-India rows must stay excluded"
         # nationwide serving: more than one state on a real day
-        assert len(set(s for s in states if s)) >= 1
+        assert len({s for s in states if s}) >= 1
         for pred in preds:
             assert "geography" in pred
             assert pred["geography"] in {"training_geography", "india_outside_training", "outside_india", None}

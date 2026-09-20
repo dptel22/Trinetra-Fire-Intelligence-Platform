@@ -9,11 +9,10 @@ a failed positive test was rationalized away; see AGENT_LOG correction).
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from pipeline.transition_detection import (
-    TRANSITION_STATES,
     MAX_BOUNDARY_GAP_DAYS,
+    TRANSITION_STATES,
     annotate_transitions,
 )
 
@@ -220,7 +219,7 @@ def test_land_use_claim_false_always():
         ),
     ]
     out = annotate_transitions(pd.concat(frames, ignore_index=True))
-    assert (out["land_use_claim"] == False).all()  # noqa: E712
+    assert (out["land_use_claim"] == False).all()
 
 
 def test_transition_state_set_is_exactly_six():
@@ -243,8 +242,9 @@ def test_output_states_always_valid():
 def test_end_to_end_monthly_layer_carries_transitions(tmp_path):
     """daily df -> build_materialized_layers -> monthly parquet -> the layer
     itself contains the accepted transition annotation."""
-    from pipeline.timeline_materializer import build_materialized_layers
     import pandas as pd
+
+    from pipeline.timeline_materializer import build_materialized_layers
 
     rows = []
     def add_days(year, months_active):
@@ -268,4 +268,4 @@ def test_end_to_end_monthly_layer_carries_transitions(tmp_path):
     assert "transition_state" in monthly.columns
     fired = monthly[monthly["transition_state"] == "seasonal_to_persistent"]
     assert len(fired) == 1, monthly[["period", "n_detections", "transition_state"]].to_string()
-    assert (monthly["land_use_claim"] == False).all()  # noqa: E712
+    assert (monthly["land_use_claim"] == False).all()

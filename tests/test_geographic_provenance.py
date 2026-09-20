@@ -101,7 +101,6 @@ def test_training_geography_loads_from_bundle_metadata():
     fallback — a missing/renamed metadata file must never silently change
     provenance labels."""
     import json
-
     from pathlib import Path as _Path
 
     meta_path = _Path(settings.INFERENCE_BUNDLE_DIR).parent / "model_metadata.json"

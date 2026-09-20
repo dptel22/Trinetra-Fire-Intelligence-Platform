@@ -229,7 +229,6 @@ class FeatureStoreService:
         self, h3_index: str, start_date: str | None = None, end_date: str | None = None
     ):
         """Return the H3-day evidence stream for one cell in date order."""
-        import pandas as pd
 
         self.load()
         clauses = ["d.h3_08 = ?"]

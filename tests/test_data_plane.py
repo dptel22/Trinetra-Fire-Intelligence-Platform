@@ -24,7 +24,7 @@ Live FIRMS smoke tests stay in tests/test_ingestion.py (`pytest -m live`).
 import hashlib
 import sys
 import threading
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -36,12 +36,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.core.config import settings
 from app.services.feature_store import FeatureStoreService
 from ingestion.aggregate import DAILY_COLUMNS
-from tests.conftest import serving_data_present
 from ingestion.run_ingestion import (
     BACKUP_DIR,
     RUN_HISTORY_PATH,
     STATIC_FILE_COLUMNS,
 )
+from tests.conftest import serving_data_present
 
 REAL_DAILY_PARQUET = Path(settings.H3_DAILY_PARQUET)
 REAL_STATIC_PARQUET = Path(settings.OSMWRI_PARQUET)
@@ -244,11 +244,12 @@ def test_serving_data_is_fresh():
         except (OSError, json.JSONDecodeError):
             pass
     max_date = pd.to_datetime(pd.read_parquet(REAL_DAILY_PARQUET, columns=["acq_date"])["acq_date"]).max().date()
-    if max_date < date.today() - timedelta(days=2):
+    today_utc = datetime.now(UTC).date()  # acq_date is a UTC acquisition date
+    if max_date < today_utc - timedelta(days=2):
         if not RUN_HISTORY_PATH.exists() or not (last_run and last_run.get('ok')):
             pytest.skip(f"serving data is a static dataset snapshot: max(acq_date)={max_date}; live ingestion has not run here")
         pytest.fail(
-            f"serving data is stale: max(acq_date)={max_date}, today={date.today()}, "
+            f"serving data is stale: max(acq_date)={max_date}, today={today_utc}, "
             f"last ingestion run={'ok' if last_run and last_run.get('ok') else 'none/failed'} — run ingestion"
         )
 
@@ -328,8 +329,8 @@ def test_invalid_legacy_state_assignment_never_serves(tmp_path, monkeypatch):
 @pytest.mark.skipif(not REAL_ARTIFACTS, reason="Real serving parquets not present")
 def test_get_cell_is_safe_under_concurrent_reload(tmp_path, monkeypatch):
     """Queries racing a reload must never observe a half-swapped table pair."""
-    store, daily_path, _static_path = _make_tmp_store(tmp_path, monkeypatch)
-    static = pd.read_parquet(static_path := tmp_path / "static.parquet").head(1).iloc[0]
+    store, _daily_path, static_path = _make_tmp_store(tmp_path, monkeypatch)
+    static = pd.read_parquet(static_path).head(1).iloc[0]
     cell_id, acq_date = str(static["h3_08"]), str(pd.Timestamp(static["acq_date"]).date())
 
     errors: list[Exception] = []
