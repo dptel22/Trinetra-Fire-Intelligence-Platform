@@ -1496,3 +1496,13 @@ pm run lint: 0 warnings, 0 errors.
 
 **Verification:** `npm run lint` clean (0 warnings, 0 errors); `npm run build` succeeds (exit 0).
 
+---
+
+## 2026-09-20 — Documentation update: System Architecture Diagram
+
+**Files modified:**
+- `README.md`: Added `diagram.png` (End-to-End System Architecture diagram) to Section 3 ("Architecture & data flow").
+
+**Interface impact:** None (documentation only).
+
+

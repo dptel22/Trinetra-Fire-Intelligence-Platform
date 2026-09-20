@@ -65,6 +65,8 @@ SIH_2026/
 
 ## 3. Architecture & data flow
 
+![Trinetra End-to-End System Architecture](diagram.png)
+
 ```
 NASA FIRMS (VIIRS) ──> ingestion/ ──> data/processed/*.parquet
                                           │ (DuckDB feature store, gitignored)
