@@ -1590,3 +1590,39 @@ pm run lint: 0 warnings, 0 errors.
 **Verification:**
 - `npm run lint` → 0 warnings, 0 errors; `npm run build` → exit 0 (2026-09-20).
 - Backend proof above (explain_single today vs latest) confirms both the trigger condition and the fix path (404 → retry with `latest_acq_date` → 200 with `feature_attributions`).
+
+---
+
+## 2026-09-20 — Env: venv not broken; added `run-backend.bat` launcher (system-Python 3.14 pitfall)
+
+**Trigger:** user report "fix the venv" with a pasted log showing `pip install` failing to compile scikit-learn 1.6.1 from source (MSVC/ninja build, `cp314` artifacts, pip 26.1.2 from `C:\Python314`) followed by two uvicorn launches that started fine.
+
+**Diagnosis (evidenced):** the project venv `.venv` (uv-managed CPython 3.12.13, prompt `sih-2026`) is fully healthy — all pinned versions match `requirements.txt` exactly (catboost 1.2.10, scikit-learn 1.6.1, h3 4.5.0, fastapi 0.141.1, uvicorn 0.52.4). The pip failure came from running `pip` against **system Python 3.14** (`C:\Python314`), which has no prebuilt sklearn 1.6.1 cp314 wheels → doomed source build (fatal C1083). Nothing to reinstall. `GET /health` on the venv-booted server returned healthy (model loaded, DB connected, ingestion last_run_ok, latest_acq_date 2026-09-19).
+
+**Files created:**
+- `run-backend.bat` (repo root): always launches uvicorn through `.venv\Scripts\python.exe` (never an ambient `pip`/`python` on PATH); auto-creates the venv via `uv venv --python 3.12` + `pip install -r requirements.txt` if `.venv` is missing.
+
+**Verification:** `run-backend.bat` → uvicorn boots from `.venv`, binds 0.0.0.0:8000, `/health` healthy (new PID 28236; prior user-launched PID 23804 had exited and released the audit_log.duckdb lock).
+
+**Interface impact:** none — tooling only, no app/ or ingestion/ code touched.
+
+---
+
+## 2026-09-20 — Applied 5-patch submission-readiness series via `git am` (user-provided mbox files)
+
+**Trigger:** user asked to apply patches from `C:\Users\dhruv\Downloads\files\` (0001–0005), verify tests with/without serving data, ruff, and push.
+
+**Applied (all clean, no conflicts), now on main as new commits:**
+1. `fix(scripts): fetch_serving_data accepts the published Get-FileHash manifest shape`
+2. `fix(backend): boot degraded and fail closed (503) when serving parquets are missing`
+3. `test(ingestion): skip end-to-end ingestion test when raw OSM/WRI/shapefile inputs are absent`
+4. `style: make ruff clean on app/ pipeline/ tests/ (CI lint scope, ruff 0.16.6 per uv.lock)`
+5. `docs: correct snapshot coverage, degraded-mode behavior, test counts; add screenshots and model limits to README`
+
+**Verification:**
+- `pytest -m "not live"` **with** serving parquets present (data/processed/*.parquet): 9 failed, 189 passed, 1 skipped. Cross-checked against detached-HEAD baseline 9aeec8e (pre-patch) run in the same tree: **identical 9 failures** (test_archive 1, test_data_plane 4, test_ingestion 2, test_raw_archive 2) — all pre-existing backfill-data-state issues, zero regressions from the patches.
+- `pytest -m "not live"` **without** serving parquets (renamed out, fresh-clone simulation): **121 passed, 78 skipped, 0 failed** — patch 2's degraded/fail-closed behavior holds; parquets restored afterwards.
+- `ruff check app/ pipeline/ tests/` → All checks passed.
+- `run-backend.bat`'s `run-backend.bat` remains untracked (not part of this push).
+
+**Interface impact:** patch 2 changes backend boot/HTTP behavior only when serving parquets are absent (503 fail-closed) — no contract change when data is present.
