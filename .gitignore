@@ -3,6 +3,7 @@ data/raw/**
 data/processed/**
 data/archive/**
 !data/sample/**
+!data/processed/.gitkeep
 data/DL_FIRE_*
 data/*.zip
 *.duckdb*
@@ -17,6 +18,26 @@ notebooks/eda/*.parquet
 .claude/
 .mimosa/
 .scratch-requirements-repro/
+
+# Local agent tooling binaries + generated output (not part of the shipped
+# project; the skill md/toml definitions stay tracked, only built binaries
+# and derived output are excluded)
+.impeccable/
+.superpowers/
+graphify-out/
+.agents/skills/*/scripts/bin/
+.github/skills/*/scripts/bin/
+**/impeccable.exe
+
+# Legacy root notebook exports (kept on disk only)
+/FIRMS DATA EDA
+/Cat boost training notebook
+/OSI and WRI EDA
+
+# Unused local Blue Marble raster fallback (code uses NASA GIBS remote tiles;
+# see docs/PMTILES_BUILD.md for the per-basemap source table)
+frontend/public/tiles/bluemarble.jpg
+frontend/public/tiles/bluemarble/
 
 
 # Model artifacts - use GitHub Releases instead of committing binaries
