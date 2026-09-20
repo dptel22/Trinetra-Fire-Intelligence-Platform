@@ -4,7 +4,10 @@
 # when live ingestion runs in a container.
 data/raw/
 data/processed/backup_nationwide_pre_10state/
+data/processed/backup_pre_2019_backfill/
+data/processed/timeline/
 data/processed/ingestion_run_history.json
+data/processed/*.log
 data/feature_store.duckdb
 data/audit_log.duckdb
 .venv/

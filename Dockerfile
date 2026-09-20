@@ -27,8 +27,14 @@ ENV OSMWRI_PARQUET=/data/sih2026_h3_daily_features_with_osm_wri.parquet
 ENV DUCKDB_PATH=/data/feature_store.duckdb
 ENV H3_RESOLUTION=8
 
-COPY data/processed/sih2026_h3_daily_features_firms.parquet /data/
-COPY data/processed/sih2026_h3_daily_features_with_osm_wri.parquet /data/
+# Bake in the serving parquets when they exist on the build host (fetched
+# from the serving-data GitHub Release via scripts/fetch_serving_data.py, or
+# produced by ingestion/). On a fresh clone without data this COPY still
+# succeeds (only data/processed/.gitkeep is tracked), and the container boots
+# in degraded mode — the API comes up, /health reports the missing store, and
+# the frontend falls back to its visibly-flagged mock mode. Backup dirs,
+# timeline layers, and run logs are excluded via .dockerignore.
+COPY data/processed/ /data/
 
 EXPOSE 8000
 
