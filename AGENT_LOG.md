@@ -1569,3 +1569,24 @@ pm run lint: 0 warnings, 0 errors.
 **Interface impact:** none at runtime (docs, git metadata, CI, one test-collection guard, Dockerfile COPY semantics). Contract, routes, and taxonomy untouched.
 
 **Not done (deliberate):** serving-data/PMTiles release uploads (backfill in flight — cut releases only after promotion + validation; PMTiles ~1.98 GiB fits the 2 GiB asset cap); `BACKEND_DOCUMENTATION.md` deep refresh deferred (API_REFERENCE covers the route map).
+
+---
+
+## 2026-09-20 — Fix: SHAP explain panel never showing feature attributions (acq_date desync)
+
+**Trigger:** user report — clicking a hexagon opened the inspector, but "Why this label? (SHAP Analysis)" never listed the boosting features (panel fell back to "No feature attribution data returned for this cell.").
+
+**Root cause (demonstrated, not guessed):** `FireMapPage` held `acqDate` at today with no setter (`const [acqDate] = useState(...)`, `isToday = true` hardcoded), while `fetchPredictions` (api.js) silently falls back to the store's `latest_acq_date` when the requested day has no rows — so the map renders fallback-day data but every downstream per-date call still queried the calendar day. `fetchExplanation(cell_id, today)` hit `GET /predictions/{cell_id}/explain` → `explain_single` → `get_cell(h3, today)` → `ValueError("No H3-day features found ...")` → HTTP 404 → the error was swallowed (`catch { setExplanation(null) }`) → misleading "no attribution data" message. Proof run 2026-09-20 via `model_service.explain_single` on the live store: `latest_acq_date=2026-09-19`, today=2026-09-20 — explain(today) raises the 404-mapped ValueError; explain(2026-09-19) succeeds with attributions (top: dist_osm_farmland_km, daynight, frp_max). Cell timeline in the panel still worked because it queries all dates — which isolated the fault to the per-date explain path.
+
+**Files modified:**
+- `frontend/src/services/api.js`: `fetchPredictions` gained optional `{ onEffectiveDate }` 4th param — invoked with the fallback date when the requested day had no rows (non-breaking; single verified caller). `fetchExplanation` now retries once with `latest_acq_date` on HTTP 404 (same fallback rule as the map, skipped for the 'historical' pseudo-date) — belt-and-suspenders against date races.
+- `frontend/src/components/FireMapPage.jsx`: `acqDate` now has a setter and adopts the effective date via `onEffectiveDate` (effect deps `[acqDate, viewport]` refetch once and converge); `isToday` derived (`acqDate === todayStr`) instead of hardcoded `true` so the sidebar Observation Date label is honest; new `explanationError` state — `handleRequestExplanation` stores `err.message` instead of swallowing; cleared at all selection-change sites (hex click, locate flow, clear-selection) and passed to the panel.
+- `frontend/src/components/HexInspectorPanel.jsx`: new `explanationError` prop rendered as a real `role="alert"` line ("Explanation unavailable: ...") — the "No feature attribution data returned" message now only appears for genuine empty 200s; loading text "defense-grade SHAP attribution vectors" → "Fetching SHAP feature attributions..." (aligns with the C-33 claim-hygiene pass); attribution cards show the signed `shap_value` (e.g. `+1.84`) instead of the backend's redundant `contribution` word ("increases").
+
+**Interface impact:** none at the API contract level. `fetchPredictions` signature extended optionally (backwards compatible); `HexInspectorPanel` prop added optionally. No backend changes — route/contract/SHAP computation were correct; the bug was purely client-side date desync + silent error swallowing.
+
+**File-ownership note:** touches Agent A (`FireMapPage.jsx`) and Agent B (`api.js`, `HexInspectorPanel.jsx`) files; done on direct user request as integrator, crossover logged here.
+
+**Verification:**
+- `npm run lint` → 0 warnings, 0 errors; `npm run build` → exit 0 (2026-09-20).
+- Backend proof above (explain_single today vs latest) confirms both the trigger condition and the fix path (404 → retry with `latest_acq_date` → 200 with `feature_attributions`).

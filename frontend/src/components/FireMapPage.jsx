@@ -154,10 +154,12 @@ export default function FireMapPage() {
   // Observation date: starts at today, then snaps to the newest date the
   // backend actually holds (latest_acq_date from /health). Requesting a
   // calendar day with no ingested data yields a valid empty 200 — the map
-  // must query the store's real newest day, not guess one.
+  // must query the store's real newest day, not guess one. The snapped date
+  // comes back via fetchPredictions' onEffectiveDate so per-date calls (cell
+  // explain) query the same day the map actually rendered.
   const todayStr = new Date().toLocaleDateString('en-CA');
-  const [acqDate] = useState(() => todayStr);
-  const isToday = true;
+  const [acqDate, setAcqDate] = useState(() => todayStr);
+  const isToday = acqDate === todayStr;
 
   // activeClasses is a Set — seeded with all 5, matching original all-on default
   const [activeClasses, setActiveClasses] = useState(
@@ -166,6 +168,7 @@ export default function FireMapPage() {
 
   const [selectedCell, setSelectedCell] = useState(null);
   const [explanation, setExplanation] = useState(null);
+  const [explanationError, setExplanationError] = useState(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
 
   // Hover tooltip state: {x, y, cell} or null. React state only changes when
@@ -255,7 +258,9 @@ export default function FireMapPage() {
       try {
         const zoom = mapRef.current?.getMap?.()?.getZoom?.() ?? 5;
         const clampedZoom = Math.max(1, Math.min(20, zoom));
-        const res = await fetchPredictions(viewport, acqDate, clampedZoom);
+        const res = await fetchPredictions(viewport, acqDate, clampedZoom, {
+          onEffectiveDate: (date) => { if (isMounted) setAcqDate(date); }
+        });
         if (!isMounted) return;
         // res is PredictionResponse[] (Agent B's api.js returns the array directly)
         const arr = Array.isArray(res) ? res : (res?.predictions ?? []);
@@ -319,6 +324,7 @@ export default function FireMapPage() {
       });
     }
     setExplanation(null);
+    setExplanationError(null);
   }, []));
 
   // ── onRequestExplanation ──────────────────────────────────────────────────
@@ -326,14 +332,19 @@ export default function FireMapPage() {
     if (!selectedCell?.cell_id && !selectedCell?.h3_index) return;
     setLoadingExplanation(true);
     setExplanation(null);
+    setExplanationError(null);
     try {
       const result = await fetchExplanation(
         selectedCell.cell_id ?? selectedCell.h3_index,
         acqDate
       );
       setExplanation(result);
-    } catch {
+    } catch (err) {
+      // Surface the real failure — a silent null here renders the misleading
+      // "No feature attribution data returned" message for what may be a
+      // transport/HTTP error.
       setExplanation(null);
+      setExplanationError(err?.message || 'Explanation request failed.');
     } finally {
       setLoadingExplanation(false);
     }
@@ -443,6 +454,7 @@ export default function FireMapPage() {
         if (object) {
           setSelectedCell(object);
           setExplanation(null);
+          setExplanationError(null);
         }
       },
       onHover: handleIconHover,
@@ -630,6 +642,7 @@ export default function FireMapPage() {
               onClick={() => {
                 setSelectedCell(null);
                 setExplanation(null);
+                setExplanationError(null);
               }}
             >
               ✕ Clear selection
@@ -642,6 +655,7 @@ export default function FireMapPage() {
             onRequestExplanation={handleRequestExplanation}
             explanation={explanation}
             loadingExplanation={loadingExplanation}
+            explanationError={explanationError}
           />
 
           {/* Detections in View count + data-quality provenance */}

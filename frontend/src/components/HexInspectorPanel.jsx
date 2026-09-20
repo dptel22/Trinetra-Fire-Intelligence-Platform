@@ -21,12 +21,16 @@ import { StatusBadge } from './FireAlertsPage';
  * - onRequestExplanation: () => void
  * - explanation: ExplanationResponse | null
  * - loadingExplanation: boolean
+ * - explanationError: string | null — transport/HTTP failure message from the
+ *   last explain request; shown as an alert instead of the misleading
+ *   "no attribution data" line (which stays reserved for genuine empty 200s).
  */
 export default function HexInspectorPanel({
   cell,
   onRequestExplanation = () => {},
   explanation = null,
-  loadingExplanation = false
+  loadingExplanation = false,
+  explanationError = null
 }) {
   const [isExplainOpen, setIsExplainOpen] = useState(false);
   const [timeline, setTimeline] = useState(null);
@@ -500,7 +504,7 @@ export default function HexInspectorPanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
             {loadingExplanation && (
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)', fontStyle: 'italic' }}>
-                Fetching defense-grade SHAP attribution vectors...
+                Fetching SHAP feature attributions...
               </div>
             )}
 
@@ -568,7 +572,7 @@ export default function HexInspectorPanel({
                     }}
                   >
                     <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '0.72rem' }}>
-                      {humanizeAttribution(attr).name} — {humanizeAttribution(attr).direction} ({attr.contribution})
+                      {humanizeAttribution(attr).name} — {humanizeAttribution(attr).direction} ({attr.shap_value != null ? `${attr.shap_value >= 0 ? '+' : ''}${attr.shap_value}` : attr.contribution})
                     </div>
                     <div style={{ color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.3 }}>
                       {humanizeAttribution(attr).detail} <span className="feature-audit">Raw: {attr.feature_name} = {attr.feature_value}</span>
@@ -578,7 +582,13 @@ export default function HexInspectorPanel({
               </div>
             )}
 
-            {!loadingExplanation && (!explanation || !explanation.feature_attributions) && (
+            {!loadingExplanation && explanationError && (
+              <div role="alert" style={{ fontSize: '0.75rem', color: '#e06c75', lineHeight: 1.4 }}>
+                Explanation unavailable: {explanationError}
+              </div>
+            )}
+
+            {!loadingExplanation && !explanationError && (!explanation || !explanation.feature_attributions) && (
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #8b949e)' }}>
                 No feature attribution data returned for this cell.
               </div>

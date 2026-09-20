@@ -467,9 +467,14 @@ const DEFAULT_ACQ_DATE = () => new Date().toLocaleDateString('en-CA');
  * @param {object|Array} bbox
  * @param {string} [acqDate=today YYYY-MM-DD]
  * @param {number} [zoom=8]
+ * @param {object} [options]
+ * @param {(effectiveDate: string) => void} [options.onEffectiveDate] - Called
+ *   with the store's latest ingested date when the requested date had no rows
+ *   and the fallback date was queried instead. Callers showing a date label
+ *   must adopt this date or downstream per-date calls (explain/detail) 404.
  * @returns {Promise<Array>} List of PredictionResponse objects
  */
-export async function fetchPredictions(bbox, acqDate = DEFAULT_ACQ_DATE(), zoom = 8) {
+export async function fetchPredictions(bbox, acqDate = DEFAULT_ACQ_DATE(), zoom = 8, { onEffectiveDate } = {}) {
   const normBbox = normalizeBbox(bbox);
   const effectiveDate = acqDate || DEFAULT_ACQ_DATE();
   const effectiveZoom = typeof zoom === 'number' ? Math.max(1, Math.min(20, zoom)) : 8.0;
@@ -484,6 +489,7 @@ export async function fetchPredictions(bbox, acqDate = DEFAULT_ACQ_DATE(), zoom 
       const latest = await fetchLatestAcqDate();
       if (latest && latest !== effectiveDate) {
         results = await fetchPredictionsWithTiling(normBbox, latest, effectiveZoom, 0);
+        if (typeof onEffectiveDate === 'function') onEffectiveDate(latest);
       }
     }
     if (currentMode !== 'live') {
@@ -1202,7 +1208,19 @@ export async function fetchExplanation(cellId, acqDate) {
     };
   }
 
-  const res = await fetch(`${BASE_URL}/api/v1/predictions/${encodeURIComponent(cellId)}/explain?acq_date=${effectiveDate}`);
+  const explainUrl = (date) => `${BASE_URL}/api/v1/predictions/${encodeURIComponent(cellId)}/explain?acq_date=${date}`;
+  let res = await fetch(explainUrl(effectiveDate));
+  // fetchPredictions silently falls back to the store's latest ingested day
+  // when the requested day holds no rows — a 404 here usually means the map is
+  // rendering that fallback day while the caller still passes the original
+  // date. Retry once on the day the store actually holds (same rule as the
+  // map: never for the 'historical' pseudo-date).
+  if (res.status === 404 && effectiveDate !== 'historical') {
+    const latest = await fetchLatestAcqDate();
+    if (latest && latest !== effectiveDate) {
+      res = await fetch(explainUrl(latest));
+    }
+  }
   if (!res.ok) {
     throw new Error(`Failed to fetch explanation for ${cellId}: HTTP ${res.status}`);
   }
