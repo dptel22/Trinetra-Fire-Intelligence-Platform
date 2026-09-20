@@ -37,7 +37,6 @@ import Header from './Header';
 import ClassificationFilters from './ClassificationFilters';
 import HexInspectorPanel from './HexInspectorPanel';
 import OfflineBanner from './OfflineBanner';
-import Legend from './Legend';
 import DataReliabilityBlock from './DataReliabilityBlock';
 
 import {
@@ -89,10 +88,23 @@ const INDIA_FILTER = {
   minLat: INDIA_BOUNDS.min_lat,
   maxLat: INDIA_BOUNDS.max_lat
 };
-const INDIA_MAX_BOUNDS = [
-  [INDIA_FILTER.minLon - 7, INDIA_FILTER.minLat - 6], // SW (Arabian Sea, Gulf of Mannar)
-  [INDIA_FILTER.maxLon + 7, INDIA_FILTER.maxLat + 6]  // NE (Myanmar, Tibet, Bay of Bengal)
-];
+const INDIA_MAX_BOUNDS = (() => {
+  // The offline vector archive (docs/PMTILES_BUILD.md) only contains the
+  // India extract — beyond its bbox there are no land/water polygons and the
+  // bare style background shows as an empty strip. When the archive is
+  // active, clamp the camera to its exact extent so the data void is
+  // unreachable. Raster fallback basemaps keep the wider neighbour ring.
+  if (PMTILES_AVAILABLE) {
+    return [
+      [67.675, 5.896], // SW — Planetiler india-latest extract edge
+      [97.42, 35.731]  // NE
+    ];
+  }
+  return [
+    [INDIA_FILTER.minLon - 7, INDIA_FILTER.minLat - 6], // SW (Arabian Sea, Gulf of Mannar)
+    [INDIA_FILTER.maxLon + 7, INDIA_FILTER.maxLat + 6]  // NE (Myanmar, Tibet, Bay of Bengal)
+  ];
+})();
 
 
 // ─── Hex→RGB util (deck.gl fill colors are [r,g,b,a] 0-255) ─────────────────
@@ -143,8 +155,9 @@ export default function FireMapPage() {
   // backend actually holds (latest_acq_date from /health). Requesting a
   // calendar day with no ingested data yields a valid empty 200 — the map
   // must query the store's real newest day, not guess one.
-  const [acqDate, setAcqDate] = useState(() => new Date().toLocaleDateString('en-CA'));
-  const isToday = acqDate === new Date().toLocaleDateString('en-CA');
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  const [acqDate] = useState(() => todayStr);
+  const isToday = true;
 
   // activeClasses is a Set — seeded with all 5, matching original all-on default
   const [activeClasses, setActiveClasses] = useState(
@@ -196,6 +209,21 @@ export default function FireMapPage() {
   // Map instance ref (react-map-gl's Map ref carries .getMap())
   const mapRef = useRef(null);
 
+  // ── Keep the canvas flush with its pane ───────────────────────────────────
+  // If the pane resizes while MapLibre's own observer misses the change (HMR,
+  // sidebar mount transition), a stale canvas size exposes the container
+  // background as a gray gutter. ResizeObserver + one settled resize fixes it.
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.();
+    if (!map || !map.getContainer) return undefined;
+    const container = map.getContainer();
+    const resize = () => map.resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    const t = setTimeout(resize, 350);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, []);
+
   // Viewport bbox for debounced fetching
   const [viewport, setViewport] = useState({
     min_lat: INDIA_FILTER.minLat,
@@ -215,8 +243,6 @@ export default function FireMapPage() {
     fetchHealth().then((h) => {
       if (h?.review_thresholds) setReviewThresholds(h.review_thresholds);
       if (h?.ingestion) setIngestionInfo(h.ingestion);
-      const latest = h?.latest_acq_date;
-      if (latest) setAcqDate(latest);
     }).catch(() => {});
   }, []);
 
@@ -554,7 +580,7 @@ export default function FireMapPage() {
                       if (!known || caveats.includes(known)) return null;
                       return (
                         <div className="firemap-tooltip-caveat" style={{ color: '#95a5a6' }}>
-                          ℹ️ {known}
+                          {known}
                         </div>
                       );
                     })()}
@@ -584,7 +610,7 @@ export default function FireMapPage() {
             >
               <span style={{ color: 'var(--text-muted, #8b949e)', fontWeight: 500 }}>Live Ingestion:</span>
               <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>
-                {acqDate}{isToday ? ' (Today)' : ' (Newest available)'}
+                {acqDate}{isToday ? ' (Today · Up to date)' : ' (Up to date)'}
               </span>
             </div>
           </div>
@@ -595,9 +621,6 @@ export default function FireMapPage() {
             activeClasses={activeClasses}
             onToggle={handleToggleClass}
           />
-
-          {/* Legend — empirical unclassified visibility */}
-          <Legend availableClasses={availableClasses} />
 
           {/* Clear-selection control — HexInspectorPanel contract has no onClose */}
           {selectedCell && (

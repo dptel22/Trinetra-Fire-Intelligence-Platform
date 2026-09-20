@@ -22,13 +22,16 @@ export default function TrinetraBrand({
   style = {}
 }) {
   const [inferredTheme, setInferredTheme] = useState(() => {
-    return document.documentElement.getAttribute('data-theme') || 
-           localStorage.getItem('trinetra_theme') || 
-           'light';
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') || 
+             (typeof localStorage !== 'undefined' ? localStorage.getItem('trinetra_theme') : null) || 
+             'light';
+    }
+    return (typeof localStorage !== 'undefined' ? localStorage.getItem('trinetra_theme') : null) || 'light';
   });
 
   useEffect(() => {
-    if (explicitTheme) return;
+    if (explicitTheme || typeof window === 'undefined' || typeof MutationObserver === 'undefined') return;
 
     const observer = new MutationObserver(() => {
       const active = document.documentElement.getAttribute('data-theme') || 'light';

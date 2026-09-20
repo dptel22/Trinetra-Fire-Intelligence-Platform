@@ -222,8 +222,8 @@ export default function HomePage() {
         }}
       >
         <div className="marquee-track">
-          {/* Duplicate ticker ×3 to ensure seamless CSS loop regardless of item count */}
-          {[0, 1, 2].map((copyIdx) => (
+          {/* Ticker duplicated exactly 2x so the -50% CSS loop is seamless */}
+          {[0, 1].map((copyIdx) => (
             <React.Fragment key={copyIdx}>
               {tickerItems.map((item, i) => (
                 <Link
@@ -247,12 +247,6 @@ export default function HomePage() {
 
             <div className="hero-content-grid" style={{ gridTemplateColumns: '1fr', padding: '3.5rem 3rem 2.5rem' }}>
               {/* Hero Main Content */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.85rem' }}>
-                  <img src="/images/trinetra-emblem-dark.png" alt="" style={{ width: '28px', height: '28px', display: 'inline-block', filter: 'drop-shadow(0 0 6px rgba(255, 107, 53, 0.6))' }} />
-                  <span className="eyebrow-tag" style={{ margin: 0 }}>
-                    BREAKING INTELLIGENCE · SATELLITE RADAR
-                  </span>
-                </div>
                 <h1 className="hero-main-title">
                   Not all hotspots are the same. We tell you which kind you're looking at.
                 </h1>
@@ -332,7 +326,7 @@ export default function HomePage() {
                       <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                         Industrial
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: '#E67E22', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#A85B12', fontWeight: 700 }}>
                         Active Flares
                       </span>
                     </Link>
@@ -359,7 +353,7 @@ export default function HomePage() {
                     >
                       {/* Mining Hexagon Badge */}
                       <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
-                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#4A5568" />
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#95A5A6" />
                         <path d="M25 58 L45 35 L62 48 L75 32" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                         <path d="M75 32 L75 42 M75 32 L65 32" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" fill="none" />
                         <path d="M48 65 L55 56 L62 65 Z M60 65 L66 58 L72 65 Z M32 65 H78" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" />
@@ -367,7 +361,7 @@ export default function HomePage() {
                       <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                         Mining
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: '#95A5A6', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#5F6C6D', fontWeight: 700 }}>
                         Smelter Activity
                       </span>
                     </Link>
@@ -379,7 +373,7 @@ export default function HomePage() {
                       style={{
                         textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
-                        border: '1px solid rgba(46, 204, 113, 0.35)',
+                        border: '1px solid rgba(241, 196, 15, 0.45)',
                         borderRadius: '14px',
                         padding: '1.75rem 1rem',
                         display: 'flex',
@@ -387,14 +381,14 @@ export default function HomePage() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         textAlign: 'center',
-                        boxShadow: '0 6px 20px rgba(46, 204, 113, 0.15)',
+                        boxShadow: '0 6px 20px rgba(241, 196, 15, 0.18)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                         cursor: 'pointer'
                       }}
                     >
                       {/* Agricultural Burn Hexagon Badge */}
                       <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
-                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#2ECC71" />
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#F1C40F" />
                         {/* Stalks & Flame */}
                         <path d="M28 48 C28 40 34 38 34 38 M34 48 C34 40 40 38 40 38" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" fill="none" />
                         <path d="M60 48 C60 30 75 35 68 25 C58 35 52 42 60 48 Z" fill="#FFFFFF" />
@@ -404,7 +398,7 @@ export default function HomePage() {
                       <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                         Agricultural Burn
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: '#2ECC71', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#8A6D0B', fontWeight: 700 }}>
                         Stubble Fires
                       </span>
                     </Link>
@@ -442,7 +436,7 @@ export default function HomePage() {
                       <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                         Wildfire
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: '#E74C3C', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#C0392B', fontWeight: 700 }}>
                         Canopy Burns
                       </span>
                     </Link>
@@ -454,7 +448,7 @@ export default function HomePage() {
                       style={{
                         textDecoration: 'none',
                         backgroundColor: 'var(--panel-surface, #12181F)',
-                        border: '1px solid rgba(155, 89, 182, 0.35)',
+                        border: '1px solid rgba(120, 120, 120, 0.45)',
                         borderRadius: '14px',
                         padding: '1.75rem 1rem',
                         display: 'flex',
@@ -462,14 +456,14 @@ export default function HomePage() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         textAlign: 'center',
-                        boxShadow: '0 6px 20px rgba(155, 89, 182, 0.15)',
+                        boxShadow: '0 6px 20px rgba(120, 120, 120, 0.18)',
                         transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                         cursor: 'pointer'
                       }}
                     >
                       {/* Unclassified Hexagon Badge */}
                       <svg width="72" height="72" viewBox="0 0 100 100" fill="none" style={{ marginBottom: '0.85rem' }}>
-                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#8E44AD" />
+                        <polygon points="50 5, 90 27.5, 90 72.5, 50 95, 10 72.5, 10 27.5" fill="#787878" />
                         {/* Target Reticle + Question Mark */}
                         <circle cx="50" cy="48" r="20" stroke="#FFFFFF" strokeWidth="4" fill="none" />
                         <line x1="50" y1="22" x2="50" y2="28" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
@@ -481,7 +475,7 @@ export default function HomePage() {
                       <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
                         Unclassified
                       </span>
-                      <span style={{ fontSize: '0.8rem', color: '#9B59B6', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.8rem', color: '#6E6E6E', fontWeight: 700 }}>
                         Analyst Review
                       </span>
                     </Link>
@@ -500,6 +494,11 @@ export default function HomePage() {
         <div>
           <span className="landing-status-label">Data status</span>
           <strong>{landingStatus?.label || 'Checking data availability'}</strong>
+          {landingStatus?.tone === 'live' && (
+            <span style={{ marginLeft: '8px', color: '#2ECC71', fontWeight: 600, fontSize: '0.85rem' }}>
+              · Ingestion is up to date
+            </span>
+          )}
           {landingStatus?.detail && <span className="landing-status-detail">{landingStatus.detail}</span>}
         </div>
       </section>
@@ -611,10 +610,7 @@ export default function HomePage() {
 
       <section style={{ borderBottom: '1px solid var(--hairline-border)', backgroundColor: 'var(--panel-surface)', padding: '4.5rem 2.5rem' }}>
         <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
-          <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent-blue)' }}>
-            Assessment workflow
-          </span>
-          <h2 style={{ marginTop: '0.6rem', marginBottom: '2rem', fontSize: '2rem' }}>How TRINETRA supports assessment</h2>
+          <h2 style={{ marginBottom: '2rem', fontSize: '2rem' }}>How TRINETRA supports assessment</h2>
           <div className="landing-process-grid">
             <article>
               <span>01</span>
@@ -649,19 +645,6 @@ export default function HomePage() {
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '3rem', alignItems: 'start' }} className="landing-classification-list">
           <div style={{ maxWidth: '620px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span 
-            style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.12em',
-              color: 'var(--text-muted)',
-              marginBottom: '1.25rem'
-            }}
-          >
-            Assessment context
-          </span>
           <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Classification context for analysts</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.98rem', lineHeight: 1.65, marginBottom: '1.25rem' }}>
             A thermal detection is not, by itself, an incident classification. TRINETRA combines the signal with spatial context so analysts can distinguish routine industrial heat from sources that warrant further attention.
@@ -686,79 +669,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* Moving Anomaly Ticker at the bottom of the landing page */}
-      <div 
-        className="bottom-anomaly-ticker-ribbon"
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          width: '100%',
-          backgroundColor: 'var(--panel-surface, #0F141C)',
-          borderTop: '2px solid var(--accent-ember, #FF6B35)',
-          boxShadow: '0 -4px 25px rgba(0, 0, 0, 0.7)',
-          zIndex: 900,
-          padding: '0.65rem 1.25rem',
-          display: 'flex',
-          alignItems: 'center',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          userSelect: 'none'
-        }}
-      >
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-            backgroundColor: '#FF6B35',
-            color: '#0A0E12',
-            padding: '4px 10px',
-            borderRadius: '4px',
-            fontFamily: 'var(--font-heading)',
-            fontWeight: 900,
-            fontSize: '0.78rem',
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            flexShrink: 0,
-            marginRight: '1.25rem',
-            boxShadow: '0 0 10px rgba(255, 107, 53, 0.4)'
-          }}
-        >
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0A0E12', display: 'inline-block' }} />
-          LIVE ANOMALIES
-        </div>
-
-        <div className="marquee-track" style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {[0, 1, 2].map((copyIdx) => (
-            <React.Fragment key={copyIdx}>
-              {tickerItems.map((item, i) => (
-                <Link
-                  key={`bottom-${copyIdx}-${i}`}
-                  to={`/fire-alerts${item.cls ? `?class=${item.cls}` : ''}`}
-                  style={{
-                    color: item.cls === 'industrial' ? '#E67E22' : item.cls === 'mining' ? '#BDC3C7' : item.cls === 'agricultural_burn' ? '#F1C40F' : '#E74C3C',
-                    textDecoration: 'none',
-                    marginRight: '3.5rem',
-                    fontFamily: 'var(--font-heading)',
-                    fontSize: '0.88rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>●</span>
-                  {item.text}
-                </Link>
-              ))}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

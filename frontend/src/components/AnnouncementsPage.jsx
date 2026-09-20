@@ -329,9 +329,6 @@ export default function AnnouncementsPage() {
       {/* Page header */}
       <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '2.5rem 2rem 1.75rem', background: 'linear-gradient(180deg, rgba(30,40,55,0.5) 0%, transparent 100%)' }}>
         <div style={{ maxWidth: 860, margin: '0 auto' }}>
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', color: '#FF6B35', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-            Trinetra Intelligence Feed
-          </div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary, #eceff4)', margin: '0 0 0.5rem', letterSpacing: '-0.01em' }}>
             Announcements
           </h1>

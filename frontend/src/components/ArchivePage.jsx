@@ -334,9 +334,6 @@ export default function ArchivePage() {
         <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--font-heading)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent-blue, #3d9de8)' }}>
-                Historical Record
-              </span>
               <StatusBadge status={statusLabel} labelPrefix="Archive status" />
               <span aria-live="polite" style={{ fontSize: '0.75rem', color: 'var(--text-muted, #55595E)', fontFamily: 'monospace' }}>
                 {acqDate ? `Viewing ${acqDate}` : 'No date selected'}

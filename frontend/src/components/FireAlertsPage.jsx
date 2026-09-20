@@ -160,7 +160,7 @@ function RawEvidencePanel({ acqDate, runId }) {
   if (state === 'notCaptured') {
     return (
       <div style={{ fontSize: '0.8rem', color: '#7a5c00' }}>
-        ℹ️ Raw evidence not captured for this date — it predates the immutable raw archive. {message}
+        Raw evidence not captured for this date — it predates the immutable raw archive. {message}
       </div>
     );
   }
@@ -310,11 +310,13 @@ function MetricBar({ label, value, unit = '', max, color = '#3d9de8', note = nul
       <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
         <div
           style={{
-            width: `${pct}%`,
+            width: '100%',
             height: '100%',
             borderRadius: '3px',
             background: color,
-            transition: 'width 0.5s ease'
+            transformOrigin: 'left center',
+            transform: `scaleX(${pct / 100})`,
+            transition: 'transform 0.5s ease'
           }}
         />
       </div>
@@ -477,10 +479,6 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
                     {confPct}%
                   </span>
                   <span style={{ fontSize: '0.62rem', color: 'var(--text-muted, #8b949e)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Confidence</span>
-                  {/* Mini confidence bar */}
-                  <div style={{ width: '52px', height: '4px', borderRadius: '2px', backgroundColor: 'rgba(255,255,255,0.07)' }}>
-                    <div style={{ width: `${confPct}%`, height: '100%', borderRadius: '2px', backgroundColor: confColor, transition: 'width 0.5s ease' }} />
-                  </div>
                 </div>
               )}
               {alert.latitude != null && alert.longitude != null && (
@@ -506,54 +504,15 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
             </div>
           </div>
 
-          {/* Row 2: Metadata grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: '8px 20px',
-              padding: '10px 12px',
-              backgroundColor: 'var(--control-subtle, rgba(0,0,0,0.04))',
-              border: '1px solid var(--hairline-border, rgba(0,0,0,0.06))',
-              borderRadius: '6px',
-              fontSize: '0.78rem'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Latitude</span>
-              <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>
-                {alert.latitude != null ? `${alert.latitude.toFixed(4)}°` : '—'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Longitude</span>
-              <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>
-                {alert.longitude != null ? `${alert.longitude.toFixed(4)}°` : '—'}
-              </span>
-            </div>
+          {/* Row 2: Location line — model fields (H3, calibration, latency) live in the Model Details expander */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 14px', fontSize: '0.78rem' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary, #eceff4)' }}>
+              {alert.latitude != null ? `${alert.latitude.toFixed(4)}°` : '—'}
+              {alert.latitude != null && alert.longitude != null ? ', ' : ''}
+              {alert.longitude != null ? `${alert.longitude.toFixed(4)}°` : ''}
+            </span>
             {mapDate && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Acquired</span>
-                <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>{mapDate}</span>
-              </div>
-            )}
-            {alert.calibrated !== undefined && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Calibrated</span>
-                <span style={{ color: alert.calibrated ? '#2ecc71' : 'var(--text-muted, #8b949e)', fontWeight: 700 }}>
-                  {alert.calibrated ? 'Yes' : 'No'}
-                </span>
-              </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>H3 Cell</span>
-              <span style={{ color: 'var(--text-muted, #8b949e)', fontFamily: 'monospace', fontSize: '0.7rem', wordBreak: 'break-all' }}>{cellKey}</span>
-            </div>
-            {latencyMs != null && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ color: 'var(--text-muted, #55595E)', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>Inference</span>
-                <span style={{ color: 'var(--text-primary, #eceff4)', fontFamily: 'monospace', fontWeight: 600 }}>{latencyMs.toFixed(1)} ms</span>
-              </div>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-muted, #55595E)' }}>{mapDate}</span>
             )}
           </div>
 
@@ -583,7 +542,7 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
             </div>
           )}
 
-          {/* Row 4: Feature Analysis — class probabilities + optional context metrics */}
+          {/* Row 4: Model Details expander — class probabilities + optional context metrics */}
           {probabilities.length > 0 && (
             <div style={{ borderTop: '1px solid var(--hairline-border, #2a303c)', paddingTop: '8px' }}>
               <button
@@ -603,11 +562,28 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
                     ? <><polyline points="18 15 12 9 6 15" /></>
                     : <><polyline points="6 9 12 15 18 9" /></>}
                 </svg>
-                {analysisExpanded ? 'Hide' : 'Show'} Feature Analysis ({probabilities.length} classes{hasContextData ? ' · sensor metrics' : ''})
+                {analysisExpanded ? 'Hide' : 'Show'} Model Details ({probabilities.length} classes{hasContextData ? ' · sensor metrics' : ''})
               </button>
 
               {analysisExpanded && (
                 <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+                  {/* Model metadata — H3 cell, calibration, inference latency */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 16px', fontSize: '0.72rem', color: 'var(--text-muted, #55595E)' }}>
+                    <span>
+                      H3 cell <span style={{ fontFamily: 'monospace', color: 'var(--text-muted, #8b949e)', wordBreak: 'break-all' }}>{cellKey}</span>
+                    </span>
+                    {alert.calibrated !== undefined && (
+                      <span>
+                        Calibrated: <span style={{ fontWeight: 700, color: alert.calibrated ? '#1e9e5a' : 'var(--text-muted, #8b949e)' }}>{alert.calibrated ? 'Yes' : 'No'}</span>
+                      </span>
+                    )}
+                    {latencyMs != null && (
+                      <span>
+                        Inference <span style={{ fontFamily: 'monospace' }}>{latencyMs.toFixed(1)} ms</span>
+                      </span>
+                    )}
+                  </div>
 
                   {/* Class Probability Distribution */}
                   <div>
@@ -636,13 +612,15 @@ export function AlertCard({ alert, index, mapDate = null, alertState = null, onA
                               <div style={{ height: '7px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
                                 <div
                                   style={{
-                                    width: `${pPct}%`,
+                                    width: '100%',
                                     height: '100%',
                                     borderRadius: '4px',
                                     background: isTop
                                       ? `linear-gradient(90deg, ${pColor}cc, ${pColor})`
                                       : `${pColor}66`,
-                                    transition: 'width 0.6s ease'
+                                    transformOrigin: 'left center',
+                                    transform: `scaleX(${pPct / 100})`,
+                                    transition: 'transform 0.6s ease'
                                   }}
                                 />
                               </div>
@@ -1157,20 +1135,6 @@ export default function FireAlertsPage() {
           {/* Top Bar: Eyebrow + Status + Ingestion metadata pill + Actions */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                textTransform: 'uppercase',
-                letterSpacing: '0.12em',
-                color: 'var(--accent-blue, #3d9de8)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', backgroundColor: '#3d9de8', boxShadow: '0 0 8px #3d9de8' }} />
-                Satellite Thermal Hotspot Feed
-              </span>
               <StatusBadge status={status} />
               {(sourceLabel || ingestionDetail) && (
                 <span
@@ -1274,8 +1238,7 @@ export default function FireAlertsPage() {
               marginBottom: '1rem',
               padding: '8px 14px',
               backgroundColor: 'rgba(241, 196, 15, 0.08)',
-              border: '1px solid rgba(241, 196, 15, 0.3)',
-              borderLeft: '4px solid #f1c40f',
+              border: '1px solid rgba(241, 196, 15, 0.45)',
               borderRadius: '6px',
               display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap'
             }}
@@ -1740,7 +1703,7 @@ export default function FireAlertsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {paginatedAlerts.map((alert, idx) => (
               <AlertCard
-                key={alert.cell_id || alert.h3_index || idx}
+                key={`${alert.cell_id || alert.h3_index || 'cell'}-${idx}`}
                 alert={alert}
                 index={idx}
                 mapDate={acqDate}

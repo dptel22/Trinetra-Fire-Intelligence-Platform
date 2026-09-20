@@ -752,11 +752,25 @@ a:focus,
   white-space: nowrap;
 }
 
-.landing-status-live { border-left: 3px solid #2ECC71; }
-.landing-status-caution { border-left: 3px solid var(--color-agri-burn); }
-.landing-status-demo { border-left: 3px solid var(--accent-blue); }
-.landing-status-offline { border-left: 3px solid var(--color-wildfire); }
-.landing-status-checking { border-left: 3px solid var(--hairline-border); }
+.landing-status-live strong::before,
+.landing-status-caution strong::before,
+.landing-status-demo strong::before,
+.landing-status-offline strong::before,
+.landing-status-checking strong::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: 1px;
+  background: var(--text-muted);
+}
+.landing-status-live strong::before { background: #2ECC71; }
+.landing-status-caution strong::before { background: var(--color-agri-burn); }
+.landing-status-demo strong::before { background: var(--accent-blue); }
+.landing-status-offline strong::before { background: var(--color-wildfire); }
+.landing-status-checking strong::before { background: var(--text-muted); }
 
 .landing-process-grid {
   display: grid;
@@ -852,7 +866,7 @@ a:focus,
   letter-spacing: 0.05em;
   cursor: pointer;
   background-color: var(--panel-surface);
-  transition: background-color 0.15s ease, padding-left 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
   user-select: none;
 }
 
@@ -862,7 +876,6 @@ a:focus,
 
 .drawer-item-row:hover {
   background-color: rgba(215, 78, 38, 0.08);
-  padding-left: 1.5rem;
   color: #D74E26;
 }
 
@@ -987,11 +1000,12 @@ a:focus,
   opacity: 0;
   overflow: hidden;
   white-space: nowrap;
-  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, margin 0.25s ease;
+  transition: opacity 0.25s ease;
   margin-left: 0;
 }
 
-.header-hover-reveal:hover .header-hover-text {
+.header-hover-reveal:hover .header-hover-text,
+.header-hover-reveal:focus-visible .header-hover-text {
   max-width: 180px;
   opacity: 1;
   margin-left: 0.55rem;

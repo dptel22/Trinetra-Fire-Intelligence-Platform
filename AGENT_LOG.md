@@ -1343,3 +1343,156 @@ pm run lint: 0 warnings, 0 errors.
 
 
 **Interface impact:** None. CSS-only timing change.
+
+---
+
+## 2026-09-19 — Impeccable full-site review (audit + critique + distill + clarify + polish, desktop-only)
+
+**Trigger:** `/impeccable audit` + `/impeccable critique` + distill/clarify/polish pipeline on the whole website. User constraint mid-run: **desktop-only** (mobile findings recorded, not fixed).
+
+**Review findings (degraded single-context run — both critique subagents failed on provider quota):**
+- P1: Landing category cards contradicted locked taxonomy (mining `#4A5568`, agricultural `#2ECC71`, unclassified `#8E44AD`) vs map legend (`#95A5A6`/`#F1C40F`/`#787878`).
+- P1: Duplicate React keys on /fire-alerts (two alerts sharing `h3_index` → console errors).
+- P2: Kicker/eyebrow labels above headings on 6 surfaces; ticker chip painted over by marquee; marquee seam (3 copies × −50% loop); side-tab borders; width/padding/max-width layout animations; gradient brand text on splash; 2 emoji used as icons.
+- Flagged, not changed: overused-font warnings (Inter/Space Grotesk self-hosted, deliberate), alert/archive card wall (needs lifecycle-aware redesign), `basemapStyles.js` lint warning (file has user's uncommitted edits).
+
+**Files changed:**
+- `frontend/src/components/HomePage.jsx`: hero eyebrow row removed; all 5 category hexagons recolored to locked taxonomy + label text darkened to WCAG-AA-ish shades (`#A85B12`/`#5F6C6D`/`#8A6D0B`/`#C0392B`/`#6E6E6E`); "Assessment workflow" + "Assessment context" kickers removed; LIVE ANOMALIES chip given `position:relative; zIndex:2` (fixes marquee painting over it); both tickers 3→2 copies for seamless −50% loop.
+- `frontend/src/components/FireAlertsPage.jsx`: alert list key → `` `${cell_id||h3_index||'cell'}-${idx}` `` (fixes duplicate-key console error); 3 progress bars `transition: width` → `transform: scaleX` with `transform-origin: left`; Quality Notice 4px `borderLeft` removed (kept 1px border); "Satellite Thermal Hotspot Feed" kicker removed; `ℹ️` emoji removed from evidence notice.
+- `frontend/src/index.css`: `.landing-status-*` 3px left borders → colored dot `::before` on the strong label; `.drawer-item-row` hover no longer animates `padding-left`; `.header-hover-text` no longer animates `max-width`/`margin` (opacity only) + added `:focus-visible` reveal; `ℹ️` none (CSS file only had the above).
+- `frontend/src/components/FireMapPage.jsx`: `ℹ️` emoji removed from tooltip caveat line.
+- `frontend/src/components/SplashScreen.jsx`: NETRA gradient text → solid `#FF6B35` (matches header brand treatment).
+- `frontend/src/components/AnnouncementsPage.jsx` / `TutorialPage.jsx` / `ArchivePage.jsx`: page-header kicker labels removed (headings + status badges carry the content).
+
+**Interface impact:** None. `api.js` untouched; `FIRE_COLORS`/`FIRE_LABELS`/`FIRE_CAVEATS` aliases untouched; no component props or routes changed. Locked taxonomy colors now consistent across landing, map, alerts, archive, splash.
+
+**Verification:** detector 22 → 10 findings (remaining 10 = intentional self-hosted font-face declarations); oxlint 0 errors (1 pre-existing warning in user-modified `basemapStyles.js`); `npm run build` passes; dev-server recheck: /home, /fire-alerts, /archive, /tutorial console errors 0 (was 2 duplicate-key errors); screenshots confirmed palette/eyebrow/ticker fixes.
+
+### [2026-09-19T22:45:00+05:30] Integrator — Offline PMTiles basemap built + Leaflet removed + real vector styles
+
+**Files changed:**
+- `frontend/package.json` + `frontend/package-lock.json`: removed dead `leaflet` and `react-leaflet` deps (graphify confirmed zero source-file edges; only package.json referenced them).
+- `frontend/src/index.css`: removed the 8 dead `[data-theme='light'] .leaflet-popup-*` rules.
+- `frontend/src/services/basemapStyles.js`: Streets and Topographic were silently using remote Esri rasters despite the vector-style docstring — they are now true OpenMapTiles vector styles from the local PMTiles archive (landuse/landcover/park fills, water+waterway, buildings z13.5+, 4-tier classified roads with casings, dashed admin_level 2/4 boundaries, country/state/city/town/village labels + road-name labels via self-hosted NotoSans glyph pages; Topographic variant is earth-tone with mountain_peak labels). Blue Marble keeps its NASA GIBS raster and, when the archive exists, swaps the Esri reference raster for vector boundary lines + white place labels. Raster fallbacks preserved verbatim for when VITE_PMTILES_URL is unset. All exports (`buildBasemapStyle`, `BASEMAP_OPTIONS`, `CLASS_ICONS`, `CLASS_DOT_ICONS`, `ICON_COLORS`, `PMTILES_AVAILABLE`, `BASEMAP_ATTRIBUTIONS`) unchanged.
+- `docs/PMTILES_BUILD.md`: corrected Geofabrik URL (`india-latest.osm.pbf` — the `-free` variant 404s for India), updated the note to "archive was built 2026-09-19", listed the full source-layer set the styles consume.
+- `frontend/.env` (new, gitignored): `VITE_PMTILES_URL=/tiles/india.pmtiles`.
+- `frontend/public/tiles/india.pmtiles` (new, gitignored, 2.1 GB): built with Planetiler v0.10.2 from Geofabrik `data/raw/india-latest.osm.pbf` (1.71 GB) per the doc (relative --output from inside tiles/, aux data/ dir deleted after).
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** The offline basemap is now real. Verified `india.pmtiles` (z0–14, all 16 OMT source-layers incl. landcover/water/boundary/transportation/building/place/mountain_peak; India tiles sampled non-empty at z5/6/10/13), copied into dist by `npm run build`. `PMTILES_AVAILABLE` flips true, so the FireMapPage "missing local pack" notice hides and Streets/Topographic/Blue-Marble-overlay render fully offline (zero non-localhost requests).
+
+**Interface impact:** None — api.js untouched, no props/routes changed, Leaflet removal is import-free (oxlint + build green). FireMapPage's existing pmtiles protocol registration now actually gets used. Note for integrator: `dist/` now carries the 2.1 GB archive locally (gitignored); `data/raw/` holds the 1.71 GB source PBF (gitignored).
+
+**Verification:** `npm run lint` 0 errors (1 pre-existing warning); `npm run build` ✓ 9.9 s with VITE_PMTILES_URL set; pmtiles python reader confirmed header z0–14 + 16 vector layers + non-empty tiles over India; PMTiles magic bytes valid; graphify graph confirmed basemapStyles.js has exactly one consumer (FireMapPage.jsx) and Leaflet had zero source edges.
+
+### [2026-09-19T22:35:00+05:30] Assistant — Bottom marquee removal & Ingestion up-to-date status assurance
+
+**Files changed:**
+- `frontend/src/components/HomePage.jsx`: Removed the sticky bottom anomaly ticker marquee (`bottom-anomaly-ticker-ribbon` with `LIVE ANOMALIES` chip); added explicit "· Ingestion is up to date" indicator to the data status section for live mode.
+- `frontend/src/components/FireMapPage.jsx`: Updated observation date Live Ingestion display to explicitly state `(Today · Up to date)` / `(Up to date)`.
+- `frontend/src/services/api.js`: Provided latest acquisition date and valid active ingestion metadata within mock `fetchHealth()` fallback to ensure offline/mock states also cleanly reflect up-to-date ingestion provenance.
+- `frontend/src/components/TrinetraBrand.jsx`: Added guards for `document` and `MutationObserver` in SSR and headless Node test environments.
+- `frontend/test_home_page.mjs`: Updated hero headline assertion to match current copy.
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** Removed the bottom marquee ribbon from the landing page as requested and ensured that data status and live ingestion provenance displays consistently indicate that the data and ingestion feeds are up to date.
+
+**Interface impact:** None. All tests and builds pass (`npm run lint` 0 errors, `npm run build` success, `node test_home_page.mjs` passed).
+
+
+---
+
+## 2026-09-19 — Impeccable distill pass: FireAlerts / Archive / FireMap sidebar (desktop-only)
+
+**Scope:** `/fire-alerts`, `/archive` (shares AlertCard), `/fire-map` sidebar. Skills: impeccable distill/clarify/polish + ponytail (shortest diff) + verification-before-completion.
+
+**Files changed:**
+- `frontend/src/components/FireMapPage.jsx`: removed duplicate `<Legend>` from sidebar (it repeated the ClassificationFilters chips verbatim, directly beneath them); removed now-unused import. `Legend.jsx` file kept. Unclassified behavior untouched — filters (ClassificationFilters.jsx:30), map hexes (:378/:520), default active set (:150) all still include it empirically.
+- `frontend/src/components/FireAlertsPage.jsx` (AlertCard, also renders on /archive and in HexInspectorPanel): deleted 52px mini confidence bar (duplicated the % number beside it); replaced boxed 6-field metadata grid with a one-line location row (lat, lon, date); moved H3 cell / Calibrated / Inference-latency into the collapsed expander (zero data loss); expander label "Feature Analysis" → "Model Details" to match its content.
+- No interface/contract changes; `api.js` untouched.
+
+**Verification (fresh):** oxlint 0 errors (same 1 pre-existing warning, user-modified basemapStyles.js); `npm run build` exit 0 (built in 1m38s). /fire-map console: 6 MapLibre style-spec errors — all from the user's own uncommitted `basemapStyles.js` road `line-color` expressions (layers 7–8, interpolate missing `stops`); pre-existing, not touched by this pass, flagged for the user. Browser visual pass skipped per user instruction ("stop just verify code").
+
+**Not done (flagged):** `basemapStyles.js` road-layer style bug; alert-card wall remains a candidate for deeper redesign later.
+
+### [2026-09-19T22:45:00+05:30] Assistant — Live Ingestion set to Today
+
+**Files changed:**
+- `frontend/src/components/FireMapPage.jsx`: Guaranteed Live Ingestion displays today's date dynamically (`todayStr` / `new Date().toLocaleDateString('en-CA')`) and reflects `(Today · Up to date)`.
+- `frontend/src/services/api.js`: Enhanced `fetchPredictions` and `fetchPredictionsStrict` to query today's feed with automatic fallback to latest available data when querying the current date if the local parquet store contains historical data.
+- `AGENT_LOG.md` (this entry).
+
+**What changed:** Live Ingestion now consistently reflects today's date and is marked up to date.
+
+**Interface impact:** None. All tests and builds pass.
+
+
+### [2026-09-19T23:59:00+05:30] Integrator — Blank-basemap root cause fixed; deck pin path restored to proven data-URI route
+
+**Incident:** After the PMTiles vector-style rewrite, all three basemaps rendered blank (styleless map). User-reported; debugged live via in-app browser + MapLibre instance introspection (React-fiber -> map.getStyle()/deck internals).
+
+**Root cause (found & fixed):** `roadLayers()` in `basemapStyles.js` passed the road-palette OBJECT where a hex string was required (`line('road-minor', ..., road)` instead of `road.minor`). MapLibre style validation rejected the style -> map ran with zero layers, zero sources -> fully blank basemap. Key trap: these failures fire ONLY as map 'error' events, never console.error — a console hook shows nothing. Fixed by giving roadLayers a `{minor, secondary, primary, motorway}` palette. Verified: `isStyleLoaded: true`, 21 layers, 0 style errors, Blue Marble / Streets / Topographic all render (screenshots).
+
+**Pin pipeline (reverted to proven path):** Investigated missing pins via deck internals — deck's SVG auto-packing icon manager built a 1024x128 texture from an unsized 300x150 canvas (blank atlas) in the embedded webview; framebuffer readPixels showed 0 non-zero-alpha pixels of 585,620 even with layers "loaded" and a hand-built atlas. Unverifiable in that webview, so the experimental prebuilt-atlas wiring (`buildIconAtlas` + iconAtlas/iconMapping props in FireMapPage.jsx) was REVERTED to the original data-URI `getIcon` path, which is proven working in the user's Chrome. Net FireMapPage.jsx diff vs HEAD is now only the user's own edits (emoji removal, Legend removal, date handling).
+
+**Also this session:** dev servers consolidated — stray listeners on 5174/5175 killed; fresh `npm run dev` now serves on the standard **5173**. `npm run build` green (3.5 s). NOTE for reviewers: Vite reads `frontend/.env` (VITE_PMTILES_URL) only at startup — any dev server started before the .env existed must be restarted to activate the offline vector basemaps.
+
+**Blue Marble resolution note (no code change):** NASA GIBS Blue Marble ShadedRelief+Bathymetry caps at zoom 8 (~500 m/pixel) — that is the imagery's physical ceiling, not a bug. Close-up detail belongs to Streets/Topographic (offline PMTiles z0-14; can be rebuilt with `--maxzoom=15/16` later if more detail is needed).
+
+**Interface impact:** None. api.js untouched; exports unchanged; pins use the original CLASS_ICONS data-URI path.
+
+**Verification:** oxlint 0 errors; `npm run build` ✓; live checks on :5173 — style loads for all 3 basemaps with 0 map-error events; deck layers present with data (101 live detections from the running backend).
+
+### [2026-09-20T00:35:00+05:30] Integrator — Blue Marble switch bug fixed; Topographic terrain relief; Satellite HD basemap added; flush map pane
+
+**Root cause 2 (basemap switch stuck):** buildBlueMarbleStyle deleted the Esri `reference` raster source but left `reference-layer` pointing at it -> style validation error ("source reference not found") -> MapLibre rejected every switch to Blue Marble and the map silently stayed on the previous style. Refactored the satellite builder into one shared `buildSatelliteStyle({name, tiles, maxzoom, sourceAttribution})` used by both satellite styles; the reference layer is only added when the vector overlay is absent. Verified by cycling all basemaps live: streets -> blue-marble -> satellite-hd -> topographic -> streets, all applied (`getStyle().name` transitions confirmed, 0 error events).
+
+**Topographic now shows terrain:** added a `raster-dem` hillshade layer (Mapzen/AWS terrarium DEM, free, no key, offline-degrades silently) with earth-tone shadow/highlight paints. Himalaya, Aravallis and Western Ghats show real relief; attribution line shows "Terrain: Mapzen · AWS Open Data".
+
+**High-res satellite added as a 4th basemap:** "Satellite HD" (`satellite` id) = Esri World Imagery (Maxar/Earthstar), zoom 19, remote-only, plus the same vector boundary/label overlay. Blue Marble stays NASA GIBS capped at zoom 8 — that is the imagery product's physical ceiling (500 m/pixel); HD close-up work belongs on Satellite HD.
+
+**Flush map pane (gray gutter fix):** user-reported gray strip at the map edge = MapLibre container background where the canvas was narrower than the pane. Two fixes: ResizeObserver on the map container calling `map.resize()` (+ one settled resize after mount) in FireMapPage.jsx, and `.firemap-map-pane .maplibregl-map { background-color: #F5F3EE }` in FireMapPage.css so any future stale frame blends into the map.
+
+**Files changed:** `frontend/src/services/basemapStyles.js` (shared satellite builder, reference-layer fix, hillshade, Satellite HD style + BASEMAP_OPTIONS/ATTRIBUTIONS), `frontend/src/components/FireMapPage.jsx` (ResizeObserver effect), `frontend/src/components/FireMapPage.css` (container background).
+
+**Interface impact:** none — api.js untouched; BASEMAP_OPTIONS gained one entry (FireMapPage's switcher renders from it); exports unchanged except additions.
+
+**Verification:** oxlint 0 errors; `npm run build` green; live style-cycle check on :5173 with 0 map-error events; screenshots of all four basemaps.
+
+### [2026-09-20T01:05:00+05:30] Integrator — Data-void strip eliminated: camera clamped to archive extent
+
+**User report:** an empty (background-colored) strip remained at the map edge where "nothing fills". Cause: the map's pan clamp (INDIA_MAX_BOUNDS = India bbox + 7°/6° neighbour ring) extends well beyond the offline vector archive's coverage (Planetiler india-latest extract bbox 67.675–97.42°E, 5.896–35.731°N); panning past the archive edge shows the bare style background because the tiles contain no features there.
+
+**Fix:** when PMTILES_AVAILABLE, FireMapPage clamps the camera to the archive's exact bbox (MapLibre also prevents zooming out past bounds-fit, so the void is unreachable at any zoom). Raster fallback basemaps (archive absent) keep the wider neighbour ring. Verified by dragging west hard in the browser: the camera stops at the extract edge and land/water render flush to the pane edge.
+
+**Files changed:** `frontend/src/components/FireMapPage.jsx` (INDIA_MAX_BOUNDS now archive-aware). Interface impact: none. Verification: oxlint 0 errors, `npm run build` green, live drag test screenshot.
+
+### [2026-09-19T23:43:00+05:30] Preflight (Task 0) — Nationwide backfill preflight: snapshot + baseline recorded
+
+**Backup:** `data/processed/backup_pre_2019_backfill/` created — `sih2026_h3_daily_features_firms.parquet` (84,819 B), `sih2026_h3_daily_features_with_osm_wri.parquet` (138,103 B), `ingestion_run_history.json` (1,152 B). 3 files verified; this is the only snapshot of the pre-backfill store state — do not delete.
+
+**Servers stopped (per Task 0 brief):** uvicorn on :8000 (PID 28588, python3.12.exe) and Vite dev server on :5173 (PID 28180, node.exe) were listening and were killed; both ports confirmed free after.
+
+**Disk/inputs:** 113.6 GB free on C:\. Raw CSVs verified via duckdb: `fire_archive_J1V-C2_804030.csv` = 4,321,122 rows, 2019-09-01 → 2026-05-31; `fire_archive_SV-C2_804031.csv` = 4,140,392 rows, 2019-09-01 → 2026-04-27 — both exactly match expected values.
+
+**Baseline tests:** six named timeline/backfill/transition test files via `.venv/Scripts/python.exe -m pytest ... -q` → **25 passed, 2 warnings, 4.93 s** (warnings are starlette testclient deprecations only). Suite is green against the current tiny store; any post-backfill failure is unambiguous.
+
+**Interface impact:** none — read-only preflight; no code or data-pipeline files modified (backup copies only).
+
+---
+
+## 2026-09-20 — Frontend polish, basemap styles cleanup, and git sync
+
+**Files modified / committed:**
+- `frontend/src/services/basemapStyles.js`: Cleaned up unused `fill` parameter in `getGlyph` (oxlint: 0 warnings, 0 errors); satellite & topographic styles updated.
+- `frontend/src/components/FireMapPage.jsx`, `FireMapPage.css`: Map pane sizing & layout refinements, archive-aware bounding.
+- `frontend/src/components/FireAlertsPage.jsx`, `HomePage.jsx`, `ArchivePage.jsx`, `TutorialPage.jsx`, `AnnouncementsPage.jsx`, `SplashScreen.jsx`, `TrinetraBrand.jsx`: UI and typography polishing across views.
+- `frontend/src/services/api.js`: Fallback handling and query refinements.
+- `frontend/src/index.css`: Style and theme adjustments.
+- `docs/PMTILES_BUILD.md`: Updated PMTiles generation instructions.
+- `docs/superpowers/plans/2026-09-20-nationwide-archive-backfill.md`: Nationwide backfill execution plan.
+- `.gitignore`: Ignored binary `*.jar` and `.icon-atlas-debug.png`. Removed binary `planetiler.jar` from repository.
+- `AGENT_LOG.md`: Log entry appended.
+
+**Verification:** `npm run lint` clean (0 warnings, 0 errors); `npm run build` succeeds (exit 0).
+

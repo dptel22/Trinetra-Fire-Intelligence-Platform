@@ -115,6 +115,8 @@ coverage/
 *.tmp
 *.temp
 .cache/
+*.jar
+.icon-atlas-debug.png
 # PMTiles basemap build artifact (regenerate per docs/PMTILES_BUILD.md)
 frontend/public/tiles/*.pmtiles
 frontend/public/tiles/data/
@@ -122,3 +124,4 @@ frontend/public/tiles/data/
 # Playwright MCP page dumps
 .playwright-mcp/
 .audit_pytest_tmp/
+

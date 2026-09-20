@@ -61,7 +61,7 @@ try {
     React.createElement(MemoryRouter, { initialEntries: ['/home'] }, React.createElement(home.default))
   );
   for (const text of [
-    'See which fires are industrial before they&#x27;re declared.',
+    'Not all hotspots are the same. We tell you which kind you&#x27;re looking at.',
     'Data status',
     'How TRINETRA supports assessment',
     'Detect',

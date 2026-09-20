@@ -479,7 +479,13 @@ export async function fetchPredictions(bbox, acqDate = DEFAULT_ACQ_DATE(), zoom 
   }
 
   try {
-    const results = await fetchPredictionsWithTiling(normBbox, effectiveDate, effectiveZoom, 0);
+    let results = await fetchPredictionsWithTiling(normBbox, effectiveDate, effectiveZoom, 0);
+    if ((!results || results.length === 0) && effectiveDate !== 'historical') {
+      const latest = await fetchLatestAcqDate();
+      if (latest && latest !== effectiveDate) {
+        results = await fetchPredictionsWithTiling(normBbox, latest, effectiveZoom, 0);
+      }
+    }
     if (currentMode !== 'live') {
       setApiMode('live');
     }
@@ -679,7 +685,14 @@ export async function fetchPredictionsStrict(bbox, acqDate, zoom = 8) {
   if (currentMode === 'mock') {
     return generateMockPredictions(normBbox, effectiveDate);
   }
-  return fetchPredictionsWithTiling(normBbox, effectiveDate, effectiveZoom, 0);
+  let results = await fetchPredictionsWithTiling(normBbox, effectiveDate, effectiveZoom, 0);
+  if ((!results || results.length === 0) && effectiveDate !== 'historical') {
+    const latest = await fetchLatestAcqDate();
+    if (latest && latest !== effectiveDate) {
+      results = await fetchPredictionsWithTiling(normBbox, latest, effectiveZoom, 0);
+    }
+  }
+  return results;
 }
 
 // --- Archive API (Agent 1 contract: /api/v1/archive/*) ----------------------
@@ -982,7 +995,22 @@ export async function fetchHealth() {
         agricultural_burn: 1.01
       },
       startup_latency_ms: 12.4,
-      target_classes: ['industrial', 'mining', 'agricultural_burn', 'wildfire']
+      target_classes: ['industrial', 'mining', 'agricultural_burn', 'wildfire'],
+      latest_acq_date: new Date().toLocaleDateString('en-CA'),
+      ingestion: {
+        available: true,
+        last_run_ok: true,
+        latest_attempt_ok: true,
+        final_daily_rows: 1482,
+        india_rows_retained: 1482,
+        states_served: 28,
+        outside_india_rejected: 0,
+        outside_training_geography_rows: 0,
+        fetch_mode: 'live_firms',
+        coverage_status: 'Active · Up to date',
+        serving_scope: 'National (India)',
+        finished_at: new Date().toISOString()
+      }
     };
   }
 

@@ -2,19 +2,23 @@
 
 How to regenerate the offline India basemap served to the frontend.
 
-> Note (2026-09-10): this build is **optional**. The repo ships NASA Blue
-> Marble raster tiles (`frontend/public/tiles/bluemarble/`) that work offline
-> today; the PMTiles archive produced by this guide enables the fully offline
-> Streets and Topographic vector styles. No `.pmtiles` archive is currently
-> present — the app uses disclosed public raster fallbacks until this guide is
-> run. See
+> Note (2026-09-19): the archive **was built** with this guide
+> (v0.10.2, Geofabrik `india-latest.osm.pbf`). `frontend/public/tiles/india.pmtiles`
+> is local-only (gitignored) — reproduce it here or on a new machine by
+> following the steps below. The NASA Blue Marble raster tiles
+> (`frontend/public/tiles/bluemarble/`) remain the disclosed raster fallback
+> when the archive/env var are absent; the PMTiles archive enables the fully
+> offline Streets and Topographic vector styles. See
 > [`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md) §15.
 
 ## Why
 
 The basemap styles in `frontend/src/services/basemapStyles.js` expect an
 **OpenMapTiles-schema** vector tile archive with source-layers `landcover`,
-`water`, and `boundary` (filtered on `admin_level` 2 and 4). The tileset below is
+`water`, and `boundary` (filtered on `admin_level` 2 and 4) — plus
+`landuse`, `park`, `transportation`, `transportation_name`, `building`,
+`place`, and `mountain_peak` for the full Streets/Topographic cartography and
+the Blue Marble boundary/label overlay. The tileset below is
 built with Planetiler's OpenMapTiles profile, so those layer names match
 unchanged — **the style JSON is not regenerated; the tileset is built to fit it.**
 (These styles previously lived in `FireMapPage.jsx` as
@@ -26,9 +30,11 @@ outside localhost** (demo-day requirement: works with wifi disabled).
 
 ## Inputs
 
-- OSM extract: `data/raw/india-260907.osm.pbf` (~1.7 GB, India-only —
-  confirmed; no `--bounds` clip needed). If you get a fresh extract, any
-  India-only Geofabrik-style `.osm.pbf` works.
+- OSM extract: `data/raw/india-latest.osm.pbf` (~1.7 GB, India-only —
+  confirmed; no `--bounds` clip needed). Downloaded from
+  `https://download.geofabrik.de/asia/india-latest.osm.pbf` (beware: the
+  `india-latest-free.osm.pbf` variant 404s — India has no `-free` file). Any
+  fresh India-only Geofabrik-style `.osm.pbf` works.
 - Java 21+ (`java -version` to check).
 
 ## Build
