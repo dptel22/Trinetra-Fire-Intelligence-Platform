@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="NTRO-Compliant NASA FIRMS Hotspot Classification and Defense-Grade Geospatial AI Platform.",
+    description="NASA FIRMS thermal hotspot classification and geospatial intelligence platform (SIH 2026, PS26162).",
     lifespan=lifespan
 )
 

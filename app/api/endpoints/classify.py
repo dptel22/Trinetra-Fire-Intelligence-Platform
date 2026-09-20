@@ -20,8 +20,8 @@ router = APIRouter()
 @router.post("/classify", response_model=PredictionResponse)
 def classify_hotspot(record: FIRMSRecord):
     """
-    Sub-50ms real-time classification of NASA FIRMS thermal anomaly
-    into the configured NTRO target classes using CatBoost + DuckDB H3 context.
+    Single-record classification of a NASA FIRMS thermal anomaly
+    into the configured target classes using CatBoost + DuckDB H3 context.
     """
     try:
         payload = record.model_dump()
@@ -62,7 +62,7 @@ def classify_batch(records: list[FIRMSRecord]):
 @router.post("/explain", response_model=ExplanationResponse)
 def explain_hotspot(record: FIRMSRecord):
     """
-    On-Demand Defense-Grade SHAP TreeExplainer Local Attribution.
+    On-demand SHAP TreeExplainer local attribution.
     Computes exact game-theoretic feature contributions for analyst auditing.
     """
     try:
