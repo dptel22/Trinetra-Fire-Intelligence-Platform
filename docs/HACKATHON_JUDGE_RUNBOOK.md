@@ -17,11 +17,13 @@ or the image.
 
 ## Truthfulness rules
 
-The refreshed serving snapshot covers 2024-08-01 through 2026-09-10. It uses
-the full India bounding box and currently contains detections in 20 states/UTs;
-states with no FIRMS detections on a date are not fabricated into the map; empty
-states/UTs remain empty rather than becoming synthetic alerts. The model marks
-44 rows outside its training geography for analyst review.
+The pinned release snapshot (`serving-data-2026-09-09`, what
+`scripts/fetch_serving_data.py` installs) covers 2024-08-01 through 2026-09-08 with
+detections in 10 states (measured 2026-09-20). A locally refreshed artifact may cover
+more; state coverage from the live `/health` and archive provenance, not from this
+file. States with no FIRMS detections on a date are not fabricated into the map;
+empty states/UTs remain empty rather than becoming synthetic alerts. Rows outside the
+model's training geography are marked for analyst review.
 
 - `LIVE`, `HISTORICAL`, `DEMO`, and `OFFLINE` are different states.
 - Mock rows are always visibly labeled.

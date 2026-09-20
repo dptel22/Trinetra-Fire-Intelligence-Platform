@@ -39,9 +39,9 @@ current serving snapshot.
   `DUCKDB_PATH` → `data/feature_store.duckdb`.
 - The DuckDB feature store is seeded from the processed parquets
   (`h3_daily` ← firms parquet, `osm_wri_static` ← osm_wri parquet).
-- VIIRS 7-day South Asia CSVs (`J1_VIIRS_C2_South_Asia_7d.csv`,
-  `SUOMI_VIIRS_C2_South_Asia_7d.csv`) are tracked in git as small pipeline inputs;
-  bulk FIRMS downloads belong in `data/raw/`.
+- Raw FIRMS downloads (including the 7-day South Asia CSVs
+  `J1_VIIRS_C2_South_Asia_7d.csv` / `SUOMI_VIIRS_C2_South_Asia_7d.csv`) belong in
+  `data/raw/` and are **not** tracked in git.
 
 ## Data sources
 

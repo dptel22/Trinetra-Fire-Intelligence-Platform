@@ -53,7 +53,7 @@ What the repository actually implements today (all verified — see
   archive with provenance labels [C-22, C-36].
 - React/MapLibre/deck.gl frontend with visible mock-mode honesty machinery
   [C-25–C-27].
-- Validation: 135 backend tests passing on the current checkout; parity,
+- Validation: 195 backend tests passing with the pinned serving data (2026-09-20); parity,
   provenance, and sanitization suites [C-23, C-35].
 
 ## 4. Gaps

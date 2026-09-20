@@ -7,8 +7,8 @@ in git: `catboost_hotspot_classifier.cbm`, `calibrators.joblib`,
 
 Training provenance: [`notebooks/training/sih-catboost-training.ipynb`](../notebooks/training/sih-catboost-training.ipynb).
 
-Model metadata (dataset SHA256, class support, validation splits) lives in the
-bundle's `model_metadata.json`. Validation metrics there are internal
+Model metadata (dataset SHA256, class support, validation splits) lives in
+`PS26162_catboost_final/model_metadata.json` (one level above the bundle). Validation metrics there are internal
 held-out/pseudo-label scores — they are **not** independent ground-truth
 accuracy measurements; see [`../docs/CLAIMS_AND_EVIDENCE.md`](../docs/CLAIMS_AND_EVIDENCE.md).
 

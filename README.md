@@ -64,6 +64,14 @@ throughout the docs and UI.
 
 Mock/demo data mode is always visibly flagged (OfflineBanner), never silent.
 
+| Fire map (desktop) | Analyst alert review (desktop) |
+|---|---|
+| ![Fire map](docs/ppt-screenshots/desktop-fire-map.png) | ![Fire alerts](docs/ppt-screenshots/desktop-fire-alerts.png) |
+
+<sub>Screenshots captured 2026-09-10 on a local build; mobile layouts:
+[`home`](docs/ppt-screenshots/mobile-home.png) ·
+[`alerts`](docs/ppt-screenshots/mobile-fire-alerts.png).</sub>
+
 ## 3. Repository layout
 
 ```text
@@ -121,6 +129,30 @@ NASA FIRMS (VIIRS) ──> ingestion/ ──> data/processed/*.parquet
 The backend fails loudly at startup if the configured `.cbm` does not match the
 55-feature / 4-class contract; it never invents fallback predictions.
 
+### Model performance & limits
+
+Read these numbers with the caveat below — they are **not** ground-truth accuracy.
+
+| Evaluation (macro-F1) | Score |
+|---|---|
+| Internal validation (H3-parent hash fold, zero H3 overlap) | 0.997 |
+| Blind Test A (Gujarat, Tamil Nadu) | 0.974 |
+| Blind Test B (Jharkhand, Rajasthan) | 0.994 |
+| Ablated model (12 features removed, incl. `frp_max` and 8 OSM/WRI distance features) — Test A / Test B | 0.819 / 0.822 |
+
+- **Labels are bootstrap/pseudo-labels** derived partly from the same FIRMS/OSM/WRI
+  feature family the model consumes, so the scores above estimate how well the
+  labeling scheme generalizes across states, not independent real-world accuracy.
+  Always quote the headline scores together with the ablated ones.
+- Test A/B states were consumed only after the final refit (no tuning, early
+  stopping, feature or threshold selection on them).
+- Thin classes: `mining` (4,886) and `agricultural_burn` (1,762) of 58,911
+  validation rows. `agricultural_burn` is always routed to analyst review.
+- Isotonic calibration saturates confidences (most cells land at 0 or 1), so
+  confidence is not a fine-grained uncertainty signal.
+- Source of truth and evidence per claim: `models/PS26162_catboost_final/model_metadata.json`
+  and [`docs/CLAIMS_AND_EVIDENCE.md`](docs/CLAIMS_AND_EVIDENCE.md) (C-10 – C-13).
+
 ## 5. Supported environments
 
 | Path | Status |
@@ -168,7 +200,9 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# 1) Contract + data-plane tests (avoids hitting the live FIRMS API)
+# 1) Contract + data-plane tests (avoids hitting the live FIRMS API).
+#    Green on a fresh clone (data-backed tests skip with a reason); run
+#    scripts/fetch_serving_data.py first to execute them too.
 python -m pytest -m "not live"
 
 # 2) Live-ingestion smoke tests (burns FIRMS transactions — opt-in)
@@ -194,9 +228,17 @@ On a fresh clone, fetch the pinned release snapshot (SHA256-verified):
 python scripts/fetch_serving_data.py
 ```
 
-or produce them with `ingestion/` from a FIRMS pull. Without them the backend starts
-fail-closed (`/health` reports the missing store) and the frontend runs in mock/demo
-mode — visibly flagged (OfflineBanner), never silent.
+or produce them with `ingestion/` from a FIRMS pull. Without them the backend boots
+**degraded and fail-closed**: `/health` returns HTTP 200 with `status: "degraded"`,
+`database: "unavailable"` and the reason in `database_detail`; prediction, archive and
+alert routes answer **503** (never invented data) and recover as soon as the parquets
+appear. The frontend then runs in mock/demo mode — visibly flagged (OfflineBanner),
+never silent.
+
+Pinned snapshot `serving-data-2026-09-09` (measured 2026-09-20): 813,789 cell-days over
+463,127 H3-8 cells, acquisition dates 2024-08-01 → 2026-09-08, detections in 10 states
+(the 6 training + 4 blind-test states). The nationwide refresh is pending — see
+[`docs/RELEASES.md`](docs/RELEASES.md).
 
 ## 8. Frontend — run it
 
@@ -232,8 +274,8 @@ docker build -t sih2026-backend .
 ```
 
 - The build is **self-contained from a fresh clone**: without the serving
-  parquets it produces a degraded-mode image (API boots, `/health` reports the
-  missing store) — run `python scripts/fetch_serving_data.py` first to bake in
+  parquets it produces a degraded-mode image (API boots, `/health` reports
+  `status: "degraded"` / `database: "unavailable"`, data routes return 503) — run `python scripts/fetch_serving_data.py` first to bake in
   real data.
 - The image bakes in `models/PS26162_catboost_final/inference_bundle/` and, when
   present, the processed parquets, and on first boot seeds a writable volume. A

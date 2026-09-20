@@ -16,7 +16,7 @@ trust, trust the highest level.
 | `app/`, `ingestion/`, `pipeline/` code | Actual system behavior |
 | `models/PS26162_catboost_final/inference_bundle/` (git-tracked) | Served model contract (55 features, thresholds, calibrators) |
 | `app/core/config.py`, schemas | API/data contracts |
-| `tests/` (135 passing, 2026-09-10) | Verified behavior |
+| `tests/` (195 passed / 7 skipped with pinned data, 2026-09-20; see C-23) | Verified behavior |
 | **[`docs/CURRENT_PROJECT_TRUTH.md`](CURRENT_PROJECT_TRUTH.md)** | Canonical narrative of all of the above |
 | **[`docs/CLAIMS_AND_EVIDENCE.md`](CLAIMS_AND_EVIDENCE.md)** | Claim → evidence registry; gates every factual statement |
 
